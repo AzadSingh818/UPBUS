@@ -1,0 +1,563 @@
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = __importDefault(require("express"));
+const cors_1 = __importDefault(require("cors"));
+const http_1 = __importDefault(require("http"));
+const ws_1 = require("ws");
+const dotenv_1 = __importDefault(require("dotenv"));
+const db_1 = require("./db");
+const adapter_1 = require("./ingestion/adapter");
+const eta_1 = require("./engine/eta");
+function doesBusRouteMatch(busRouteStr, legRouteName, routeSource, routeDest) {
+    const busStr = busRouteStr.toUpperCase();
+    const rName = legRouteName.toUpperCase();
+    const matchesEndpoints = busStr.includes(routeSource.toUpperCase()) && busStr.includes(routeDest.toUpperCase());
+    if (!matchesEndpoints)
+        return false;
+    const legKeywords = rName.replace(/[^A-Z0-9\s]/g, ' ').split(/\s+/).filter(w => w.length > 3 && w !== 'DEPOT' && w !== 'BUS' && w !== 'STAND' && w !== 'EXPRESS' && w !== 'RETURN');
+    const hasRouteQualifiers = legKeywords.some(kw => kw === 'NAKUR' || kw === 'AMBEHTA' || kw === 'BIJNOR' || kw === 'MUZAFFARNAGAR' || kw === 'RAMPUR' || kw === 'GHAZIABAD' || kw === 'HARIDWAR');
+    if (hasRouteQualifiers) {
+        return legKeywords.some(kw => busStr.includes(kw));
+    }
+    return true;
+}
+dotenv_1.default.config();
+const app = (0, express_1.default)();
+const port = process.env.PORT || 5000;
+app.use((0, cors_1.default)());
+app.use(express_1.default.json());
+// ----------------------------------------------------
+// REST ENDPOINTS
+// ----------------------------------------------------
+// 1. Health check
+app.get('/api/health', (req, res) => {
+    res.json({ status: 'ok', service: 'upbus-backend' });
+});
+// 2. Search routes (Fuzzy route search by From -> To)
+app.get('/api/v1/search/routes', async (req, res) => {
+    const { from, to } = req.query;
+    if (!from || !to) {
+        return res.status(400).json({ error: 'Parameters "from" and "to" are required.' });
+    }
+    try {
+        const { findPathsDFS } = await Promise.resolve().then(() => __importStar(require('./engine/graph')));
+        // Fetch all paths with 0 transfers (direct routes)
+        const directPaths = findPathsDFS(from, to, 0);
+        const result = [];
+        const fetch = (await Promise.resolve().then(() => __importStar(require('node-fetch')))).default;
+        let liveData = [];
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 2000);
+            const response = await fetch('http://117.218.157.195/margdarshi/api/busdata?routeId=ALL', { signal: controller.signal });
+            clearTimeout(timeoutId);
+            if (response.ok) {
+                liveData = await response.json();
+            }
+        }
+        catch (e) {
+            console.warn('⚠️ [Warning] Margdarshi live API is currently unreachable. Returning static routes.');
+        }
+        for (const path of directPaths) {
+            const leg = path.legs[0]; // 0 transfers means exactly 1 leg
+            const missedTrips = [];
+            const nextTrips = [];
+            let routeSource = '';
+            let routeDest = '';
+            try {
+                const routeRes = await (0, db_1.query)(`SELECT source, destination FROM routes WHERE route_code = $1 LIMIT 1`, [leg.routeCode]);
+                if (routeRes.rowCount && routeRes.rowCount > 0) {
+                    routeSource = routeRes.rows[0].source;
+                    routeDest = routeRes.rows[0].destination;
+                }
+            }
+            catch (dbErr) {
+                console.error('Error fetching route details for search matching:', dbErr);
+            }
+            if (Array.isArray(liveData)) {
+                // Filter buses for this specific route or the long route containing this leg
+                const matchedBuses = liveData.filter(b => {
+                    const routeStr = (b.route_description || b.routename || '').toUpperCase();
+                    const fromStr = from.toUpperCase();
+                    const toStr = to.toUpperCase();
+                    const directMatch = routeStr.includes(fromStr) && routeStr.includes(toStr);
+                    if (directMatch)
+                        return true;
+                    if (leg.allRoutes && leg.allRoutes.length > 0) {
+                        return leg.allRoutes.some(r => {
+                            return doesBusRouteMatch(routeStr, r.routeName, r.source, r.destination);
+                        });
+                    }
+                    if (routeSource && routeDest) {
+                        return doesBusRouteMatch(routeStr, leg.routeName, routeSource, routeDest);
+                    }
+                    return false;
+                });
+                for (const bus of matchedBuses) {
+                    let etaMinutes = 0;
+                    if (bus.next_stop_eta) {
+                        etaMinutes = Math.max(0, Math.round((new Date(bus.next_stop_eta).getTime() - Date.now()) / 60000));
+                    }
+                    else if (bus.delay) {
+                        etaMinutes = Math.round(parseFloat(bus.delay));
+                    }
+                    if (isNaN(etaMinutes) || etaMinutes < 0)
+                        etaMinutes = 0;
+                    let actualRouteCode = leg.routeCode;
+                    let actualRouteName = leg.routeName;
+                    if (leg.allRoutes && leg.allRoutes.length > 0) {
+                        let bestScore = -1;
+                        let bestRoute = leg.allRoutes[0];
+                        const routeStr = (bus.route_description || bus.routename || '').toUpperCase();
+                        for (const r of leg.allRoutes) {
+                            let score = 0;
+                            if (routeStr.includes(r.source.toUpperCase()) && routeStr.includes(r.destination.toUpperCase())) {
+                                score += 5;
+                            }
+                            const keywords = r.routeName.toUpperCase().replace(/[^A-Z0-9\s]/g, ' ').split(/\s+/).filter((w) => w.length > 3 && w !== 'DEPOT' && w !== 'BUS' && w !== 'STAND' && w !== 'EXPRESS' && w !== 'RETURN');
+                            for (const word of keywords) {
+                                if (routeStr.includes(word)) {
+                                    score += 10;
+                                }
+                            }
+                            if (score > bestScore) {
+                                bestScore = score;
+                                bestRoute = r;
+                            }
+                        }
+                        actualRouteCode = bestRoute.routeCode;
+                        actualRouteName = bestRoute.routeName;
+                    }
+                    nextTrips.push({
+                        tripId: Math.floor(Math.random() * 100000), // Random Trip ID for tracking
+                        busRegNo: bus.RegNo,
+                        busType: 'UPSRTC',
+                        routeCode: actualRouteCode,
+                        routeName: bus.route_description || actualRouteName,
+                        busLatitude: parseFloat(bus.lat),
+                        busLongitude: parseFloat(bus.long),
+                        currentSpeedKmph: parseFloat(bus.speed) || 0,
+                        heading: parseFloat(bus.heading) || 0,
+                        lastSeen: bus.LogrecTime ? new Date(bus.LogrecTime).toISOString() : new Date().toISOString(),
+                        status: 'running',
+                        // Instead of hardcoding 2 stops, we provide the full sequence of stops from our Graph Path!
+                        stops: leg.stops.map(s => ({
+                            stopId: s.stopId,
+                            name: s.name,
+                            etaMinutes: etaMinutes, // Basic mock, ETA engine handles actual
+                            status: 'upcoming'
+                        })),
+                        etaToBoardingMinutes: etaMinutes
+                    });
+                }
+            }
+            result.push({
+                id: leg.routeId,
+                route_code: leg.routeCode,
+                route_name: leg.routeName,
+                source: leg.fromStopName,
+                destination: leg.toStopName,
+                distance_km: leg.distanceKm,
+                stops: leg.stops.map(s => ({
+                    stopId: s.stopId,
+                    name: s.name,
+                    sequenceNo: s.sequenceNo,
+                    latitude: s.latitude,
+                    longitude: s.longitude,
+                    status: 'upcoming'
+                })),
+                missedTrips: missedTrips.sort((a, b) => a.passedMinutesAgo - b.passedMinutesAgo),
+                nextTrips: nextTrips.sort((a, b) => a.etaToBoardingMinutes - b.etaToBoardingMinutes)
+            });
+        }
+        res.json({ routes: result });
+    }
+    catch (error) {
+        console.error('Error searching routes:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+// 3. Get all stops on a specific route
+app.get('/api/v1/routes/:routeId/stops', async (req, res) => {
+    const { routeId } = req.params;
+    try {
+        const stopsRes = await (0, db_1.query)(`SELECT rs.sequence_no, rs.distance_from_start_km,
+              s.id as stop_id, s.name, s.latitude, s.longitude
+       FROM route_stops rs
+       JOIN stops s ON rs.stop_id = s.id
+       WHERE rs.route_id = $1
+       ORDER BY rs.sequence_no ASC`, [routeId]);
+        res.json({ stops: stopsRes.rows });
+    }
+    catch (error) {
+        console.error('Error fetching route stops:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+// 4. Get live tracking details and ETA for a trip
+app.get('/api/v1/trips/:tripId/live', async (req, res) => {
+    const { tripId } = req.params;
+    const { regNo, routeCode } = req.query;
+    try {
+        const data = await (0, eta_1.getTripETAs)(parseInt(tripId, 10), regNo, routeCode);
+        if (!data) {
+            return res.status(404).json({ error: 'Trip not found or no live tracking available.' });
+        }
+        res.json(data);
+    }
+    catch (error) {
+        console.error('Error fetching live trip tracking:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+// 5. Multi-leg Journey Planner — DFS graph search across depot routes
+// Returns a list of legs: [{from, to, routeName, busType, registrationNo, stops, distanceKm, durationMins}]
+app.get('/api/v1/journey', async (req, res) => {
+    const { from, to } = req.query;
+    if (!from || !to)
+        return res.status(400).json({ error: 'from and to are required' });
+    try {
+        const { findPathsDFS } = await Promise.resolve().then(() => __importStar(require('./engine/graph')));
+        // Find all paths allowing up to 2 transfers
+        const paths = findPathsDFS(from, to, 2);
+        // If no paths found
+        if (!paths || paths.length === 0) {
+            return res.json({ legs: [], journeys: [], message: 'No route found. Try a different combination.' });
+        }
+        let liveData = [];
+        try {
+            const fetch = (await Promise.resolve().then(() => __importStar(require('node-fetch')))).default;
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 2000);
+            const liveRes = await fetch('http://117.218.157.195/margdarshi/api/busdata?routeId=ALL', { signal: controller.signal });
+            clearTimeout(timeoutId);
+            liveData = await liveRes.json();
+        }
+        catch (e) {
+            console.warn('⚠️ [Warning] Margdarshi live API is currently unreachable. Returning static schedules.');
+        }
+        // Map all paths to the journey format
+        const journeys = [];
+        for (const path of paths) {
+            const legs = [];
+            let cumulativeMinutes = 0;
+            for (const leg of path.legs) {
+                let routeSource = '';
+                let routeDest = '';
+                try {
+                    const routeRes = await (0, db_1.query)(`SELECT source, destination FROM routes WHERE route_code = $1 LIMIT 1`, [leg.routeCode]);
+                    if (routeRes.rowCount && routeRes.rowCount > 0) {
+                        routeSource = routeRes.rows[0].source;
+                        routeDest = routeRes.rows[0].destination;
+                    }
+                }
+                catch (dbErr) {
+                    console.error('Error fetching route details for matching:', dbErr);
+                }
+                let busInfo = null;
+                let actualRouteCode = leg.routeCode;
+                let actualRouteName = leg.routeName;
+                if (Array.isArray(liveData)) {
+                    busInfo = liveData.find(b => {
+                        const routeStr = (b.route_description || b.routename || '').toUpperCase();
+                        const directMatch = routeStr.includes(leg.fromStopName.toUpperCase()) && routeStr.includes(leg.toStopName.toUpperCase());
+                        if (directMatch)
+                            return true;
+                        if (leg.allRoutes && leg.allRoutes.length > 0) {
+                            return leg.allRoutes.some(r => {
+                                return doesBusRouteMatch(routeStr, r.routeName, r.source, r.destination);
+                            });
+                        }
+                        if (routeSource && routeDest) {
+                            return doesBusRouteMatch(routeStr, leg.routeName, routeSource, routeDest);
+                        }
+                        return false;
+                    });
+                    if (busInfo && leg.allRoutes && leg.allRoutes.length > 0) {
+                        let bestScore = -1;
+                        let bestRoute = leg.allRoutes[0];
+                        const routeStr = (busInfo.route_description || busInfo.routename || '').toUpperCase();
+                        for (const r of leg.allRoutes) {
+                            let score = 0;
+                            if (routeStr.includes(r.source.toUpperCase()) && routeStr.includes(r.destination.toUpperCase())) {
+                                score += 5;
+                            }
+                            const keywords = r.routeName.toUpperCase().replace(/[^A-Z0-9\s]/g, ' ').split(/\s+/).filter((w) => w.length > 3 && w !== 'DEPOT' && w !== 'BUS' && w !== 'STAND' && w !== 'EXPRESS' && w !== 'RETURN');
+                            for (const word of keywords) {
+                                if (routeStr.includes(word)) {
+                                    score += 10;
+                                }
+                            }
+                            if (score > bestScore) {
+                                bestScore = score;
+                                bestRoute = r;
+                            }
+                        }
+                        actualRouteCode = bestRoute.routeCode;
+                        actualRouteName = bestRoute.routeName;
+                    }
+                }
+                const durationMins = Math.round((leg.distanceKm / 40) * 60);
+                legs.push({
+                    from: leg.fromStopName,
+                    to: leg.toStopName,
+                    routeName: actualRouteName,
+                    routeCode: actualRouteCode,
+                    busType: 'UPSRTC',
+                    registrationNo: busInfo ? busInfo.RegNo : 'Scheduled',
+                    busInfo: {
+                        trip_id: Math.floor(Math.random() * 100000),
+                        registration_no: busInfo ? busInfo.RegNo : 'Scheduled',
+                        bus_type: 'UPSRTC',
+                        depot_name: 'Margdarshi Live'
+                    },
+                    stops: leg.stops.map(s => ({
+                        stopId: s.stopId,
+                        name: s.name,
+                        latitude: s.latitude,
+                        longitude: s.longitude,
+                        etaMinutes: cumulativeMinutes,
+                        status: 'upcoming'
+                    })),
+                    distanceKm: leg.distanceKm,
+                    durationMins: durationMins,
+                    departureOffsetMins: cumulativeMinutes,
+                    arrivalOffsetMins: cumulativeMinutes + durationMins
+                });
+                cumulativeMinutes += durationMins + 15; // 15 mins transfer buffer
+            }
+            journeys.push({
+                legs,
+                totalDistanceKm: path.totalDistanceKm,
+                totalDurationMins: cumulativeMinutes - 15, // subtract last transfer buffer
+                totalTransfers: path.totalTransfers
+            });
+        }
+        res.json({
+            legs: journeys[0].legs,
+            totalDistanceKm: journeys[0].totalDistanceKm,
+            totalDurationMins: journeys[0].totalDurationMins,
+            totalTransfers: journeys[0].totalTransfers,
+            journeys
+        });
+    }
+    catch (error) {
+        console.error('Error fetching journey:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+// GET real bus live data from Margdarshi API by Registration Number
+app.get('/api/v1/search/bus/:regNo', async (req, res) => {
+    try {
+        const regNo = req.params.regNo.toUpperCase().replace(/\s+/g, '');
+        const fetch = (await Promise.resolve().then(() => __importStar(require('node-fetch')))).default;
+        const response = await fetch('https://margdarshi.upsrtcvlt.com/php/getGpsLiveData.php', {
+            method: 'POST',
+            headers: { 'User-Agent': 'Mozilla/5.0' }
+        });
+        const rawText = await response.text();
+        const data = JSON.parse(rawText);
+        const bus = data.find((b) => {
+            const busReg = (b.RegNo || b.bus_id || b.regNum || '').toUpperCase().replace(/\s+/g, '');
+            return busReg === regNo;
+        });
+        if (!bus) {
+            return res.status(404).json({ message: 'Bus not found or currently offline.' });
+        }
+        const tripId = parseInt(bus.vehicle_journey_id) || Math.floor(Math.random() * 100000);
+        const tripETA = await (0, eta_1.getTripETAs)(tripId, regNo);
+        if (tripETA && tripETA.stops.length > 0) {
+            return res.json(tripETA);
+        }
+        res.json({
+            tripId: parseInt(bus.vehicle_journey_id) || Math.floor(Math.random() * 100000), // Mock ID for frontend tracking state
+            busRegNo: bus.RegNo || bus.regNum,
+            busType: 'UPSRTC',
+            routeCode: bus.route || 'N/A',
+            routeName: bus.route_description || bus.routename || 'Unknown Route',
+            busLatitude: parseFloat(bus.latitude),
+            busLongitude: parseFloat(bus.longitude),
+            currentSpeedKmph: parseFloat(bus.speed),
+            heading: parseFloat(bus.heading),
+            lastSeen: bus.timestamp,
+            status: bus.vehicle_status === 'no_signal' ? 'offline' : (parseFloat(bus.speed) > 0 ? 'moving' : 'halted'),
+            stops: [
+                {
+                    stopId: 1,
+                    name: bus.next_stop || 'Next Stop',
+                    etaMinutes: bus.next_stop_eta ? Math.round((new Date(bus.next_stop_eta).getTime() - Date.now()) / 60000) : 0,
+                    status: 'upcoming'
+                },
+                {
+                    stopId: 2,
+                    name: bus.destination || 'Destination',
+                    etaMinutes: bus.destination_eta ? Math.round((new Date(bus.destination_eta).getTime() - Date.now()) / 60000) : 0,
+                    status: 'upcoming'
+                }
+            ]
+        });
+    }
+    catch (error) {
+        console.error('Error fetching real bus data:', error);
+        res.status(500).json({ message: 'Failed to fetch real-time data.' });
+    }
+});
+// Create HTTP server
+const server = http_1.default.createServer(app);
+// ----------------------------------------------------
+// REALTIME WEBSOCKET SERVER
+// ----------------------------------------------------
+const wss = new ws_1.WebSocketServer({ server });
+const subscriptions = new Set();
+wss.on('connection', (ws) => {
+    console.log('New client connected via WebSocket');
+    ws.on('message', async (message) => {
+        try {
+            const data = JSON.parse(message);
+            if (data.event === 'subscribe_trip' && data.tripId) {
+                const tripId = parseInt(data.tripId, 10);
+                console.log(`Client subscribed to trip: ${tripId}`);
+                // Add to active subscriptions
+                const sub = { ws, tripId, regNo: data.regNo, routeCode: data.routeCode };
+                subscriptions.add(sub);
+                // Send initial state immediately
+                const initialData = await (0, eta_1.getTripETAs)(tripId, data.regNo, data.routeCode);
+                if (initialData) {
+                    const activeCrowdSourced = global.activeCrowdSourcedTrips || {};
+                    const now = Date.now();
+                    const state = activeCrowdSourced[tripId];
+                    if (state && now - state.timestamp < 15000) {
+                        initialData.trackingMethod = state.method;
+                    }
+                    ws.send(JSON.stringify({ event: 'trip_update', data: initialData }));
+                }
+            }
+            if (data.event === 'report_location' && data.tripId) {
+                const tripId = parseInt(data.tripId, 10);
+                const { latitude, longitude, speed, heading, source } = data;
+                console.log(`Received crowd-sourced location for trip ${tripId} via ${source}: (${latitude}, ${longitude})`);
+                // Update database with this coordinates
+                const tripRes = await (0, db_1.query)('SELECT bus_id FROM trips WHERE id = $1', [tripId]);
+                if (tripRes.rows.length > 0) {
+                    const busId = tripRes.rows[0].bus_id;
+                    await (0, db_1.query)(`INSERT INTO bus_live_state (bus_id, trip_id, latitude, longitude, speed, heading, last_seen_at)
+             VALUES ($1, $2, $3, $4, $5, $6, NOW())
+             ON CONFLICT (bus_id) 
+             DO UPDATE SET 
+                trip_id = EXCLUDED.trip_id,
+                latitude = EXCLUDED.latitude,
+                longitude = EXCLUDED.longitude,
+                speed = EXCLUDED.speed,
+                heading = EXCLUDED.heading,
+                last_seen_at = NOW()`, [busId, tripId, latitude, longitude, speed || 0, heading || 0]);
+                    // Mark this trip as having active crowd-sourced updates to prevent simulator overrides
+                    global.activeCrowdSourcedTrips = global.activeCrowdSourcedTrips || {};
+                    global.activeCrowdSourcedTrips[tripId] = {
+                        timestamp: Date.now(),
+                        method: source
+                    };
+                    // Broadcast update immediately to all clients subscribed to this trip
+                    for (const sub of subscriptions) {
+                        if (sub.tripId === tripId && sub.ws.readyState === ws_1.WebSocket.OPEN) {
+                            const updatedData = await (0, eta_1.getTripETAs)(tripId, sub.regNo);
+                            if (updatedData) {
+                                updatedData.trackingMethod = source;
+                                sub.ws.send(JSON.stringify({ event: 'trip_update', data: updatedData }));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        catch (e) {
+            console.error('Failed to parse WebSocket message:', e);
+        }
+    });
+    ws.on('close', () => {
+        // Clean up subscriptions for this client
+        for (const sub of subscriptions) {
+            if (sub.ws === ws) {
+                subscriptions.delete(sub);
+            }
+        }
+        console.log('Client disconnected');
+    });
+});
+// Broadcast updates to subscribed clients every 5 seconds
+setInterval(async () => {
+    for (const sub of subscriptions) {
+        if (sub.ws.readyState === ws_1.WebSocket.OPEN) {
+            try {
+                const data = await (0, eta_1.getTripETAs)(sub.tripId, sub.regNo, sub.routeCode);
+                if (data) {
+                    const activeCrowdSourced = global.activeCrowdSourcedTrips || {};
+                    const now = Date.now();
+                    const state = activeCrowdSourced[sub.tripId];
+                    if (state && now - state.timestamp < 15000) {
+                        data.trackingMethod = state.method;
+                    }
+                    sub.ws.send(JSON.stringify({ event: 'trip_update', data }));
+                }
+            }
+            catch (err) {
+                console.error(`Failed to push update for trip ${sub.tripId}:`, err);
+            }
+        }
+    }
+}, 5000);
+// Start server
+server.listen(port, async () => {
+    console.log(`API Server running on port ${port}`);
+    // Boot Graph Engine
+    const { buildGraph } = await Promise.resolve().then(() => __importStar(require('./engine/graph')));
+    await buildGraph();
+    // Boot GPS Ingestion Engine
+    (0, adapter_1.startIngestion)();
+});
+// Graceful Shutdown
+const shutdown = () => {
+    console.log('Shutting down server...');
+    (0, adapter_1.stopIngestion)();
+    server.close(() => {
+        console.log('Server stopped.');
+        process.exit(0);
+    });
+};
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);

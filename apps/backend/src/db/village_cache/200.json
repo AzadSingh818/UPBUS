@@ -1,0 +1,15 @@
+{
+  "fetchedAt": "2026-06-24T05:21:14.229Z",
+  "villages": [
+    {
+      "name": "Jukheri",
+      "latitude": 29.8031215,
+      "longitude": 77.3060984
+    },
+    {
+      "name": "Sabdalpur",
+      "latitude": 29.9178235,
+      "longitude": 77.4777808
+    }
+  ]
+}

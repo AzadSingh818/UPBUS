@@ -1,0 +1,15 @@
+{
+  "fetchedAt": "2026-06-24T06:17:50.613Z",
+  "villages": [
+    {
+      "name": "Shermau",
+      "latitude": 29.8531326,
+      "longitude": 77.2726108
+    },
+    {
+      "name": "Sabdalpur",
+      "latitude": 29.9178235,
+      "longitude": 77.4777808
+    }
+  ]
+}
