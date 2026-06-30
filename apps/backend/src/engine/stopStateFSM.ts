@@ -25,13 +25,13 @@
 export let ARRIVING_RADIUS_KM = 0.5;
 
 /** Radius (km) within which entry into "On Stop" can be triggered. */
-export let ON_STOP_RADIUS_KM = 0.15;
+export let ON_STOP_RADIUS_KM = 0.05;
 
 /**
  * Hysteresis exit radius (km). Bus must move *beyond* this radius to leave
  * the "On Stop" state. Must be >= ON_STOP_RADIUS_KM.
  */
-export let ON_STOP_EXIT_RADIUS_KM = 0.20;
+export let ON_STOP_EXIT_RADIUS_KM = 0.10;
 
 /** Speed (km/h) below which the bus counts as "stationary" for dwell check. */
 export let SPEED_THRESHOLD_KMPH = 5;
@@ -104,7 +104,7 @@ export function updateBusFSM(
   busLat: number,
   busLng: number,
   speedKmph: number,
-  stops: Array<{ stopId: number; sequenceNo: number; latitude: number; longitude: number }>,
+  stops: Array<{ stopId: number; sequenceNo: number; name: string; latitude: number; longitude: number }>,
   busAlreadyPassedSeqs: Set<number>
 ): void {
   for (const stop of stops) {
@@ -135,6 +135,14 @@ export function updateBusFSM(
         if (dist <= ARRIVING_RADIUS_KM) {
           rec.state = 'arriving_now';
           rec.dwellCount = 0;
+          
+          // Trigger push notification: arriving soon
+          try {
+            const { sendArrivalNotification } = require('../services/notificationService');
+            sendArrivalNotification(busRegNo, stop.name, 2).catch(console.error);
+          } catch (err: any) {
+            console.error('Failed to trigger arrival notification:', err.message);
+          }
         }
         break;
 
@@ -143,6 +151,19 @@ export function updateBusFSM(
           rec.dwellCount += 1;
           if (rec.dwellCount >= DWELL_PINGS) {
             rec.state = 'on_stop';
+            
+            // Trigger push notification: arrived
+            try {
+              const { sendNotificationToAll } = require('../services/notificationService');
+              sendNotificationToAll({
+                title: `Bus Arrived! 🚌`,
+                body: `Bus ${busRegNo} has arrived at ${stop.name}.`,
+                tag: `arrived-${busRegNo}`,
+                icon: '/favicon.ico'
+              }).catch(console.error);
+            } catch (err: any) {
+              console.error('Failed to trigger arrival notification:', err.message);
+            }
           }
         } else {
           // Reset dwell counter if conditions break

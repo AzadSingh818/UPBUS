@@ -9,7 +9,7 @@
 import { distanceToPolylineKm, Coordinate } from '../engine/geoUtils';
 import type { OverpassVillage } from './overpass';
 
-export const DEFAULT_MAX_DISTANCE_KM = 3;
+export const DEFAULT_MAX_DISTANCE_KM = 5;
 
 export interface FilteredVillage {
   name: string;

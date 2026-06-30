@@ -1,0 +1,110 @@
+{
+  "fetchedAt": "2026-06-29T08:51:11.893Z",
+  "villages": [
+    {
+      "name": "Sansarpur",
+      "latitude": 30.1291749,
+      "longitude": 77.653549
+    },
+    {
+      "name": "Shahpur",
+      "latitude": 30.196335,
+      "longitude": 77.6283497
+    },
+    {
+      "name": "Nawāda",
+      "latitude": 30.0365991,
+      "longitude": 77.76101
+    },
+    {
+      "name": "Mādo",
+      "latitude": 30.0455758,
+      "longitude": 77.7592875
+    },
+    {
+      "name": "Guramb",
+      "latitude": 30.0383856,
+      "longitude": 77.7636035
+    },
+    {
+      "name": "Gandewarh",
+      "latitude": 30.2046969,
+      "longitude": 77.6009384
+    },
+    {
+      "name": "Bhainsrāon",
+      "latitude": 30.022208,
+      "longitude": 77.7605614
+    },
+    {
+      "name": "Bhatpura",
+      "latitude": 30.056982,
+      "longitude": 77.764344
+    },
+    {
+      "name": "Alāwalpur",
+      "latitude": 30.0424707,
+      "longitude": 77.7767998
+    },
+    {
+      "name": "Barkala",
+      "latitude": 30.0167124,
+      "longitude": 77.7648947
+    },
+    {
+      "name": "Jaisingha",
+      "latitude": 30.0106612,
+      "longitude": 77.7538659
+    },
+    {
+      "name": "Naugawan",
+      "latitude": 30.2095938,
+      "longitude": 77.6542466
+    },
+    {
+      "name": "Gelhewāla",
+      "latitude": 30.0788619,
+      "longitude": 77.7559386
+    },
+    {
+      "name": "Malakpur",
+      "latitude": 30.2345631,
+      "longitude": 77.5843789
+    },
+    {
+      "name": "Muzaffarābād",
+      "latitude": 30.1201896,
+      "longitude": 77.7135067
+    },
+    {
+      "name": "Gagalheri",
+      "latitude": 29.9748134,
+      "longitude": 77.6637307
+    },
+    {
+      "name": "Rasūlpar Kalān",
+      "latitude": 30.064489,
+      "longitude": 77.7754
+    },
+    {
+      "name": "Kālewāla",
+      "latitude": 30.0592686,
+      "longitude": 77.7842604
+    },
+    {
+      "name": "Raipur",
+      "latitude": 30.2466578,
+      "longitude": 77.5791299
+    },
+    {
+      "name": "Hasanpur",
+      "latitude": 30.012815,
+      "longitude": 77.788896
+    },
+    {
+      "name": "Islāmnagor",
+      "latitude": 30.1000675,
+      "longitude": 77.750546
+    }
+  ]
+}

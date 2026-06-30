@@ -249,8 +249,8 @@ test('handles polyline shorter than 2 points gracefully', () => {
   expect(result).toHaveLength(0);
 });
 
-test('uses DEFAULT_MAX_DISTANCE_KM = 3 when no arg given', () => {
-  expect(DEFAULT_MAX_DISTANCE_KM).toBe(3);
+test('uses DEFAULT_MAX_DISTANCE_KM = 5 when no arg given', () => {
+  expect(DEFAULT_MAX_DISTANCE_KM).toBe(5);
 });
 
 // ---------------------------------------------------------------------------

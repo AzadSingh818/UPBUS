@@ -1,4 +1,5 @@
 import mockDb from '../db/data.json';
+import { query } from '../db';
 
 export interface GraphEdge {
   fromStopId: number;
@@ -42,25 +43,36 @@ export interface JourneyPath {
 let graph: Map<number, GraphEdge[]> = new Map();
 let stopsMap: Map<number, any> = new Map();
 let routeStopsMap: Map<number, any[]> = new Map(); // route_id -> stops
+let cachedRoutes: any[] = [];
 
 /**
- * Initializes the graph from Mock DB
+ * Initializes the graph from DB/Mock DB
  */
 export async function buildGraph() {
   graph.clear();
   stopsMap.clear();
   routeStopsMap.clear();
 
-  // Load stops
-  const stops = mockDb.stops;
+  // Load stops from database/mock
+  const stopsRes = await query('SELECT id, stop_code, name, latitude, longitude FROM stops');
+  const stops = stopsRes.rows;
   for (const s of stops) {
-    stopsMap.set(s.id, s);
+    stopsMap.set(s.id, {
+      ...s,
+      latitude: parseFloat(s.latitude),
+      longitude: parseFloat(s.longitude)
+    });
     graph.set(s.id, []);
   }
 
-  // Load route_stops and routes
-  const routeStops = mockDb.route_stops;
-  const routes = mockDb.routes;
+  // Load route_stops and routes from database/mock
+  const routeStopsRes = await query('SELECT route_id, stop_id, sequence_no, distance_from_start_km FROM route_stops');
+  const routeStops = routeStopsRes.rows;
+
+  const routesRes = await query('SELECT id, route_code, route_name, source, destination, distance_km FROM routes');
+  const routes = routesRes.rows;
+  cachedRoutes = routes;
+
   const routeMap = new Map(routes.map((r: any) => [r.id, r]));
 
   // Group by route
@@ -266,7 +278,7 @@ function createLeg(edges: GraphEdge[]): PathLeg {
 
 function filterUniquePaths(paths: JourneyPath[]): JourneyPath[] {
   const seen = new Map<string, JourneyPath>();
-  const routeMap = new Map<number, any>(mockDb.routes.map((r: any) => [r.id, r]));
+  const routeMap = new Map<number, any>(cachedRoutes.map((r: any) => [r.id, r]));
 
   for (const p of paths) {
     // Unique key is based on the sequence of all stop IDs visited in order

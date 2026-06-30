@@ -1,10 +1,10 @@
 // divergenceBinding.ts
 import { loadDivergenceNodes, DivergenceNode, DivergenceBranch } from './divergenceNode';
-import { pointToPolylineDistKm } from './geoUtils';
+import { distanceToPolylineKm } from './geoUtils';
 import { DIV_DISTANCE_THRESHOLD_KM } from './divergenceConfig';
 
 // Cache loaded nodes for fast lookup
-let divergenceCache: DivergenceNode[] = [];
+export let divergenceCache: DivergenceNode[] = [];
 
 /** Initialize divergence node cache – call once at server start */
 export function initDivergenceCache() {
@@ -24,7 +24,7 @@ export function matchBranchForBus(
   const node = divergenceCache.find(n => n.id === nodeId);
   if (!node) return null;
   for (const branch of node.branches) {
-    const dist = pointToPolylineDistKm(busLat, busLng, branch.polyline);
+    const dist = distanceToPolylineKm({ lat: busLat, lng: busLng }, branch.polyline);
     if (dist <= DIV_DISTANCE_THRESHOLD_KM) {
       return branch;
     }

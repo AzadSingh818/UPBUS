@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import { useState, useEffect, useRef, Fragment } from 'react';
@@ -32,6 +33,7 @@ const fmtTime = (baseDate: Date, offsetMins: number) => {
   return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
 };
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371; // Earth radius in km
   const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -295,6 +297,7 @@ export default function Home() {
 
   const [selectedTrip, setSelectedTrip] = useState<ActiveTrip | null>(null);
   const [liveDetails, setLiveDetails] = useState<TripLiveDetails | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [trackingLoading, setTrackingLoading] = useState(false);
   const [isWebSocket, setIsWebSocket] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
@@ -311,11 +314,109 @@ export default function Home() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [villages, setVillages] = useState<Village[]>([]);
 
+  const [passengerReports, setPassengerReports] = useState<any[]>([]);
+  const [isSubscribed, setIsSubscribed] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportType, setReportType] = useState('Delay');
+  const [reportDesc, setReportDesc] = useState('');
+  const [submittingReport, setSubmittingReport] = useState(false);
+
+  // Mount logic: Service worker registration & active report fetching
+  useEffect(() => {
+    // Register Service Worker and check subscription
+    import('./utils/swHelper').then(async (m) => {
+      await m.registerServiceWorker();
+      const sub = await m.getPushSubscription();
+      setIsSubscribed(!!sub);
+    }).catch(err => console.warn('Failed to load swHelper:', err));
+
+    // Fetch reports
+    // eslint-disable-next-line react-hooks/immutability
+    fetchActiveReports();
+
+    // Poll reports every 10 seconds
+    const interval = setInterval(fetchActiveReports, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const fetchActiveReports = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/reports/active`);
+      if (res.ok) {
+        const data = await res.json();
+        setPassengerReports(data.reports || []);
+      }
+    } catch (e) {
+      console.warn('Failed to fetch active passenger reports:', e);
+    }
+  };
+
+  const handleNotificationToggle = async () => {
+    try {
+      const swHelper = await import('./utils/swHelper');
+      if (isSubscribed) {
+        const success = await swHelper.unsubscribeFromNotifications(API_BASE);
+        if (success) {
+          setIsSubscribed(false);
+          alert('Notifications disabled.');
+        }
+      } else {
+        const sub = await swHelper.subscribeToNotifications(API_BASE);
+        if (sub) {
+          setIsSubscribed(true);
+          alert('Notifications enabled! You will receive arrivals alerts.');
+        }
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Notification configuration failed.';
+      alert(message);
+    }
+  };
+
+  const handleReportSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedTrip || !liveDetails) return;
+    setSubmittingReport(true);
+    try {
+      const lat = liveDetails.busLatitude || (liveDetails.stops?.[0]?.latitude) || null;
+      const lng = liveDetails.busLongitude || (liveDetails.stops?.[0]?.longitude) || null;
+
+      const response = await fetch(`${API_BASE}/reports`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tripId: selectedTrip.trip_id,
+          busRegNo: selectedTrip.registration_no || liveDetails.busRegNo,
+          reportType,
+          description: reportDesc,
+          latitude: lat,
+          longitude: lng
+        })
+      });
+
+      if (response.ok) {
+        alert('Report submitted successfully! Thank you.');
+        setShowReportModal(false);
+        setReportDesc('');
+        fetchActiveReports(); // Refresh reports
+      } else {
+        alert('Failed to submit report. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error submitting report:', error);
+      alert('Error submitting report.');
+    } finally {
+      setSubmittingReport(false);
+    }
+  };
+
+
   const fetchLiveDetailsManual = async () => {
     if (!selectedTrip) return;
     setIsRefreshing(true);
     try {
       const regNoParam = selectedTrip.registration_no ? `?regNo=${selectedTrip.registration_no}` : '';
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const routeCodeParam = (selectedTrip as any).routeCode ? (regNoParam ? `&routeCode=${(selectedTrip as any).routeCode}` : `?routeCode=${(selectedTrip as any).routeCode}`) : '';
       const res = await fetch(`${API_BASE}/trips/${selectedTrip.trip_id}/live${regNoParam}${routeCodeParam}`);
       const data = await res.json();
@@ -356,6 +457,7 @@ export default function Home() {
         // or fall back to matching routeCode in the direct-routes list
         const firstLeg = journeysList[0]?.legs?.[0];
         const routeIdToFetch = firstLeg?.routeId
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           || (d2.routes || []).find((r: any) => r.route_code === firstLeg?.routeCode)?.id;
         if (routeIdToFetch) {
           try {
@@ -425,14 +527,20 @@ export default function Home() {
       setLiveDetails(data);
       setLastUpdated(new Date());
       setTrackingLoading(false);
-      // Fetch villages for the tracked route if we have a routeId from the route list
-      const matchedRoute = routes.find(r => r.route_code === routeCode);
-      if (matchedRoute) {
+      // Fetch villages for the tracked route
+      const routeIdToFetch = data.routeId
+        || routes.find(r => r.route_code === routeCode)?.id
+        || (routes.length > 0 ? routes[0].id : null);
+      if (routeIdToFetch) {
+        console.log(`[Villages] Fetching for route ${routeIdToFetch}`);
         try {
-          const vRes = await fetch(`${API_BASE}/routes/${matchedRoute.id}/villages`);
+          const vRes = await fetch(`${API_BASE}/routes/${routeIdToFetch}/villages`);
           const vData = await vRes.json();
+          console.log(`[Villages] Got ${(vData.villages || []).length} villages`);
           setVillages(vData.villages || []);
-        } catch { /* non-fatal */ }
+        } catch (e) {
+          console.warn('[Villages] Fetch failed:', e);
+        }
       }
     } catch (err) {
       console.error(err);
@@ -547,6 +655,7 @@ export default function Home() {
             let lat = pos.coords.latitude;
             let lng = pos.coords.longitude;
             let speed = pos.coords.speed || 0;
+            // eslint-disable-next-line prefer-const
             let heading = pos.coords.heading || 0;
 
             if (trackingSource === 'cell' || trackingSource === 'network') {
@@ -755,7 +864,22 @@ export default function Home() {
                       >
                         <div className="route-top">
                           <div className="route-name">{route.route_name}</div>
-                          <div className="route-dist">{parseFloat(route.distance_km).toFixed(0)} km</div>
+                          <div className="route-dist">
+                            {parseFloat(route.distance_km).toFixed(0)} km
+                            {route.nextTrips && route.nextTrips.length > 0 && (
+                              <span style={{
+                                marginLeft: '6px',
+                                fontSize: '11px',
+                                color: '#fbbf24',
+                                background: 'rgba(251, 191, 36, 0.1)',
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                fontWeight: 'bold'
+                              }}>
+                                [{route.nextTrips[0].busRegNo}]
+                              </span>
+                            )}
+                          </div>
                         </div>
                         {!route.missedTrips?.length && !route.nextTrips?.length ? (
                           <div className="no-trips">No active buses right now</div>
@@ -889,6 +1013,26 @@ export default function Home() {
                 )}
               </div>
 
+              {/* Action Buttons for Report & Notification */}
+              <div style={{ display: 'flex', gap: '8px', padding: '0 16px 12px 16px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setShowReportModal(true)}
+                  style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '13px', padding: '8px 12px' }}
+                >
+                  ⚠️ Report Status
+                </button>
+                <button
+                  type="button"
+                  className={`btn ${isSubscribed ? 'btn-danger' : 'btn-primary'}`}
+                  onClick={handleNotificationToggle}
+                  style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '13px', padding: '8px 12px' }}
+                >
+                  🔔 {isSubscribed ? 'Disable Alerts' : 'Notify Me'}
+                </button>
+              </div>
+
               {/* Inside the Bus Panel */}
               <div className="passenger-toggle-card">
                 <div className="passenger-toggle-row">
@@ -958,97 +1102,127 @@ export default function Home() {
               </div>
 
               {/* Live Map */}
-              <div className="map-wrapper">
-                <LiveMap
-                  latitude={liveDetails.busLatitude}
-                  longitude={liveDetails.busLongitude}
-                  stops={liveDetails.stops}
-                  busRegNo={liveDetails.busRegNo}
-                  heading={liveDetails.heading}
-                  villages={villages}
-                />
-              </div>
+              {(() => {
+                const fromQuery = (from || '').toLowerCase().trim();
+                const toQuery = (to || '').toLowerCase().trim();
 
-              {/* Stops Timeline — "Where is my train" style */}
-              <div className="stops-timeline">
-                <div className="stops-title">🗺 Stops & Live Progress</div>
-                {(() => {
-                  const lastPassedIdx = liveDetails.stops.map(s => s.status).lastIndexOf('passed');
-                  const nextUpcomingIdx = liveDetails.stops.findIndex(s => s.status === 'upcoming' || s.status === 'arriving_soon');
-                  
-                  let busAtStopIdx = -1;
-                  liveDetails.stops.forEach((s, idx) => {
-                    if (s.status === 'arriving_now' || s.status === 'arriving_soon' || s.status === 'on_stop') {
-                      busAtStopIdx = idx;
-                    }
-                  });
+                let startIdx = 0;
+                if (fromQuery) {
+                  const idx = liveDetails.stops.findIndex(s => s.name.toLowerCase().includes(fromQuery));
+                  if (idx !== -1) startIdx = idx;
+                }
 
-                  const busBetweenStopsAfterIdx = (busAtStopIdx === -1 && lastPassedIdx !== -1 && lastPassedIdx < liveDetails.stops.length - 1) ? lastPassedIdx : -1;
+                let endIdx = liveDetails.stops.length - 1;
+                if (toQuery) {
+                  const idx = liveDetails.stops.findIndex(s => s.name.toLowerCase().includes(toQuery));
+                  if (idx !== -1) endIdx = idx;
+                }
 
-                  return liveDetails.stops.map((stop, idx) => {
-                    const isLast = idx === liveDetails.stops.length - 1;
-                    const isPassed   = stop.status === 'passed';
-                    const isOnStop   = stop.status === 'on_stop';
-                    const isBusHere  = idx === busAtStopIdx;
-                    const isBusAfterThis = idx === busBetweenStopsAfterIdx;
+                const filteredStops = startIdx <= endIdx
+                  ? liveDetails.stops.slice(startIdx, endIdx + 1)
+                  : liveDetails.stops;
 
-                    const statusClass = isPassed ? 'passed' : isOnStop ? 'on-stop' : isBusHere ? 'arriving' : 'upcoming';
+                return (
+                  <>
+                    <div className="map-wrapper">
+                      <LiveMap
+                        latitude={liveDetails.busLatitude}
+                        longitude={liveDetails.busLongitude}
+                        stops={filteredStops}
+                        busRegNo={liveDetails.busRegNo}
+                        heading={liveDetails.heading}
+                        villages={villages}
+                        reports={passengerReports}
+                        isNavigationMode={isPassenger}
+                        currentSpeedKmph={liveDetails.currentSpeedKmph}
+                        onCloseNavigation={() => setIsPassenger(false)}
+                        routeName={liveDetails.routeName}
+                      />
+                    </div>
 
-                    return (
-                      <div key={stop.stopId} className={`stop-row ${statusClass}`}>
-                        <div className="stop-left">
-                          {/* Stop Line */}
-                          {!isLast && (
-                            <div className={`stop-line ${isPassed && !isBusAfterThis ? 'passed' : 'upcoming'}`}>
-                              {/* Draw split colored line segment if the bus is between this stop and next */}
-                              {isBusAfterThis && (
-                                <>
-                                  <div className="line-segment-passed" />
-                                  <div className="line-segment-upcoming" />
-                                  <div className="timeline-bus-badge pulsing-bus">
+                    {/* Stops Timeline — "Where is my train" style */}
+                    <div className="stops-timeline">
+                      <div className="stops-title">🗺 Stops & Live Progress</div>
+                      {(() => {
+                        const lastPassedIdx = filteredStops.map(s => s.status).lastIndexOf('passed');
+                        const nextUpcomingIdx = filteredStops.findIndex(s => s.status === 'upcoming' || s.status === 'arriving_soon');
+
+                        let busAtStopIdx = -1;
+                        filteredStops.forEach((s, idx) => {
+                          if (s.status === 'arriving_now' || s.status === 'arriving_soon' || s.status === 'on_stop') {
+                            busAtStopIdx = idx;
+                          }
+                        });
+
+                        const busBetweenStopsAfterIdx = (busAtStopIdx === -1 && lastPassedIdx !== -1 && lastPassedIdx < filteredStops.length - 1) ? lastPassedIdx : -1;
+
+                        return filteredStops.map((stop, idx) => {
+                          const isLast = idx === filteredStops.length - 1;
+                          const isPassed   = stop.status === 'passed';
+                          const isOnStop   = stop.status === 'on_stop';
+                          const isBusHere  = idx === busAtStopIdx;
+                          const isBusAfterThis = idx === busBetweenStopsAfterIdx;
+
+                          const statusClass = isPassed ? 'passed' : isOnStop ? 'on-stop' : isBusHere ? 'arriving' : 'upcoming';
+
+                          return (
+                            <div key={stop.stopId} className={`stop-row ${statusClass}`}>
+                              <div className="stop-left">
+                                {/* Stop Line */}
+                                {!isLast && (
+                                  <div className={`stop-line ${isPassed && !isBusAfterThis ? 'passed' : 'upcoming'}`}>
+                                    {/* Draw split colored line segment if the bus is between this stop and next */}
+                                    {isBusAfterThis && (
+                                      <>
+                                        <div className="line-segment-passed" />
+                                        <div className="line-segment-upcoming" />
+                                        <div className="timeline-bus-badge pulsing-bus">
+                                          <Bus size={11} className="timeline-bus-icon" />
+                                        </div>
+                                      </>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* Dot or Bus overlay */}
+                                {isBusHere ? (
+                                  <div className="timeline-bus-badge stop-overlay pulsing-bus">
                                     <Bus size={11} className="timeline-bus-icon" />
                                   </div>
-                                </>
-                              )}
-                            </div>
-                          )}
-                          
-                          {/* Dot or Bus overlay */}
-                          {isBusHere ? (
-                            <div className="timeline-bus-badge stop-overlay pulsing-bus">
-                              <Bus size={11} className="timeline-bus-icon" />
-                            </div>
-                          ) : (
-                            <div className={`stop-dot ${statusClass}`}>
-                              {idx === nextUpcomingIdx && <div className="pulse-ring" />}
-                            </div>
-                          )}
-                        </div>
+                                ) : (
+                                  <div className={`stop-dot ${statusClass}`}>
+                                    {idx === nextUpcomingIdx && <div className="pulse-ring" />}
+                                  </div>
+                                )}
+                              </div>
 
-                        <div className="stop-body">
-                          <div className="stop-name">{stop.name}</div>
-                          <div className="stop-sub">Uttar Pradesh</div>
-                        </div>
+                              <div className="stop-body">
+                                <div className="stop-name">{stop.name}</div>
+                                <div className="stop-sub">Uttar Pradesh</div>
+                              </div>
 
-                        <div className="stop-right">
-                          {isPassed ? (
-                            <span className="stop-badge passed-badge">Passed</span>
-                          ) : stop.status === 'on_stop' ? (
-                            <span className="stop-badge on-stop-badge">On Stop</span>
-                          ) : (stop.status === 'arriving_now' || stop.status === 'arriving_soon') ? (
-                            <span className="stop-badge arriving-badge">Arriving Now</span>
-                          ) : (
-                            <span className="stop-badge upcoming-badge">~{stop.etaMinutes}m</span>
-                          )}
-                          {stop.distanceRemainingKm > 0 && (
-                            <span className="stop-dist">{stop.distanceRemainingKm.toFixed(1)} km</span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  });
-                })()}
-              </div>
+                              <div className="stop-right">
+                                {isPassed ? (
+                                  <span className="stop-badge passed-badge">Passed</span>
+                                ) : stop.status === 'on_stop' ? (
+                                  <span className="stop-badge on-stop-badge">On Stop</span>
+                                ) : (stop.status === 'arriving_now' || stop.status === 'arriving_soon') ? (
+                                  <span className="stop-badge arriving-badge">Arriving Now</span>
+                                ) : (
+                                  <span className="stop-badge upcoming-badge">~{stop.etaMinutes}m</span>
+                                )}
+                                {stop.distanceRemainingKm > 0 && (
+                                  <span className="stop-dist">{stop.distanceRemainingKm.toFixed(1)} km</span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        });
+                      })()}
+                    </div>
+                  </>
+                );
+              })()}
 
               {/* Refresh FAB */}
               <button 
@@ -1080,6 +1254,7 @@ export default function Home() {
                 busRegNo={''}
                 heading={0}
                 villages={villages}
+                reports={passengerReports}
                 multipleRoutes={journeys.map((j, i) => ({
                   stops: j.legs.flatMap(leg => leg.stops || []).map(s => ({
                     stopId: s.stop_id,
@@ -1118,6 +1293,7 @@ export default function Home() {
                 busRegNo={''}
                 heading={0}
                 villages={villages}
+                reports={passengerReports}
                 multipleRoutes={routes.map((r, i) => ({
                   stops: r.stops || [],
                   color: i === selectedRouteIdx ? '#4f46e5' : '#6b7280',
@@ -1156,6 +1332,80 @@ export default function Home() {
           )}
         </section>
       </div>
+
+      {/* Passenger Report Modal */}
+      {showReportModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 9999, padding: '16px'
+        }}>
+          <div className="glass-panel" style={{ maxWidth: '400px', width: '100%', padding: '24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'white' }}>⚠️ Report Bus Status</h3>
+              <button
+                onClick={() => setShowReportModal(false)}
+                style={{ background: 'none', border: 'none', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '18px' }}
+              >
+                ✕
+              </button>
+            </div>
+            <form onSubmit={handleReportSubmit}>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', color: '#9ca3af' }}>Select Report Type</label>
+                <select
+                  value={reportType}
+                  onChange={e => setReportType(e.target.value)}
+                  style={{
+                    width: '100%', padding: '10px', borderRadius: '6px',
+                    backgroundColor: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)',
+                    color: 'white', outline: 'none'
+                  }}
+                >
+                  <option value="Delay">Delay / Late Running</option>
+                  <option value="Overcrowded">Overcrowded Bus</option>
+                  <option value="Breakdown">Bus Breakdown / Issue</option>
+                  <option value="Cleanliness">Cleanliness Issue</option>
+                  <option value="Other">Other Delay / Issue</option>
+                </select>
+              </div>
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', color: '#9ca3af' }}>Description (optional)</label>
+                <textarea
+                  rows={3}
+                  placeholder="E.g., Bus is stuck in traffic near the highway bridge."
+                  value={reportDesc}
+                  onChange={e => setReportDesc(e.target.value)}
+                  style={{
+                    width: '100%', padding: '10px', borderRadius: '6px',
+                    backgroundColor: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)',
+                    color: 'white', outline: 'none', resize: 'none'
+                  }}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setShowReportModal(false)}
+                  style={{ flex: 1 }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={submittingReport}
+                  style={{ flex: 1 }}
+                >
+                  {submittingReport ? 'Submitting...' : 'Submit Report'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

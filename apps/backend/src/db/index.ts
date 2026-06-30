@@ -14,10 +14,60 @@ try {
 let useMock = false;
 
 // Seed data — UP 75-District Depot Corridor Network
-const mockDb: any = require('./data.json');
+export const mockDb: any = require('./data.json');
 
 function executeMockQuery(text: string, params: any[] = []): { rows: any[]; rowCount: number } {
   const queryStr = text.replace(/\s+/g, ' ').trim();
+
+  // Custom added queries for route learning & graph engine
+  if (queryStr.toLowerCase().includes('from stops') && !queryStr.toLowerCase().includes('where') && !queryStr.toLowerCase().includes('join')) {
+    return { rows: mockDb.stops, rowCount: mockDb.stops.length };
+  }
+  if (queryStr.toLowerCase().includes('from routes') && !queryStr.toLowerCase().includes('where') && !queryStr.toLowerCase().includes('join')) {
+    return { rows: mockDb.routes, rowCount: mockDb.routes.length };
+  }
+  if (queryStr.toLowerCase().includes('from route_stops') && !queryStr.toLowerCase().includes('where') && !queryStr.toLowerCase().includes('join')) {
+    return { rows: mockDb.route_stops, rowCount: mockDb.route_stops.length };
+  }
+  if (queryStr.startsWith('INSERT INTO routes')) {
+    const routeCode = params[0];
+    const routeName = params[1];
+    const source = params[2];
+    const destination = params[3];
+    const distanceKm = parseFloat(params[4]) || 0.0;
+    const newId = mockDb.routes.reduce((max: number, r: any) => r.id > max ? r.id : max, 0) + 1;
+    const newRoute = { id: newId, route_code: routeCode, route_name: routeName, source, destination, distance_km: distanceKm };
+    mockDb.routes.push(newRoute);
+    return { rows: [{ id: newId }], rowCount: 1 };
+  }
+  if (queryStr.startsWith('INSERT INTO route_stops')) {
+    const routeId = parseInt(params[0], 10);
+    const stopId = parseInt(params[1], 10);
+    const sequenceNo = parseInt(params[2], 10);
+    const distanceFromStartKm = parseFloat(params[3]) || 0.0;
+    const newMapping = { route_id: routeId, stop_id: stopId, sequence_no: sequenceNo, distance_from_start_km: distanceFromStartKm };
+    mockDb.route_stops.push(newMapping);
+    return { rows: [], rowCount: 1 };
+  }
+  if (queryStr.startsWith('UPDATE trips')) {
+    const status = params[0];
+    const tripId = parseInt(params[1], 10);
+    const trip = mockDb.trips.find((t: any) => t.id === tripId);
+    if (trip) {
+      trip.status = status;
+      return { rows: [], rowCount: 1 };
+    }
+    return { rows: [], rowCount: 0 };
+  }
+
+  if (queryStr.toLowerCase().includes('from trips') && queryStr.toLowerCase().includes('id = $1') && !queryStr.toLowerCase().includes('routes r') && !queryStr.toLowerCase().includes('buses b')) {
+    const tripId = parseInt(params[0], 10);
+    const trip = mockDb.trips.find((t: any) => t.id === tripId);
+    return {
+      rows: trip ? [trip] : [],
+      rowCount: trip ? 1 : 0
+    };
+  }
 
   // 1. Search routes
   if (queryStr.toLowerCase().includes('from routes') && queryStr.includes('source') && queryStr.includes('destination')) {

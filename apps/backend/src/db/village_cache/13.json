@@ -1,0 +1,155 @@
+{
+  "fetchedAt": "2026-06-28T16:20:47.560Z",
+  "villages": [
+    {
+      "name": "Khudana",
+      "latitude": 29.7294323,
+      "longitude": 77.4405856
+    },
+    {
+      "name": "Silawar",
+      "latitude": 29.5118903,
+      "longitude": 77.347784
+    },
+    {
+      "name": "Baghra",
+      "latitude": 29.4673626,
+      "longitude": 77.5730037
+    },
+    {
+      "name": "Sona Arjanpur",
+      "latitude": 29.7531262,
+      "longitude": 77.4574327
+    },
+    {
+      "name": "Butrara",
+      "latitude": 29.4600764,
+      "longitude": 77.4234438
+    },
+    {
+      "name": "Shamaspur",
+      "latitude": 29.8601853,
+      "longitude": 77.4930095
+    },
+    {
+      "name": "Pandokheri",
+      "latitude": 29.6958952,
+      "longitude": 77.4342211
+    },
+    {
+      "name": "Hardeki",
+      "latitude": 29.790671,
+      "longitude": 77.4821017
+    },
+    {
+      "name": "Devpura",
+      "latitude": 29.6729524,
+      "longitude": 77.4307394
+    },
+    {
+      "name": "Banat",
+      "latitude": 29.4637943,
+      "longitude": 77.3535346
+    },
+    {
+      "name": "Jandheri",
+      "latitude": 29.6647861,
+      "longitude": 77.4337434
+    },
+    {
+      "name": "Heend",
+      "latitude": 29.5311223,
+      "longitude": 77.376151
+    },
+    {
+      "name": "Bhanera Khemchand",
+      "latitude": 29.6814536,
+      "longitude": 77.4449014
+    },
+    {
+      "name": "Alauddinpur",
+      "latitude": 29.787833,
+      "longitude": 77.4924672
+    },
+    {
+      "name": "Kudana",
+      "latitude": 29.4302537,
+      "longitude": 77.3698424
+    },
+    {
+      "name": "Bhaiswal",
+      "latitude": 29.5145732,
+      "longitude": 77.3180088
+    },
+    {
+      "name": "Pahanshu",
+      "latitude": 29.8439942,
+      "longitude": 77.523651
+    },
+    {
+      "name": "Kallarpur Rajput",
+      "latitude": 29.7120826,
+      "longitude": 77.4668994
+    },
+    {
+      "name": "Dwarika City",
+      "latitude": 29.4493151,
+      "longitude": 77.7283261
+    },
+    {
+      "name": "Thaska",
+      "latitude": 29.6992599,
+      "longitude": 77.4687769
+    },
+    {
+      "name": "Gudamb",
+      "latitude": 29.7295019,
+      "longitude": 77.4848556
+    },
+    {
+      "name": "Bhojpur",
+      "latitude": 29.6861887,
+      "longitude": 77.4658012
+    },
+    {
+      "name": "Chakwali",
+      "latitude": 29.7789053,
+      "longitude": 77.5088023
+    },
+    {
+      "name": "Babri",
+      "latitude": 29.4925426,
+      "longitude": 77.4280357
+    },
+    {
+      "name": "Sabdalpur",
+      "latitude": 29.9178235,
+      "longitude": 77.4777808
+    },
+    {
+      "name": "Raichanda",
+      "latitude": 29.7340483,
+      "longitude": 77.4929666
+    },
+    {
+      "name": "Garhi Pukhta",
+      "latitude": 29.549268,
+      "longitude": 77.3072719
+    },
+    {
+      "name": "Malhendi",
+      "latitude": 29.5071844,
+      "longitude": 77.2884321
+    },
+    {
+      "name": "Sisauli",
+      "latitude": 29.4141055,
+      "longitude": 77.4680328
+    },
+    {
+      "name": "Bhajju",
+      "latitude": 29.4109652,
+      "longitude": 77.4196242
+    }
+  ]
+}

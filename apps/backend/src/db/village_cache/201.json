@@ -1,5 +1,5 @@
 {
-  "fetchedAt": "2026-06-24T06:16:44.795Z",
+  "fetchedAt": "2026-06-29T05:37:47.426Z",
   "villages": [
     {
       "name": "Jukheri",
@@ -10,6 +10,21 @@
       "name": "Sabdalpur",
       "latitude": 29.9178235,
       "longitude": 77.4777808
+    },
+    {
+      "name": "Bahadur Nagar",
+      "latitude": 29.7655803,
+      "longitude": 77.2223028
+    },
+    {
+      "name": "Shermau",
+      "latitude": 29.8531326,
+      "longitude": 77.2726108
+    },
+    {
+      "name": "Kapuri",
+      "latitude": 29.8625406,
+      "longitude": 77.3937554
     }
   ]
 }

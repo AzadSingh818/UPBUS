@@ -71,8 +71,8 @@ body {
 
 .app-header {
   background: rgba(12, 19, 38, 0.8);
-  backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--card-border);
   padding: 16px 24px;
   position: sticky;
@@ -164,8 +164,8 @@ body {
 
 .search-form {
   background: var(--card-bg);
-  backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
   border: 1px solid var(--card-border);
   border-radius: 16px;
   padding: 20px;
@@ -1326,6 +1326,36 @@ body {
   justify-content: center;
 }
 
+.bus-pulse-ring {
+  position: absolute;
+  top: -20px;
+  left: -20px;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: rgba(59, 130, 246, 0.18);
+  border: 2px solid rgba(59, 130, 246, 0.45);
+  box-shadow: 0 0 15px rgba(59, 130, 246, 0.4);
+  animation: busPulse 2s infinite cubic-bezier(0.24, 0, 0.38, 1);
+  pointer-events: none;
+  z-index: 1;
+}
+
+@keyframes busPulse {
+  0% {
+    transform: scale(0.4);
+    opacity: 0.1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1.2);
+    opacity: 0;
+  }
+}
+
+
 .bus-icon-circle {
   width: 36px;
   height: 36px;
@@ -1653,27 +1683,27 @@ input:checked + .toggle-slider:before {
 }
 
 .village-dot {
-  width: 7px;
-  height: 7px;
+  width: 10px;
+  height: 10px;
   background: #ff9f1c;           /* amber – distinct from stop markers */
-  border: 1.5px solid rgba(0, 0, 0, 0.45);
+  border: 2px solid #fff;
   border-radius: 50%;
   flex-shrink: 0;
-  box-shadow: 0 0 4px rgba(255, 159, 28, 0.6);
+  box-shadow: 0 0 6px rgba(255, 159, 28, 0.8), 0 0 12px rgba(255, 159, 28, 0.3);
 }
 
 .village-label {
-  font-size: 10px;
+  font-size: 11px;
   font-family: var(--font-sans, sans-serif);
-  font-weight: 500;
-  color: #1a1a1a;
-  background: rgba(255, 255, 255, 0.88);
-  border: 1px solid rgba(255, 159, 28, 0.5);
-  border-radius: 3px;
-  padding: 1px 4px;
-  line-height: 1.4;
-  backdrop-filter: blur(2px);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  font-weight: 600;
+  color: #92400e;
+  background: rgba(255, 251, 235, 0.95);
+  border: 1.5px solid rgba(255, 159, 28, 0.6);
+  border-radius: 4px;
+  padding: 2px 6px;
+  line-height: 1.3;
+  backdrop-filter: blur(4px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
   letter-spacing: 0.02em;
 }
 

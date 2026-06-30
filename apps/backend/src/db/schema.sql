@@ -221,3 +221,28 @@ VALUES
 ('UP 11 ET 7890', 'Ordinary', 'Saharanpur Depot'),
 ('UP 11 FT 4321', 'Volvo AC', 'Saharanpur Depot')
 ON CONFLICT (registration_no) DO NOTHING;
+
+-- 7. Passenger Reports Table
+CREATE TABLE IF NOT EXISTS passenger_reports (
+    id SERIAL PRIMARY KEY,
+    trip_id INTEGER,
+    bus_reg_no VARCHAR(20) NOT NULL,
+    report_type VARCHAR(50) NOT NULL,
+    description TEXT,
+    latitude DOUBLE PRECISION,
+    longitude DOUBLE PRECISION,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 8. Push Subscriptions Table
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+    id SERIAL PRIMARY KEY,
+    endpoint TEXT UNIQUE NOT NULL,
+    p256dh VARCHAR(255) NOT NULL,
+    auth VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_passenger_reports_trip ON passenger_reports(trip_id);
+CREATE INDEX IF NOT EXISTS idx_passenger_reports_time ON passenger_reports(created_at);
+

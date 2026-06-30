@@ -14,6 +14,7 @@
 import express, { Request, Response } from 'express';
 import * as fs from 'fs';
 import * as path from 'path';
+
 import { getRouteGeometry } from '../engine/routeGeometry';
 import { fetchVillagesInBbox, computeBbox } from '../utils/overpass';
 import { filterVillagesByDistance, DEFAULT_MAX_DISTANCE_KM } from '../utils/villageFilter';
@@ -101,18 +102,23 @@ async function fetchAndCacheVillages(
   const raw = await fetchVillagesInBbox(bbox.south, bbox.west, bbox.north, bbox.east);
   console.log(`[Villages] Overpass returned ${raw.length} candidates for route ${routeId}`);
 
-  const filtered = filterVillagesByDistance(raw, polyline, maxDistanceKm);
-  console.log(`[Villages] ${filtered.length} within ${maxDistanceKm} km for route ${routeId}`);
-
-  const villages = filtered.map(v => ({
+  // Always cache at the DEFAULT distance (5 km) so we can re-filter on demand
+  const cacheFiltered = filterVillagesByDistance(raw, polyline, DEFAULT_MAX_DISTANCE_KM);
+  const cacheVillages = cacheFiltered.map(v => ({
     name: v.name,
     latitude: v.latitude,
     longitude: v.longitude,
   }));
+  writeCache(routeId, cacheVillages);
 
-  // Always cache at the DEFAULT distance so we can re-filter on demand
-  writeCache(routeId, villages);
-  return villages;
+  const filtered = filterVillagesByDistance(raw, polyline, maxDistanceKm);
+  console.log(`[Villages] ${filtered.length} within ${maxDistanceKm} km for route ${routeId}`);
+
+  return filtered.map(v => ({
+    name: v.name,
+    latitude: v.latitude,
+    longitude: v.longitude,
+  }));
 }
 
 // ---------------------------------------------------------------------------
@@ -125,7 +131,7 @@ router.get('/:routeId/villages', async (req: Request, res: Response) => {
     return res.status(400).json({ error: 'routeId must be a number' });
   }
 
-  const maxDistanceKm = parseFloat(req.query.maxDistanceKm as string) || DEFAULT_MAX_DISTANCE_KM;
+  const maxDistanceKm = parseFloat(req.query.maxDistanceKm as string) || 0.2; // Default to 0.2 km (200m) to match PRD
 
   try {
     // 1. Check cache
@@ -196,6 +202,7 @@ router.post('/:routeId/villages/refresh', async (req: Request, res: Response) =>
     return res.json({ ok: true, count: villages.length, villages });
   } catch (err: any) {
     console.error(`[Villages/refresh] Error for route ${routeId}:`, err.message);
-    return res.status(503).json({ error: err.message });
+    res.status(503).json({ error: err.message });
   }
 });
+

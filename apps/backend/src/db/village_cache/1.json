@@ -1,0 +1,80 @@
+{
+  "fetchedAt": "2026-06-29T05:39:45.284Z",
+  "villages": [
+    {
+      "name": "Magarwara",
+      "latitude": 26.5152001,
+      "longitude": 80.4308053
+    },
+    {
+      "name": "Ameer Nagar",
+      "latitude": 26.8339511,
+      "longitude": 80.9109708
+    },
+    {
+      "name": "Moti Nagar",
+      "latitude": 26.8395949,
+      "longitude": 80.913333
+    },
+    {
+      "name": "Sunderbagh",
+      "latitude": 26.8406331,
+      "longitude": 80.9304689
+    },
+    {
+      "name": "Vikram Nagar",
+      "latitude": 26.7776645,
+      "longitude": 80.8720519
+    },
+    {
+      "name": "Birhana",
+      "latitude": 26.848957,
+      "longitude": 80.917914
+    },
+    {
+      "name": "Sector D, LDA Colony",
+      "latitude": 26.7845433,
+      "longitude": 80.8905154
+    },
+    {
+      "name": "Nazirabad",
+      "latitude": 26.8479757,
+      "longitude": 80.9300225
+    },
+    {
+      "name": "Ajgain",
+      "latitude": 26.6115066,
+      "longitude": 80.6289268
+    },
+    {
+      "name": "Loha Bazar",
+      "latitude": 26.8535333,
+      "longitude": 80.914839
+    },
+    {
+      "name": "Kudrat Vihar Colony",
+      "latitude": 26.7419915,
+      "longitude": 80.8593883
+    },
+    {
+      "name": "Sarojni Nagar",
+      "latitude": 26.7423277,
+      "longitude": 80.8612463
+    },
+    {
+      "name": "Gauri Bazar",
+      "latitude": 26.7400509,
+      "longitude": 80.858156
+    },
+    {
+      "name": "Aurangabad",
+      "latitude": 26.7704608,
+      "longitude": 80.9140762
+    },
+    {
+      "name": "Indraprastha Estate",
+      "latitude": 26.8707003,
+      "longitude": 80.9425798
+    }
+  ]
+}
