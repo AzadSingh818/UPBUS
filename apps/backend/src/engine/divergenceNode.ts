@@ -1,6 +1,5 @@
 // divergenceNode.ts
 import { DIV_DISTANCE_THRESHOLD_KM } from './divergenceConfig'; // may be used elsewhere
-import { haversineKm } from './stopStateFSM'; // reuse helper if needed
 
 export interface DivergenceBranch {
   branchId: number; // unique within this node

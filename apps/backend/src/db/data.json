@@ -2144,6 +2144,1644 @@
       "name": "Kumarhera",
       "latitude": 29.954,
       "longitude": 77.4912
+    },
+    {
+      "id": 265,
+      "stop_code": "S_AGRA_FORT_BUS_STATION",
+      "name": "Agra Fort Bus Station",
+      "latitude": 27.1798258,
+      "longitude": 78.0208223
+    },
+    {
+      "id": 266,
+      "stop_code": "S_AKBARABAD_BUS_STATION",
+      "name": "Akbarabad Bus Station",
+      "latitude": 27.1752554,
+      "longitude": 78.0098161
+    },
+    {
+      "id": 267,
+      "stop_code": "S_BAH_BUS_STATION",
+      "name": "Bah Bus Station",
+      "latitude": 26.8706494,
+      "longitude": 78.4973007
+    },
+    {
+      "id": 268,
+      "stop_code": "S_BARSANA_BUS_STATION",
+      "name": "Barsana Bus Station",
+      "latitude": 27.1752554,
+      "longitude": 78.0098161
+    },
+    {
+      "id": 269,
+      "stop_code": "S_CHATA_BUS_STATION",
+      "name": "Chata Bus Station",
+      "latitude": 27.1752554,
+      "longitude": 78.0098161
+    },
+    {
+      "id": 270,
+      "stop_code": "S_FARAH_BUS_STATION",
+      "name": "Farah Bus Station",
+      "latitude": 27.1752554,
+      "longitude": 78.0098161
+    },
+    {
+      "id": 271,
+      "stop_code": "S_FATEHABAD_BUS_STATION",
+      "name": "Fatehabad Bus Station",
+      "latitude": 27.0276683,
+      "longitude": 78.2074341
+    },
+    {
+      "id": 272,
+      "stop_code": "S_FATEHPUR_SEEKRI_BUS_STATION",
+      "name": "Fatehpur Seekri Bus Station",
+      "latitude": 27.1752554,
+      "longitude": 78.0098161
+    },
+    {
+      "id": 273,
+      "stop_code": "S_FIROZABAD_BUS_STATION",
+      "name": "Firozabad Bus Station",
+      "latitude": 27.0385204,
+      "longitude": 78.3411499
+    },
+    {
+      "id": 274,
+      "stop_code": "S_GOVERDHAN_BUS_STATION",
+      "name": "Goverdhan Bus Station",
+      "latitude": 27.0944106,
+      "longitude": 77.6664906
+    },
+    {
+      "id": 275,
+      "stop_code": "S_IDGAAH_BUS_STATION",
+      "name": "Idgaah Bus Station",
+      "latitude": 27.1752554,
+      "longitude": 78.0098161
+    },
+    {
+      "id": 276,
+      "stop_code": "S_JAGNER_BUS_STATION",
+      "name": "Jagner Bus Station",
+      "latitude": 26.8642479,
+      "longitude": 77.6026674
+    },
+    {
+      "id": 277,
+      "stop_code": "S_KAGAROL_BUS_STATION",
+      "name": "Kagarol Bus Station",
+      "latitude": 27.0219265,
+      "longitude": 77.8472803
+    },
+    {
+      "id": 278,
+      "stop_code": "S_KOSI_BUS_STATION",
+      "name": "Kosi Bus Station",
+      "latitude": 27.1752554,
+      "longitude": 78.0098161
+    },
+    {
+      "id": 279,
+      "stop_code": "S_MAANTH_BUS_STATION",
+      "name": "Maanth Bus Station",
+      "latitude": 27.1752554,
+      "longitude": 78.0098161
+    },
+    {
+      "id": 280,
+      "stop_code": "S_NAUJHEEL_BUS_STATION",
+      "name": "Naujheel Bus Station",
+      "latitude": 27.1752554,
+      "longitude": 78.0098161
+    },
+    {
+      "id": 281,
+      "stop_code": "S_PINHAT_BUS_STATION",
+      "name": "Pinhat Bus Station",
+      "latitude": 27.1752554,
+      "longitude": 78.0098161
+    },
+    {
+      "id": 282,
+      "stop_code": "S_RAYA_BUS_STATION",
+      "name": "Raya Bus Station",
+      "latitude": 27.1752554,
+      "longitude": 78.0098161
+    },
+    {
+      "id": 283,
+      "stop_code": "S_SAIYA_BUS_STATION",
+      "name": "Saiya Bus Station",
+      "latitude": 27.1752554,
+      "longitude": 78.0098161
+    },
+    {
+      "id": 284,
+      "stop_code": "S_SHAMSHABAD_BUS_STATION",
+      "name": "Shamshabad Bus Station",
+      "latitude": 27.0250104,
+      "longitude": 78.1269266
+    },
+    {
+      "id": 285,
+      "stop_code": "S_SHERGARH_BUS_STATION",
+      "name": "Shergarh Bus Station",
+      "latitude": 27.1752554,
+      "longitude": 78.0098161
+    },
+    {
+      "id": 286,
+      "stop_code": "S_SUREER_BUS_STATION",
+      "name": "Sureer Bus Station",
+      "latitude": 27.1752554,
+      "longitude": 78.0098161
+    },
+    {
+      "id": 287,
+      "stop_code": "S_TANTPUR_BUS_STATION",
+      "name": "Tantpur Bus Station",
+      "latitude": 26.8402173,
+      "longitude": 77.4840495
+    },
+    {
+      "id": 288,
+      "stop_code": "S_TUNDALA_BUS_STATION",
+      "name": "Tundala Bus Station",
+      "latitude": 27.1752554,
+      "longitude": 78.0098161
+    },
+    {
+      "id": 289,
+      "stop_code": "S_VRANDAVAN_BUS_STATION",
+      "name": "Vrandavan Bus Station",
+      "latitude": 27.1752554,
+      "longitude": 78.0098161
+    },
+    {
+      "id": 290,
+      "stop_code": "S_ALIGARH_BUS_STATION",
+      "name": "Aligarh Bus Station",
+      "latitude": 27.9049132,
+      "longitude": 78.048966
+    },
+    {
+      "id": 291,
+      "stop_code": "S_ATRAULI_BUS_STATION",
+      "name": "Atrauli Bus Station",
+      "latitude": 27.9730519,
+      "longitude": 78.4005449
+    },
+    {
+      "id": 292,
+      "stop_code": "S_ETAH_BUS_STATION",
+      "name": "Etah Bus Station",
+      "latitude": 27.8761073,
+      "longitude": 78.1358153
+    },
+    {
+      "id": 293,
+      "stop_code": "S_GABHANA_BUS_STATION",
+      "name": "Gabhana Bus Station",
+      "latitude": 28.0539546,
+      "longitude": 77.9750303
+    },
+    {
+      "id": 294,
+      "stop_code": "S_HATHRAS_BUS_STATION",
+      "name": "Hathras Bus Station",
+      "latitude": 27.8993945,
+      "longitude": 78.0720353
+    },
+    {
+      "id": 295,
+      "stop_code": "S_IGLAAS_BUS_STATION",
+      "name": "Iglaas Bus Station",
+      "latitude": 27.8761073,
+      "longitude": 78.1358153
+    },
+    {
+      "id": 296,
+      "stop_code": "S_KASGANJ_BUS_STATION",
+      "name": "Kasganj Bus Station",
+      "latitude": 27.8439008,
+      "longitude": 78.5379358
+    },
+    {
+      "id": 297,
+      "stop_code": "S_KHAIR_BUS_STATION",
+      "name": "Khair Bus Station",
+      "latitude": 27.9420637,
+      "longitude": 77.842669
+    },
+    {
+      "id": 298,
+      "stop_code": "S_KHANDAULI_BUS_STATION",
+      "name": "Khandauli Bus Station",
+      "latitude": 27.8761073,
+      "longitude": 78.1358153
+    },
+    {
+      "id": 299,
+      "stop_code": "S_MASSODABAD_ALIGARH_BUS_STATION",
+      "name": "Massodabad Aligarh Bus Station",
+      "latitude": 27.8761073,
+      "longitude": 78.1358153
+    },
+    {
+      "id": 300,
+      "stop_code": "S_NARORA_BUS_STATION",
+      "name": "Narora Bus Station",
+      "latitude": 27.8761073,
+      "longitude": 78.1358153
+    },
+    {
+      "id": 301,
+      "stop_code": "S_SADABAD_BUS_STATION",
+      "name": "Sadabad Bus Station",
+      "latitude": 27.8761073,
+      "longitude": 78.1358153
+    },
+    {
+      "id": 302,
+      "stop_code": "S_SASANI_BUS_STATION",
+      "name": "Sasani Bus Station",
+      "latitude": 27.8761073,
+      "longitude": 78.1358153
+    },
+    {
+      "id": 303,
+      "stop_code": "S_SORON_BUS_STATION",
+      "name": "Soron Bus Station",
+      "latitude": 27.8761073,
+      "longitude": 78.1358153
+    },
+    {
+      "id": 304,
+      "stop_code": "S_AYODHYA_BUS_STATION",
+      "name": "Ayodhya Bus Station",
+      "latitude": 26.7990707,
+      "longitude": 82.2052321
+    },
+    {
+      "id": 305,
+      "stop_code": "S_FAIZABAD_BUS_STATION",
+      "name": "Faizabad Bus Station",
+      "latitude": 26.7807986,
+      "longitude": 82.1486589
+    },
+    {
+      "id": 306,
+      "stop_code": "S_SULTANPUR_BUS_STATION",
+      "name": "Sultanpur Bus Station",
+      "latitude": 26.7990707,
+      "longitude": 82.2052321
+    },
+    {
+      "id": 307,
+      "stop_code": "S_ATRAULIYA_BUS_STATION",
+      "name": "Atrauliya Bus Station",
+      "latitude": 26.3337516,
+      "longitude": 82.9468001
+    },
+    {
+      "id": 308,
+      "stop_code": "S_AZAMGARH_BUS_STATION",
+      "name": "Azamgarh Bus Station",
+      "latitude": 26.0533928,
+      "longitude": 83.1774882
+    },
+    {
+      "id": 309,
+      "stop_code": "S_BALIA_BUS_STATION",
+      "name": "Balia Bus Station",
+      "latitude": 26.023639,
+      "longitude": 83.0293105
+    },
+    {
+      "id": 310,
+      "stop_code": "S_BELTHRA_ROAD_BUS_STATION",
+      "name": "Belthra Road Bus Station",
+      "latitude": 26.023639,
+      "longitude": 83.0293105
+    },
+    {
+      "id": 311,
+      "stop_code": "S_DOHRIGHAT_BUS_STATION",
+      "name": "Dohrighat Bus Station",
+      "latitude": 26.023639,
+      "longitude": 83.0293105
+    },
+    {
+      "id": 312,
+      "stop_code": "S_GHOSI_BUS_STATION",
+      "name": "Ghosi Bus Station",
+      "latitude": 26.023639,
+      "longitude": 83.0293105
+    },
+    {
+      "id": 313,
+      "stop_code": "S_MADHUWAN_BUS_STATION",
+      "name": "Madhuwan Bus Station",
+      "latitude": 26.023639,
+      "longitude": 83.0293105
+    },
+    {
+      "id": 314,
+      "stop_code": "S_MANJHANPUR_BUS_STATION",
+      "name": "Manjhanpur Bus Station",
+      "latitude": 26.023639,
+      "longitude": 83.0293105
+    },
+    {
+      "id": 315,
+      "stop_code": "S_MARYADPUR_BUS_STATION",
+      "name": "Maryadpur Bus Station",
+      "latitude": 26.023639,
+      "longitude": 83.0293105
+    },
+    {
+      "id": 316,
+      "stop_code": "S_MAU_BUS_STATION",
+      "name": "Mau Bus Station",
+      "latitude": 26.0229049,
+      "longitude": 82.9230016
+    },
+    {
+      "id": 317,
+      "stop_code": "S_MEHNAGAR_BUS_STATION",
+      "name": "Mehnagar Bus Station",
+      "latitude": 25.8624096,
+      "longitude": 83.1410318
+    },
+    {
+      "id": 318,
+      "stop_code": "S_RASRA_BUS_STATION",
+      "name": "Rasra Bus Station",
+      "latitude": 26.023639,
+      "longitude": 83.0293105
+    },
+    {
+      "id": 319,
+      "stop_code": "S_SHAHGANJ_BUS_STATION",
+      "name": "Shahganj Bus Station",
+      "latitude": 26.0613506,
+      "longitude": 82.67964
+    },
+    {
+      "id": 320,
+      "stop_code": "S_BADAUN_BUS_STATION",
+      "name": "Badaun Bus Station",
+      "latitude": 28.3463467,
+      "longitude": 79.4063334
+    },
+    {
+      "id": 321,
+      "stop_code": "S_BAREILLY_BUS_STATION",
+      "name": "Bareilly Bus Station",
+      "latitude": 28.4582345,
+      "longitude": 79.4047452
+    },
+    {
+      "id": 322,
+      "stop_code": "S_BAREILLY_SATELITE_BUS_STATION",
+      "name": "Bareilly Satelite Bus Station",
+      "latitude": 28.4582345,
+      "longitude": 79.4047452
+    },
+    {
+      "id": 323,
+      "stop_code": "S_BISALPUR_BUS_STATION",
+      "name": "Bisalpur Bus Station",
+      "latitude": 28.3612405,
+      "longitude": 79.4567436
+    },
+    {
+      "id": 324,
+      "stop_code": "S_BISAULI_BUS_STATION",
+      "name": "Bisauli Bus Station",
+      "latitude": 28.4582345,
+      "longitude": 79.4047452
+    },
+    {
+      "id": 325,
+      "stop_code": "S_DATAGANJ_BUS_STATION",
+      "name": "Dataganj Bus Station",
+      "latitude": 28.4582345,
+      "longitude": 79.4047452
+    },
+    {
+      "id": 326,
+      "stop_code": "S_PILIBHIT_BUS_STATION",
+      "name": "Pilibhit Bus Station",
+      "latitude": 28.3552529,
+      "longitude": 79.4544751
+    },
+    {
+      "id": 327,
+      "stop_code": "S_SAHASWAN_BUS_STATION",
+      "name": "Sahaswan Bus Station",
+      "latitude": 28.4582345,
+      "longitude": 79.4047452
+    },
+    {
+      "id": 328,
+      "stop_code": "S_SHAHJAHANPUR_BUS_STATION",
+      "name": "Shahjahanpur Bus Station",
+      "latitude": 28.4582345,
+      "longitude": 79.4047452
+    },
+    {
+      "id": 329,
+      "stop_code": "S_ATRRA_BUS_STATION",
+      "name": "Atrra Bus Station",
+      "latitude": 25.217139,
+      "longitude": 81.1045927
+    },
+    {
+      "id": 330,
+      "stop_code": "S_BANDA_BUS_STATION",
+      "name": "Banda Bus Station",
+      "latitude": 25.217139,
+      "longitude": 81.1045927
+    },
+    {
+      "id": 331,
+      "stop_code": "S_HAMIRPUR_BUS_STATION",
+      "name": "Hamirpur Bus Station",
+      "latitude": 25.217139,
+      "longitude": 81.1045927
+    },
+    {
+      "id": 332,
+      "stop_code": "S_KUL_PAHAR_BUS_STATION",
+      "name": "Kul Pahar Bus Station",
+      "latitude": 25.217139,
+      "longitude": 81.1045927
+    },
+    {
+      "id": 333,
+      "stop_code": "S_MAHOBA_BUS_STATION",
+      "name": "Mahoba Bus Station",
+      "latitude": 25.217139,
+      "longitude": 81.1045927
+    },
+    {
+      "id": 334,
+      "stop_code": "S_RATH_BUS_STATION",
+      "name": "Rath Bus Station",
+      "latitude": 25.217139,
+      "longitude": 81.1045927
+    },
+    {
+      "id": 335,
+      "stop_code": "S_BAHRAICH_BUS_STATION",
+      "name": "Bahraich Bus Station",
+      "latitude": 26.8467,
+      "longitude": 80.9462
+    },
+    {
+      "id": 336,
+      "stop_code": "S_GILAULA_BUS_STATION",
+      "name": "Gilaula Bus Station",
+      "latitude": 26.8467,
+      "longitude": 80.9462
+    },
+    {
+      "id": 337,
+      "stop_code": "S_GONDA_BUS_STATION",
+      "name": "Gonda Bus Station",
+      "latitude": 26.8467,
+      "longitude": 80.9462
+    },
+    {
+      "id": 338,
+      "stop_code": "S_RUPAIDIAAH_BUS_STATION",
+      "name": "Rupaidiaah Bus Station",
+      "latitude": 26.8467,
+      "longitude": 80.9462
+    },
+    {
+      "id": 339,
+      "stop_code": "S_KURAWALI_BUS_STATION",
+      "name": "Kurawali Bus Station",
+      "latitude": 26.7155629,
+      "longitude": 79.0917098
+    },
+    {
+      "id": 340,
+      "stop_code": "S_AJITMAL_BUS_STATION",
+      "name": "Ajitmal Bus Station",
+      "latitude": 26.7155629,
+      "longitude": 79.0917098
+    },
+    {
+      "id": 341,
+      "stop_code": "S_AURRAIYA_BUS_STATION",
+      "name": "Aurraiya Bus Station",
+      "latitude": 26.7155629,
+      "longitude": 79.0917098
+    },
+    {
+      "id": 342,
+      "stop_code": "S_BARNAHAL_BUS_STATION",
+      "name": "Barnahal Bus Station",
+      "latitude": 26.7155629,
+      "longitude": 79.0917098
+    },
+    {
+      "id": 343,
+      "stop_code": "S_BEWAR_BUS_STATION",
+      "name": "Bewar Bus Station",
+      "latitude": 26.7155629,
+      "longitude": 79.0917098
+    },
+    {
+      "id": 344,
+      "stop_code": "S_BHOGAON_BUS_STATION",
+      "name": "Bhogaon Bus Station",
+      "latitude": 26.7155629,
+      "longitude": 79.0917098
+    },
+    {
+      "id": 345,
+      "stop_code": "S_BIDHUNA_BUS_STATION",
+      "name": "Bidhuna Bus Station",
+      "latitude": 26.8474023,
+      "longitude": 79.4738585
+    },
+    {
+      "id": 346,
+      "stop_code": "S_CHIBRAMAU_BUS_STATION",
+      "name": "Chibramau Bus Station",
+      "latitude": 26.7155629,
+      "longitude": 79.0917098
+    },
+    {
+      "id": 347,
+      "stop_code": "S_ETAWAH_BUS_STATION",
+      "name": "Etawah Bus Station",
+      "latitude": 26.7799315,
+      "longitude": 79.0287313
+    },
+    {
+      "id": 348,
+      "stop_code": "S_FARRUKHABAD_BUS_STATION",
+      "name": "Farrukhabad Bus Station",
+      "latitude": 27.3208388,
+      "longitude": 79.3712044
+    },
+    {
+      "id": 349,
+      "stop_code": "S_FATEHGARH_BUS_STATION",
+      "name": "Fatehgarh Bus Station",
+      "latitude": 26.7155629,
+      "longitude": 79.0917098
+    },
+    {
+      "id": 350,
+      "stop_code": "S_GURSAHAYGANJ_BUS_STATION",
+      "name": "Gursahayganj Bus Station",
+      "latitude": 26.7155629,
+      "longitude": 79.0917098
+    },
+    {
+      "id": 351,
+      "stop_code": "S_JASWANT_NAGAR_BUS_STATION",
+      "name": "Jaswant Nagar Bus Station",
+      "latitude": 26.7155629,
+      "longitude": 79.0917098
+    },
+    {
+      "id": 352,
+      "stop_code": "S_KARHAL_BUS_STATION",
+      "name": "Karhal Bus Station",
+      "latitude": 26.7155629,
+      "longitude": 79.0917098
+    },
+    {
+      "id": 353,
+      "stop_code": "S_KISHNI_BUS_STATION",
+      "name": "Kishni Bus Station",
+      "latitude": 27.0315256,
+      "longitude": 79.2656399
+    },
+    {
+      "id": 354,
+      "stop_code": "S_MAINPURI_BUS_STATION",
+      "name": "Mainpuri Bus Station",
+      "latitude": 26.7155629,
+      "longitude": 79.0917098
+    },
+    {
+      "id": 355,
+      "stop_code": "S_MURADGANJ_BUS_STATION",
+      "name": "Muradganj Bus Station",
+      "latitude": 26.7155629,
+      "longitude": 79.0917098
+    },
+    {
+      "id": 356,
+      "stop_code": "S_RAJPUR_BUS_STATION",
+      "name": "Rajpur Bus Station",
+      "latitude": 26.7155629,
+      "longitude": 79.0917098
+    },
+    {
+      "id": 357,
+      "stop_code": "S_SAIFAI_BUS_STATION",
+      "name": "Saifai Bus Station",
+      "latitude": 26.9639485,
+      "longitude": 78.9516065
+    },
+    {
+      "id": 358,
+      "stop_code": "S_SHIKOHABAD_BUS_STATION",
+      "name": "Shikohabad Bus Station",
+      "latitude": 26.7155629,
+      "longitude": 79.0917098
+    },
+    {
+      "id": 359,
+      "stop_code": "S_TIRWA_BUS_STATION",
+      "name": "Tirwa Bus Station",
+      "latitude": 26.7155629,
+      "longitude": 79.0917098
+    },
+    {
+      "id": 360,
+      "stop_code": "S_BULANDSHAHAR_BUS_STATION",
+      "name": "Bulandshahar Bus Station",
+      "latitude": 28.7749966,
+      "longitude": 77.4586967
+    },
+    {
+      "id": 361,
+      "stop_code": "S_DADRI_BUS_STATION",
+      "name": "Dadri Bus Station",
+      "latitude": 28.569538,
+      "longitude": 77.4282442
+    },
+    {
+      "id": 362,
+      "stop_code": "S_GARHMUKTESHWAR_BUS_STATION",
+      "name": "Garhmukteshwar Bus Station",
+      "latitude": 28.7749966,
+      "longitude": 77.4586967
+    },
+    {
+      "id": 363,
+      "stop_code": "S_GHAZIABAD_BUS_STATION",
+      "name": "Ghaziabad Bus Station",
+      "latitude": 28.6711527,
+      "longitude": 77.4120356
+    },
+    {
+      "id": 364,
+      "stop_code": "S_KHATAULI_BUS_STATION",
+      "name": "Khatauli Bus Station",
+      "latitude": 28.7749966,
+      "longitude": 77.4586967
+    },
+    {
+      "id": 365,
+      "stop_code": "S_LONI_BUS_STATION",
+      "name": "Loni Bus Station",
+      "latitude": 28.7317295,
+      "longitude": 77.2900919
+    },
+    {
+      "id": 366,
+      "stop_code": "S_MODINAGAR_BUS_STATION",
+      "name": "Modinagar Bus Station",
+      "latitude": 28.8320713,
+      "longitude": 77.5770873
+    },
+    {
+      "id": 367,
+      "stop_code": "S_MOHAN_NAGAR_BUS_STATION",
+      "name": "Mohan Nagar Bus Station",
+      "latitude": 28.6785372,
+      "longitude": 77.3840026
+    },
+    {
+      "id": 368,
+      "stop_code": "S_MURADNAGAR_BUS_STATION",
+      "name": "Muradnagar Bus Station",
+      "latitude": 28.7733808,
+      "longitude": 77.5033582
+    },
+    {
+      "id": 369,
+      "stop_code": "S_SAHIBABAD_BUS_STATION",
+      "name": "Sahibabad Bus Station",
+      "latitude": 28.6676672,
+      "longitude": 77.3681893
+    },
+    {
+      "id": 370,
+      "stop_code": "S_SIKANDARABAD_BUS_STATION",
+      "name": "Sikandarabad Bus Station",
+      "latitude": 28.7749966,
+      "longitude": 77.4586967
+    },
+    {
+      "id": 371,
+      "stop_code": "S_BANSI_BUS_STATION",
+      "name": "Bansi Bus Station",
+      "latitude": 26.6677977,
+      "longitude": 83.3642334
+    },
+    {
+      "id": 372,
+      "stop_code": "S_BASTI_BUS_STATION",
+      "name": "Basti Bus Station",
+      "latitude": 26.6677977,
+      "longitude": 83.3642334
+    },
+    {
+      "id": 373,
+      "stop_code": "S_BIRDGHAT_RAPTINAGAR_BUS_STATION",
+      "name": "Birdghat (raptinagar) Bus Station",
+      "latitude": 26.6677977,
+      "longitude": 83.3642334
+    },
+    {
+      "id": 374,
+      "stop_code": "S_DEORIA_BUS_STATION",
+      "name": "Deoria Bus Station",
+      "latitude": 26.6677977,
+      "longitude": 83.3642334
+    },
+    {
+      "id": 375,
+      "stop_code": "S_DUMARIYAGANJ_BUS_STATION",
+      "name": "Dumariyaganj Bus Station",
+      "latitude": 26.6677977,
+      "longitude": 83.3642334
+    },
+    {
+      "id": 376,
+      "stop_code": "S_GAURI_BAZAR_BUS_STATION",
+      "name": "Gauri Bazar Bus Station",
+      "latitude": 26.6677977,
+      "longitude": 83.3642334
+    },
+    {
+      "id": 377,
+      "stop_code": "S_GORAKHPUR_BUS_STATION",
+      "name": "Gorakhpur Bus Station",
+      "latitude": 26.7600217,
+      "longitude": 83.3668129
+    },
+    {
+      "id": 378,
+      "stop_code": "S_KASYA_BUS_STATION",
+      "name": "Kasya Bus Station",
+      "latitude": 26.6677977,
+      "longitude": 83.3642334
+    },
+    {
+      "id": 379,
+      "stop_code": "S_MAHRAJGANJ_BUS_STATION",
+      "name": "Mahrajganj Bus Station",
+      "latitude": 26.6677977,
+      "longitude": 83.3642334
+    },
+    {
+      "id": 380,
+      "stop_code": "S_MEHNDAWAL_BUS_STATION",
+      "name": "Mehndawal Bus Station",
+      "latitude": 26.6677977,
+      "longitude": 83.3642334
+    },
+    {
+      "id": 381,
+      "stop_code": "S_MUKHLISPUR_BUS_STATION",
+      "name": "Mukhlispur Bus Station",
+      "latitude": 26.6677977,
+      "longitude": 83.3642334
+    },
+    {
+      "id": 382,
+      "stop_code": "S_NAUGARH_BUS_STATION",
+      "name": "Naugarh Bus Station",
+      "latitude": 26.6677977,
+      "longitude": 83.3642334
+    },
+    {
+      "id": 383,
+      "stop_code": "S_PADRAUNA_BUS_STATION",
+      "name": "Padrauna Bus Station",
+      "latitude": 26.6677977,
+      "longitude": 83.3642334
+    },
+    {
+      "id": 384,
+      "stop_code": "S_RUDRAPUR_BUS_STATION",
+      "name": "Rudrapur Bus Station",
+      "latitude": 26.6677977,
+      "longitude": 83.3642334
+    },
+    {
+      "id": 385,
+      "stop_code": "S_ALLAGANJ_BUS_STATION",
+      "name": "Allaganj Bus Station",
+      "latitude": 27.3369978,
+      "longitude": 80.0998232
+    },
+    {
+      "id": 386,
+      "stop_code": "S_GOLA_BUS_STATION",
+      "name": "Gola Bus Station",
+      "latitude": 27.3369978,
+      "longitude": 80.0998232
+    },
+    {
+      "id": 387,
+      "stop_code": "S_HARDOI_BUS_STATION",
+      "name": "Hardoi Bus Station",
+      "latitude": 27.4010619,
+      "longitude": 80.1329669
+    },
+    {
+      "id": 388,
+      "stop_code": "S_JALALABAD_BUS_STATION",
+      "name": "Jalalabad Bus Station",
+      "latitude": 27.3369978,
+      "longitude": 80.0998232
+    },
+    {
+      "id": 389,
+      "stop_code": "S_KAANTH_BUS_STATION",
+      "name": "Kaanth Bus Station",
+      "latitude": 27.3369978,
+      "longitude": 80.0998232
+    },
+    {
+      "id": 390,
+      "stop_code": "S_KATRA_BUS_STATION",
+      "name": "Katra Bus Station",
+      "latitude": 27.3369978,
+      "longitude": 80.0998232
+    },
+    {
+      "id": 391,
+      "stop_code": "S_KNNAUJ_BUS_STATION",
+      "name": "Knnauj Bus Station",
+      "latitude": 27.3369978,
+      "longitude": 80.0998232
+    },
+    {
+      "id": 392,
+      "stop_code": "S_LAKHIMPUR_BUS_STATION",
+      "name": "Lakhimpur Bus Station",
+      "latitude": 27.3369978,
+      "longitude": 80.0998232
+    },
+    {
+      "id": 393,
+      "stop_code": "S_MAHMOODABAD_BUS_STATION",
+      "name": "Mahmoodabad Bus Station",
+      "latitude": 27.3369978,
+      "longitude": 80.0998232
+    },
+    {
+      "id": 394,
+      "stop_code": "S_MOHAMMADI_BUS_STATION",
+      "name": "Mohammadi Bus Station",
+      "latitude": 27.3369978,
+      "longitude": 80.0998232
+    },
+    {
+      "id": 395,
+      "stop_code": "S_PUNWAYAN_BUS_STATION",
+      "name": "Punwayan Bus Station",
+      "latitude": 27.3369978,
+      "longitude": 80.0998232
+    },
+    {
+      "id": 396,
+      "stop_code": "S_SIDHAULI_BUS_STATION",
+      "name": "Sidhauli Bus Station",
+      "latitude": 27.3369978,
+      "longitude": 80.0998232
+    },
+    {
+      "id": 397,
+      "stop_code": "S_SITAPUR_BUS_STATION",
+      "name": "Sitapur Bus Station",
+      "latitude": 27.3369978,
+      "longitude": 80.0998232
+    },
+    {
+      "id": 398,
+      "stop_code": "S_ARRAUL_BUS_STATION",
+      "name": "Arraul Bus Station",
+      "latitude": 26.4609135,
+      "longitude": 80.3217588
+    },
+    {
+      "id": 399,
+      "stop_code": "S_BINDKI_BUS_STATION",
+      "name": "Bindki Bus Station",
+      "latitude": 26.4609135,
+      "longitude": 80.3217588
+    },
+    {
+      "id": 400,
+      "stop_code": "S_CHUNNIGANJ_BUS_STATION",
+      "name": "Chunniganj Bus Station",
+      "latitude": 26.4770043,
+      "longitude": 80.3370488
+    },
+    {
+      "id": 401,
+      "stop_code": "S_FATEHPUR_BUS_STATION",
+      "name": "Fatehpur Bus Station",
+      "latitude": 26.4609135,
+      "longitude": 80.3217588
+    },
+    {
+      "id": 402,
+      "stop_code": "S_GHATAMPUR_BUS_STATION",
+      "name": "Ghatampur Bus Station",
+      "latitude": 26.1551192,
+      "longitude": 80.1674983
+    },
+    {
+      "id": 403,
+      "stop_code": "S_JAHANABAD_BUS_STATION",
+      "name": "Jahanabad Bus Station",
+      "latitude": 26.4609135,
+      "longitude": 80.3217588
+    },
+    {
+      "id": 404,
+      "stop_code": "S_KANPUR_CENTRAL_BUS_STATION",
+      "name": "Kanpur Central Bus Station",
+      "latitude": 26.4538613,
+      "longitude": 80.3512433
+    },
+    {
+      "id": 405,
+      "stop_code": "S_LALAULI_BUS_STATION",
+      "name": "Lalauli Bus Station",
+      "latitude": 26.4609135,
+      "longitude": 80.3217588
+    },
+    {
+      "id": 406,
+      "stop_code": "S_MAURANWA_BUS_STATION",
+      "name": "Mauranwa Bus Station",
+      "latitude": 26.4609135,
+      "longitude": 80.3217588
+    },
+    {
+      "id": 407,
+      "stop_code": "S_PUKHRANYA_BUS_STATION",
+      "name": "Pukhranya Bus Station",
+      "latitude": 26.4609135,
+      "longitude": 80.3217588
+    },
+    {
+      "id": 408,
+      "stop_code": "S_RAWATPUR_BUS_STATION",
+      "name": "Rawatpur Bus Station",
+      "latitude": 26.4829029,
+      "longitude": 80.2998708
+    },
+    {
+      "id": 409,
+      "stop_code": "S_UNNAO_BUS_STATION",
+      "name": "Unnao Bus Station",
+      "latitude": 26.4375956,
+      "longitude": 80.5502469
+    },
+    {
+      "id": 410,
+      "stop_code": "S_ALAMBAGH_BUS_STATION",
+      "name": "Alambagh Bus Station",
+      "latitude": 26.8140101,
+      "longitude": 80.9025123
+    },
+    {
+      "id": 411,
+      "stop_code": "S_BACHRANWA_BUS_STATION",
+      "name": "Bachranwa Bus Station",
+      "latitude": 26.8381,
+      "longitude": 80.9346001
+    },
+    {
+      "id": 412,
+      "stop_code": "S_BARABANKI_BUS_STATION",
+      "name": "Barabanki Bus Station",
+      "latitude": 26.8381,
+      "longitude": 80.9346001
+    },
+    {
+      "id": 413,
+      "stop_code": "S_CHARBAGH_BUS_STATION",
+      "name": "Charbagh Bus Station",
+      "latitude": 26.8334969,
+      "longitude": 80.9264143
+    },
+    {
+      "id": 414,
+      "stop_code": "S_DEVAN_BUS_STATION",
+      "name": "Devan Bus Station",
+      "latitude": 26.8381,
+      "longitude": 80.9346001
+    },
+    {
+      "id": 415,
+      "stop_code": "S_HAIDERGARH_BUS_STATION",
+      "name": "Haidergarh Bus Station",
+      "latitude": 26.8381,
+      "longitude": 80.9346001
+    },
+    {
+      "id": 416,
+      "stop_code": "S_KAISERBAGH_BUS_STATION",
+      "name": "Kaiserbagh Bus Station",
+      "latitude": 26.8498749,
+      "longitude": 80.9314544
+    },
+    {
+      "id": 417,
+      "stop_code": "S_LALGANJ_BUS_STATION",
+      "name": "Lalganj Bus Station",
+      "latitude": 26.8381,
+      "longitude": 80.9346001
+    },
+    {
+      "id": 418,
+      "stop_code": "S_MOHANLALGANJ_BUS_STATION",
+      "name": "Mohanlalganj Bus Station",
+      "latitude": 26.6722274,
+      "longitude": 81.0670433
+    },
+    {
+      "id": 419,
+      "stop_code": "S_RAEBARELLY_BUS_STATION",
+      "name": "Raebarelly Bus Station",
+      "latitude": 26.8381,
+      "longitude": 80.9346001
+    },
+    {
+      "id": 420,
+      "stop_code": "S_RAMNAGAR_BUS_STATION",
+      "name": "Ramnagar Bus Station",
+      "latitude": 26.8381,
+      "longitude": 80.9346001
+    },
+    {
+      "id": 421,
+      "stop_code": "S_SAFEDABAD_BUS_STATION",
+      "name": "Safedabad Bus Station",
+      "latitude": 26.8980333,
+      "longitude": 81.1167756
+    },
+    {
+      "id": 422,
+      "stop_code": "S_SALON_BUS_STATION",
+      "name": "Salon Bus Station",
+      "latitude": 26.7894394,
+      "longitude": 80.9080162
+    },
+    {
+      "id": 423,
+      "stop_code": "S_SHIVGARH_BUS_STATION",
+      "name": "Shivgarh Bus Station",
+      "latitude": 26.8381,
+      "longitude": 80.9346001
+    },
+    {
+      "id": 424,
+      "stop_code": "S_TILOI_BUS_STATION",
+      "name": "Tiloi Bus Station",
+      "latitude": 26.8381,
+      "longitude": 80.9346001
+    },
+    {
+      "id": 425,
+      "stop_code": "S_TRANSPORT_NAGAR_BUS_STATION",
+      "name": "Transport Nagar Bus Station",
+      "latitude": 26.777877,
+      "longitude": 80.8826512
+    },
+    {
+      "id": 426,
+      "stop_code": "S_ACHNER_BUS_STATION",
+      "name": "Achner Bus Station",
+      "latitude": 27.1752554,
+      "longitude": 78.0098161
+    },
+    {
+      "id": 427,
+      "stop_code": "S_BHOOTESHWAR_BUS_STATION",
+      "name": "Bhooteshwar Bus Station",
+      "latitude": 27.4955539,
+      "longitude": 77.6855554
+    },
+    {
+      "id": 428,
+      "stop_code": "S_MATHURA_BUS_STATION",
+      "name": "Mathura Bus Station",
+      "latitude": 27.4955539,
+      "longitude": 77.6855554
+    },
+    {
+      "id": 429,
+      "stop_code": "S_MEERUT_BUS_STATION",
+      "name": "Meerut Bus Station",
+      "latitude": 28.9963296,
+      "longitude": 77.7061915
+    },
+    {
+      "id": 430,
+      "stop_code": "S_BIJNORE_BUS_STATION",
+      "name": "Bijnore Bus Station",
+      "latitude": 28.8796553,
+      "longitude": 78.8095335
+    },
+    {
+      "id": 431,
+      "stop_code": "S_BILARI_BUS_STATION",
+      "name": "Bilari Bus Station",
+      "latitude": 28.6485251,
+      "longitude": 78.7688265
+    },
+    {
+      "id": 432,
+      "stop_code": "S_CHANDAUSI_BUS_STATION",
+      "name": "Chandausi Bus Station",
+      "latitude": 28.8796553,
+      "longitude": 78.8095335
+    },
+    {
+      "id": 433,
+      "stop_code": "S_CHANDPUR_BUS_STATION",
+      "name": "Chandpur Bus Station",
+      "latitude": 29.0022854,
+      "longitude": 78.8447569
+    },
+    {
+      "id": 434,
+      "stop_code": "S_DHAMPUR_BUS_STATION",
+      "name": "Dhampur Bus Station",
+      "latitude": 28.8796553,
+      "longitude": 78.8095335
+    },
+    {
+      "id": 435,
+      "stop_code": "S_GAZRAULA_BUS_STATION",
+      "name": "Gazraula Bus Station",
+      "latitude": 28.9898234,
+      "longitude": 78.8016699
+    },
+    {
+      "id": 436,
+      "stop_code": "S_HASANPUR_BUS_STATION",
+      "name": "Hasanpur Bus Station",
+      "latitude": 28.8248238,
+      "longitude": 78.9098167
+    },
+    {
+      "id": 437,
+      "stop_code": "S_KATGHAR_BUS_STATION",
+      "name": "Katghar Bus Station",
+      "latitude": 28.8796553,
+      "longitude": 78.8095335
+    },
+    {
+      "id": 438,
+      "stop_code": "S_MORADABAD_BUS_STATION",
+      "name": "Moradabad Bus Station",
+      "latitude": 28.8334982,
+      "longitude": 78.7732864
+    },
+    {
+      "id": 439,
+      "stop_code": "S_NAGINA_BUS_STATION",
+      "name": "Nagina Bus Station",
+      "latitude": 28.8796553,
+      "longitude": 78.8095335
+    },
+    {
+      "id": 440,
+      "stop_code": "S_NAHTAUR_BUS_STATION",
+      "name": "Nahtaur Bus Station",
+      "latitude": 28.8796553,
+      "longitude": 78.8095335
+    },
+    {
+      "id": 441,
+      "stop_code": "S_NAJIBABAD_BUS_STATION",
+      "name": "Najibabad Bus Station",
+      "latitude": 28.8796553,
+      "longitude": 78.8095335
+    },
+    {
+      "id": 442,
+      "stop_code": "S_NOORPUR_BUS_STATION",
+      "name": "Noorpur Bus Station",
+      "latitude": 28.78169,
+      "longitude": 78.7620592
+    },
+    {
+      "id": 443,
+      "stop_code": "S_RAMPUR_BUS_STATION",
+      "name": "Rampur Bus Station",
+      "latitude": 29.2355813,
+      "longitude": 78.7204291
+    },
+    {
+      "id": 444,
+      "stop_code": "S_SHADIPUR_BUS_STATION",
+      "name": "Shadipur Bus Station",
+      "latitude": 28.8796553,
+      "longitude": 78.8095335
+    },
+    {
+      "id": 445,
+      "stop_code": "S_SIRSI_BUS_STATION",
+      "name": "Sirsi Bus Station",
+      "latitude": 28.6650603,
+      "longitude": 78.7807273
+    },
+    {
+      "id": 446,
+      "stop_code": "S_THAKURDWARA_BUS_STATION",
+      "name": "Thakurdwara Bus Station",
+      "latitude": 29.102922,
+      "longitude": 78.8154436
+    },
+    {
+      "id": 447,
+      "stop_code": "S_CIVIL_LINES_BUS_STATION",
+      "name": "Civil Lines Bus Station",
+      "latitude": 25.4523026,
+      "longitude": 81.8329887
+    },
+    {
+      "id": 448,
+      "stop_code": "S_KALAKANKAR_BUS_STATION",
+      "name": "Kalakankar Bus Station",
+      "latitude": 25.4381302,
+      "longitude": 81.8338005
+    },
+    {
+      "id": 449,
+      "stop_code": "S_KORAON_BUS_STATION",
+      "name": "Koraon Bus Station",
+      "latitude": 24.9408373,
+      "longitude": 82.0701375
+    },
+    {
+      "id": 450,
+      "stop_code": "S_KUNDA_BUS_STATION",
+      "name": "Kunda Bus Station",
+      "latitude": 25.4381302,
+      "longitude": 81.8338005
+    },
+    {
+      "id": 451,
+      "stop_code": "S_MIRZAPUR_BUS_STATION",
+      "name": "Mirzapur Bus Station",
+      "latitude": 25.3594683,
+      "longitude": 81.8840524
+    },
+    {
+      "id": 452,
+      "stop_code": "S_MURATGANJ_BUS_STATION",
+      "name": "Muratganj Bus Station",
+      "latitude": 25.5532087,
+      "longitude": 81.5437831
+    },
+    {
+      "id": 453,
+      "stop_code": "S_PATTI_BUS_STATION",
+      "name": "Patti Bus Station",
+      "latitude": 25.428674,
+      "longitude": 81.8794497
+    },
+    {
+      "id": 454,
+      "stop_code": "S_PRATAPGARH_BUS_STATION",
+      "name": "Pratapgarh Bus Station",
+      "latitude": 25.4381302,
+      "longitude": 81.8338005
+    },
+    {
+      "id": 455,
+      "stop_code": "S_SAINI_BUS_STATION",
+      "name": "Saini Bus Station",
+      "latitude": 25.4381302,
+      "longitude": 81.8338005
+    },
+    {
+      "id": 456,
+      "stop_code": "S_SARAIN_AKIL_BUS_STATION",
+      "name": "Sarain Akil Bus Station",
+      "latitude": 25.4381302,
+      "longitude": 81.8338005
+    },
+    {
+      "id": 457,
+      "stop_code": "S_VINDHYACHAL_BUS_STATION",
+      "name": "Vindhyachal Bus Station",
+      "latitude": 25.4381302,
+      "longitude": 81.8338005
+    },
+    {
+      "id": 458,
+      "stop_code": "S_ZERO_ROAD_BUS_STATION",
+      "name": "Zero Road Bus Station",
+      "latitude": 25.4373281,
+      "longitude": 81.8453198
+    },
+    {
+      "id": 459,
+      "stop_code": "S_PURKAJI_BUS_STATION",
+      "name": "Purkaji Bus Station",
+      "latitude": 29.9856799,
+      "longitude": 77.5040646
+    },
+    {
+      "id": 460,
+      "stop_code": "S_SAHARANPUR_BUS_STATION",
+      "name": "Saharanpur Bus Station",
+      "latitude": 29.9637438,
+      "longitude": 77.5427464
+    },
+    {
+      "id": 461,
+      "stop_code": "S_JAUNPUR_BUS_STATION",
+      "name": "Jaunpur Bus Station",
+      "latitude": 25.3604599,
+      "longitude": 82.942405
+    },
+    {
+      "id": 462,
+      "stop_code": "S_VARANASI_BUS_STATION",
+      "name": "Varanasi Bus Station",
+      "latitude": 25.3356491,
+      "longitude": 83.0076292
+    },
+    {
+      "id": 463,
+      "stop_code": "S_BADHALGANJ_BUS_STATION",
+      "name": "Badhalganj Bus Station",
+      "latitude": 26.6677977,
+      "longitude": 83.3642334
+    },
+    {
+      "id": 464,
+      "stop_code": "S_PHARENDA_BUS_STATION",
+      "name": "Pharenda Bus Station",
+      "latitude": 26.4710847,
+      "longitude": 81.1807046
+    },
+    {
+      "id": 465,
+      "stop_code": "S_SONAULI_BUS_STATION",
+      "name": "Sonauli Bus Station",
+      "latitude": 26.4710847,
+      "longitude": 81.1807046
+    },
+    {
+      "id": 466,
+      "stop_code": "S_KASHI_BUS_STATION",
+      "name": "Kashi Bus Station",
+      "latitude": 25.3356491,
+      "longitude": 83.0076292
+    },
+    {
+      "id": 467,
+      "stop_code": "S_AURAI_SANT_RAVIDAS_BUS_STATION",
+      "name": "Aurai Sant Ravidas Bus Station",
+      "latitude": 25.2948295,
+      "longitude": 82.5809489
+    },
+    {
+      "id": 468,
+      "stop_code": "S_GYANPUR_SANT_RAVIDAS_BUS_STATION",
+      "name": "Gyanpur Sant Ravidas Bus Station",
+      "latitude": 25.3166204,
+      "longitude": 82.3859934
+    },
+    {
+      "id": 469,
+      "stop_code": "S_GAZIPUR_BUS_STATION",
+      "name": "Gazipur Bus Station",
+      "latitude": 25.5874162,
+      "longitude": 83.5903956
+    },
+    {
+      "id": 470,
+      "stop_code": "S_ROBERTSGANJ_BUS_STATION",
+      "name": "Robertsganj Bus Station",
+      "latitude": 26.8467,
+      "longitude": 80.9462
+    },
+    {
+      "id": 471,
+      "stop_code": "S_CHURK_BUS_STATION",
+      "name": "Churk Bus Station",
+      "latitude": 26.8467,
+      "longitude": 80.9462
+    },
+    {
+      "id": 472,
+      "stop_code": "S_THEKMA_BUS_STATION",
+      "name": "Thekma Bus Station",
+      "latitude": 25.8651839,
+      "longitude": 82.9263094
+    },
+    {
+      "id": 473,
+      "stop_code": "S_JAMNIA_BUS_STATION",
+      "name": "Jamnia Bus Station",
+      "latitude": 25.3356491,
+      "longitude": 83.0076292
+    },
+    {
+      "id": 474,
+      "stop_code": "S_MACHLI_SHAHAR_BUS_STATION",
+      "name": "Machli Shahar Bus Station",
+      "latitude": 25.7967065,
+      "longitude": 82.4888992
+    },
+    {
+      "id": 475,
+      "stop_code": "S_BADSHAHPUR_BUS_STATION",
+      "name": "Badshahpur Bus Station",
+      "latitude": 25.6579111,
+      "longitude": 82.1902983
+    },
+    {
+      "id": 476,
+      "stop_code": "S_SUJANGANJ_BUS_STATION",
+      "name": "Sujanganj Bus Station",
+      "latitude": 25.7696112,
+      "longitude": 82.2902825
+    },
+    {
+      "id": 477,
+      "stop_code": "S_CHAKIA_BUS_STATION",
+      "name": "Chakia Bus Station",
+      "latitude": 24.9411431,
+      "longitude": 83.2131103
+    },
+    {
+      "id": 478,
+      "stop_code": "S_AKBARPUR_BUS_STATION",
+      "name": "Akbarpur Bus Station",
+      "latitude": 26.8467,
+      "longitude": 80.9462
+    },
+    {
+      "id": 479,
+      "stop_code": "S_TANDA_BUS_STATION",
+      "name": "Tanda Bus Station",
+      "latitude": 26.8467,
+      "longitude": 80.9462
+    },
+    {
+      "id": 480,
+      "stop_code": "S_KADIPUR_BUS_STATION",
+      "name": "Kadipur Bus Station",
+      "latitude": 26.1407423,
+      "longitude": 82.4102397
+    },
+    {
+      "id": 481,
+      "stop_code": "S_MUSAFIRKHANA_BUS_STATION",
+      "name": "Musafirkhana Bus Station",
+      "latitude": 26.2604732,
+      "longitude": 82.2380532
+    },
+    {
+      "id": 482,
+      "stop_code": "S_JAGDISHPUR_BUS_STATION",
+      "name": "Jagdishpur Bus Station",
+      "latitude": 26.2604732,
+      "longitude": 82.2380532
+    },
+    {
+      "id": 483,
+      "stop_code": "S_INHAUNA_BUS_STATION",
+      "name": "Inhauna Bus Station",
+      "latitude": 26.8467,
+      "longitude": 80.9462
+    },
+    {
+      "id": 484,
+      "stop_code": "S_AMETHI_BUS_STATION",
+      "name": "Amethi Bus Station",
+      "latitude": 26.1561779,
+      "longitude": 81.8045001
+    },
+    {
+      "id": 485,
+      "stop_code": "S_JAMO_BUS_STATION",
+      "name": "Jamo Bus Station",
+      "latitude": 26.2604732,
+      "longitude": 82.2380532
+    },
+    {
+      "id": 486,
+      "stop_code": "S_IKAUNA_BUS_STATION",
+      "name": "Ikauna Bus Station",
+      "latitude": 26.8467,
+      "longitude": 80.9462
+    },
+    {
+      "id": 487,
+      "stop_code": "S_BALRAMPUR_BUS_STATION",
+      "name": "Balrampur Bus Station",
+      "latitude": 27.4156351,
+      "longitude": 82.1609777
+    },
+    {
+      "id": 488,
+      "stop_code": "S_UTRAULA_BUS_STATION",
+      "name": "Utraula Bus Station",
+      "latitude": 27.2389916,
+      "longitude": 82.3961845
+    },
+    {
+      "id": 489,
+      "stop_code": "S_NOIDA_GAUTAM_BUDH_BUS_STATION",
+      "name": "Noida Gautam Budh Bus Station",
+      "latitude": 28.4614906,
+      "longitude": 77.4998877
+    },
+    {
+      "id": 490,
+      "stop_code": "S_AJMERI_GATE_NEW_BUS_STATION",
+      "name": "Ajmeri Gate New Bus Station",
+      "latitude": 28.8281715,
+      "longitude": 77.3849742
+    },
+    {
+      "id": 491,
+      "stop_code": "S_BARRA_KANPUR_BUS_STATION",
+      "name": "Barra Kanpur Bus Station",
+      "latitude": 26.4585639,
+      "longitude": 79.8548052
+    },
+    {
+      "id": 492,
+      "stop_code": "S_NAWABGANJ_BUS_STATION",
+      "name": "Nawabganj Bus Station",
+      "latitude": 28.4914418,
+      "longitude": 79.6489882
+    },
+    {
+      "id": 493,
+      "stop_code": "S_TILHAR_BUS_STATION",
+      "name": "Tilhar Bus Station",
+      "latitude": 28.0571981,
+      "longitude": 79.7416689
+    },
+    {
+      "id": 494,
+      "stop_code": "S_MANDIAON_BUS_STATION",
+      "name": "Mandiaon Bus Station",
+      "latitude": 24.9316896,
+      "longitude": 82.6280163
+    },
+    {
+      "id": 495,
+      "stop_code": "S_KHALILABAD_SANT_KABIR_BUS_STATION",
+      "name": "Khalilabad Sant Kabir Bus Station",
+      "latitude": 26.7751208,
+      "longitude": 83.05424
+    },
+    {
+      "id": 496,
+      "stop_code": "S_KAORI_RAM_BUS_STATION",
+      "name": "Kaori Ram Bus Station",
+      "latitude": 26.6677977,
+      "longitude": 83.3642334
+    },
+    {
+      "id": 497,
+      "stop_code": "S_AHIRAUA_BUS_STATION",
+      "name": "Ahiraua Bus Station",
+      "latitude": 24.9316896,
+      "longitude": 82.6280163
+    },
+    {
+      "id": 498,
+      "stop_code": "S_UJIYARGHAT_BUS_STATION",
+      "name": "Ujiyarghat Bus Station",
+      "latitude": 26.0382286,
+      "longitude": 83.1880965
     }
   ],
   "route_stops": [
@@ -7698,6 +9336,59 @@
       "speed": 40,
       "heading": 90,
       "last_seen_at": "2026-06-22T13:23:07.292Z"
+    }
+  ],
+  "divergence_nodes": [
+    {
+      "id": 1,
+      "name": "Phandpuri Junction",
+      "latitude": 29.93,
+      "longitude": 77.45,
+      "branches": [
+        {
+          "branchId": 1,
+          "routeIds": [
+            9,
+            12
+          ],
+          "polyline": [
+            {
+              "lat": 29.93,
+              "lng": 77.45
+            },
+            {
+              "lat": 29.8943,
+              "lng": 77.3718
+            },
+            {
+              "lat": 29.9198,
+              "lng": 77.3031
+            }
+          ]
+        },
+        {
+          "branchId": 2,
+          "routeIds": [
+            200,
+            201,
+            246
+          ],
+          "polyline": [
+            {
+              "lat": 29.93,
+              "lng": 77.45
+            },
+            {
+              "lat": 29.8943,
+              "lng": 77.3718
+            },
+            {
+              "lat": 29.873,
+              "lng": 77.3411
+            }
+          ]
+        }
+      ]
     }
   ]
 }

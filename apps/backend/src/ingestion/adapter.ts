@@ -1,4 +1,5 @@
 import { query } from '../db';
+import { recordLiveLocation } from '../engine/routeLearning';
 
 export interface CanonicalVehicleLocation {
   registrationNo: string;
@@ -49,6 +50,11 @@ export async function ingestLocation(location: CanonicalVehicleLocation) {
           last_seen_at = EXCLUDED.last_seen_at`,
       [busId, tripId, location.latitude, location.longitude, location.speed, location.heading, location.timestamp]
     );
+
+    // Record the location ping in the route learning engine
+    recordLiveLocation(tripId, location.latitude, location.longitude, location.speed).catch(err => {
+      console.error('[Route Learning] Error recording location ping:', err);
+    });
   } catch (error) {
     console.error('Error ingesting location:', error);
   }

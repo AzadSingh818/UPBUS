@@ -10,6 +10,8 @@ import { buildRouteGeometries, dumpGeometrySummary, getRouteGeometry } from './e
 import { initDivergenceCache } from './engine/divergenceBinding';
 import { router as routeVillagesRouter } from './api/routeVillages';
 import { fetchMargdarshiLiveData } from './services/margdarshiClient';
+import { router as routeLearningDebugRouter } from './api/routeLearningDebug';
+import { recordLiveLocation } from './engine/routeLearning';
 
 function doesBusRouteMatch(busRouteStr: string, legRouteName: string, routeSource: string, routeDest: string): boolean {
   const busStr = busRouteStr.toUpperCase();
@@ -89,6 +91,7 @@ app.get('/api/v1/route/:routeId/waypoints', (req, res) => {
 // GET  /api/v1/routes/:routeId/villages   → list villages near the route
 // POST /api/v1/routes/:routeId/villages/refresh  → force Overpass re-fetch
 app.use('/api/v1/routes', routeVillagesRouter);
+app.use('/api/v1/debug/learning', routeLearningDebugRouter);
 
 // 2. Search routes (Fuzzy route search by From -> To)
 app.get('/api/v1/search/routes', async (req, res) => {
@@ -470,6 +473,101 @@ app.get('/api/v1/search/bus/:regNo', async (req, res) => {
   }
 });
 
+// 6. Save a passenger report
+app.post('/api/v1/reports', async (req, res) => {
+  try {
+    const { tripId, busRegNo, reportType, description, latitude, longitude } = req.body;
+    if (!busRegNo || !reportType) {
+      return res.status(400).json({ error: 'busRegNo and reportType are required.' });
+    }
+
+    await query(
+      `INSERT INTO passenger_reports (trip_id, bus_reg_no, report_type, description, latitude, longitude)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        tripId ? parseInt(tripId, 10) : null,
+        busRegNo,
+        reportType,
+        description || null,
+        latitude ? parseFloat(latitude) : null,
+        longitude ? parseFloat(longitude) : null
+      ]
+    );
+
+    res.status(201).json({ success: true, message: 'Report submitted successfully.' });
+  } catch (error: any) {
+    console.error('Error saving passenger report:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// 7. Get active passenger reports (within last 2 hours)
+app.get('/api/v1/reports/active', async (req, res) => {
+  try {
+    const cutoff = new Date(Date.now() - 2 * 60 * 60 * 1000);
+    const reportsRes = await query(
+      `SELECT id, trip_id, bus_reg_no, report_type, description, latitude, longitude, created_at
+       FROM passenger_reports
+       WHERE created_at >= $1
+       ORDER BY created_at DESC`,
+      [cutoff]
+    );
+
+    res.json({ reports: reportsRes.rows });
+  } catch (error: any) {
+    console.error('Error fetching passenger reports:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// 8. Get VAPID public key for Web Push
+app.get('/api/v1/push/key', (req, res) => {
+  try {
+    const { getVapidPublicKey } = require('./services/notificationService');
+    res.json({ publicKey: getVapidPublicKey() });
+  } catch (error: any) {
+    console.error('Error getting VAPID public key:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// 9. Subscribe to push notifications
+app.post('/api/v1/push/subscribe', async (req, res) => {
+  try {
+    const { subscription } = req.body;
+    if (!subscription) {
+      return res.status(400).json({ error: 'subscription is required.' });
+    }
+
+    const { saveSubscription } = require('./services/notificationService');
+    await saveSubscription(subscription);
+
+    res.status(201).json({ success: true, message: 'Subscribed successfully.' });
+  } catch (error: any) {
+    console.error('Error registering push subscription:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// 10. Unsubscribe from push notifications
+app.post('/api/v1/push/unsubscribe', async (req, res) => {
+  try {
+    const { endpoint } = req.body;
+    if (!endpoint) {
+      return res.status(400).json({ error: 'endpoint is required.' });
+    }
+
+    const { removeSubscription } = require('./services/notificationService');
+    await removeSubscription(endpoint);
+
+    res.json({ success: true, message: 'Unsubscribed successfully.' });
+  } catch (error: any) {
+    console.error('Error unsubscribing:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+
 // Create HTTP server
 const server = http.createServer(app);
 
@@ -540,6 +638,11 @@ wss.on('connection', (ws: WebSocket) => {
             [busId, tripId, latitude, longitude, speed || 0, heading || 0]
           );
 
+          // Record location in the route learning engine
+          recordLiveLocation(tripId, latitude, longitude, speed || 0).catch(err => {
+            console.error('[Route Learning] Error recording crowd-sourced location:', err);
+          });
+
           // Mark this trip as having active crowd-sourced updates to prevent simulator overrides
           (global as any).activeCrowdSourcedTrips = (global as any).activeCrowdSourcedTrips || {};
           (global as any).activeCrowdSourcedTrips[tripId] = {
@@ -550,7 +653,7 @@ wss.on('connection', (ws: WebSocket) => {
           // Broadcast update immediately to all clients subscribed to this trip
           for (const sub of subscriptions) {
             if (sub.tripId === tripId && sub.ws.readyState === WebSocket.OPEN) {
-              const updatedData = await getTripETAs(tripId, sub.regNo);
+              const updatedData = await getTripETAs(tripId, sub.regNo, sub.routeCode);
               if (updatedData) {
                 (updatedData as any).trackingMethod = source;
                 sub.ws.send(JSON.stringify({ event: 'trip_update', data: updatedData }));

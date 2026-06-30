@@ -1,0 +1,55 @@
+{
+  "fetchedAt": "2026-06-29T07:26:57.766Z",
+  "villages": [
+    {
+      "name": "Tabita",
+      "latitude": 29.2403869,
+      "longitude": 77.7326059
+    },
+    {
+      "name": "Dwarika City",
+      "latitude": 29.4493151,
+      "longitude": 77.7283261
+    },
+    {
+      "name": "Ghasipura",
+      "latitude": 29.3686372,
+      "longitude": 77.7053546
+    },
+    {
+      "name": "Jeetpur",
+      "latitude": 29.18821,
+      "longitude": 77.7278852
+    },
+    {
+      "name": "Loiya",
+      "latitude": 29.1548973,
+      "longitude": 77.7262973
+    },
+    {
+      "name": "Chaksamand",
+      "latitude": 29.2123728,
+      "longitude": 77.7671098
+    },
+    {
+      "name": "Jarauda",
+      "latitude": 29.4019178,
+      "longitude": 77.687931
+    },
+    {
+      "name": "Sakoti",
+      "latitude": 29.1852876,
+      "longitude": 77.7140235
+    },
+    {
+      "name": "Walidpur",
+      "latitude": 29.1468391,
+      "longitude": 77.715311
+    },
+    {
+      "name": "Daurala",
+      "latitude": 29.1149252,
+      "longitude": 77.7054571
+    }
+  ]
+}
