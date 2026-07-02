@@ -1,0 +1,40 @@
+# Walkthrough - UPBus Live Map View
+
+Humne admin panel par bina Google Maps ka use kiye, ek dynamic interactive **Dark-Themed Map View** add kiya hai. Is se aap poore UP bus network ke routes, stops, aur live running buses ko real-time coordinate updates ke sath visually track kar sakte hain.
+
+## What Was Added/Modified
+
+1. **Backend Route (`/api/v1/admin/monitor/map-data`)**:
+   - Added in [admin.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/api/admin.ts).
+   - Generates and exposes the list of all geocoded stops and route polyline paths from the in-memory graph.
+   
+2. **Leaflet CSS Dependency**:
+   - Added standard Leaflet stylesheet dynamically in [layout.tsx](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/admin/src/app/layout.tsx).
+
+3. **Leaflet React Map Component**:
+   - Created [LiveMap.tsx](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/admin/src/components/LiveMap.tsx).
+   - Renders a CartoDB Dark Matter tile base map.
+   - Removed active bus circles and stop markers to keep the map focused entirely on routes.
+   - Draws all learned route segments as orange polyline paths (`weight: 2.5`).
+   - Dynamic Tooltips: Hovering over any route segment opens a sticky tooltip displaying the official route name (e.g., "Lucknow - Gorakhpur Express").
+   - Highlight Hover Effect: Hovering over a route changes its color to neon-green (`#10b981`), increases its thickness, and increases opacity for a premium interactive feel.
+   - Cleaned up Next.js lifecycle to prevent strict-mode leaflet errors.
+
+4. **Toggle Tabs & Client Integration**:
+   - Integrated in [page.tsx](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/admin/src/app/page.tsx).
+   - Created a header switch: **Console View** (traditional logs & search table) and **Map View** (Leaflet Map).
+   - Loaded the `LiveMap` dynamically (`ssr: false`) to comply with Next.js Server Components.
+
+---
+
+## Verification & Usage Instructions
+
+1. **Open the Admin Console**:
+   - Open your browser at `http://localhost:3003`.
+   - By default, you will see the **Console View** showing live logs and the paginated search table (which works exactly as before).
+
+2. **Toggle to Map View**:
+   - Click the **Map View** tab in the top header.
+   - The interactive dark-mode map centered on Uttar Pradesh will load.
+   - You will see glowing nodes for stops, orange lines representing the bus routes, and green/red indicators for moving/stationary buses.
+   - Hover or click on any bus marker to view its live telemetry (Registration No, speed, closest stop, status).

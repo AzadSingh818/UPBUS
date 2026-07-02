@@ -1,0 +1,108 @@
+# UPBus: Project Status & Launch Plan
+
+This document outlines the current progress of the UPBus platform, identifies what works, what remains to be completed, and lays out a roadmap for a successful production launch.
+
+---
+
+## 📊 Summary of Completed Work
+
+The core system is highly developed and close to a functional Minimum Viable Product (MVP). Both the frontend and backend architectures are in place and integrated.
+
+### 1. Frontend (web-app)
+* **Framework**: React / Next.js 16 app-router setup.
+* **Journey Planner UI**:
+  * Fuzzy search input for source and destination locations.
+  * Direct and multi-leg journey cards showing travel times, distances, transfer counts, and bus types.
+  * An interactive **Journey Timeline** showing departure times, transfer nodes, intermediate stops, and live speed tracking.
+* **Interactive Live Map**:
+  * Powered by Leaflet (`LiveMap.tsx`).
+  * Displays the live bus marker, heading/direction indicator, and a real-time pulse ring.
+  * Uses colored polylines to distinguish between **passed segments** (grey, solid) and **upcoming segments** (green, dashed).
+  * Markers for stops along the route change dynamically based on the bus's proximity (`passed`, `arriving_now`, `arriving_soon`, `on_stop`, `upcoming`).
+  * Renders nearby villages along the route connected to the closest stop via dotted line links.
+* **Divergence Badging ("via" logic)**:
+  * Implemented `getDistinguishingStop` logic to automatically identify where routes diverge and display a "via <City>" badge to resolve commuter confusion (e.g., distinguishing between Saharanpur-to-Gangoh routes via *Ambehta* vs. *Nakur*).
+* **WebSocket Integration**: Live client updates mapped to websocket ports on backend.
+* **Design System**: Responsive styling in `globals.css` with a premium dark-themed layout, custom fonts, glassmorphism cards, and responsive grids.
+
+### 2. Backend (apps/backend)
+* **Framework**: Node.js Express server configured with TypeScript.
+* **Graph Routing Engine (`engine/graph.ts` & `engine/eta.ts`)**:
+  * Depth-First Search (DFS) algorithm to find transit connections allowing up to 2 transfers.
+  * Real-time ETA calculations for upcoming stops based on active speed and delays.
+* **Ingestion Adapter (`ingestion/adapter.ts`)**:
+  * Periodically polls the public UPSRTC API (`https://margdarshi.upsrtcvlt.com/php/getGpsLiveData.php`) every 10 seconds to fetch live latitude, longitude, speed, and heading data.
+  * Normalizes GPS data and ingests it to the database live state.
+* **Stop-State FSM (`stopStateFSM.ts`)**:
+  * Finite State Machine tracking bus states relative to route stops (e.g., `ARRIVING`, `ON_STOP`, `DEPARTED`).
+  * Exposes configuration tuning API endpoints so thresholds (radius limits, speed metrics) can be calibrated live.
+* **Database & Fallback (`db/index.ts`)**:
+  * PostgreSQL integration schema defined in `schema.sql` (buses, routes, stops, route mappings, trips, and live state).
+  * **Dual database mode**: Built-in mock database fallback utilizing `data.json` so the app runs fully and gracefully in mock mode if the SQL database is offline.
+* **Geographical & Village Utility API**:
+  * Automatically calculates bounding boxes around routes and queries OpenStreetMap (via Overpass API) for nearby villages.
+  * Filters and caches villages within a customizable distance threshold from the route.
+* **Unit Tests (`tests/routeVillages.test.ts`)**:
+  * Testing harness covering bounding box math, Overpass response parsers, and distance filtering algorithms.
+
+---
+
+## 🛠️ Pending Items Required for Launch (MVP)
+
+While the core functionality is built, the following items are missing before we can launch the site to the public:
+
+### 1. Production Hosting & Infrastructure (Critical)
+* **Server & Client Hosting**: Deploy the frontend (Vercel, AWS Amplify, or GCP App Engine) and backend server (GCP Cloud Run, AWS ECS, or VM).
+* **Database Provisioning**: Set up a managed PostgreSQL instance (e.g., Google Cloud SQL or AWS RDS) and run `schema.sql` to populate pilot routes.
+* **Domain & Security**: Configure a custom domain name (e.g., `upbus.in`) and install SSL/TLS certificates (HTTPS is mandatory for geolocation services).
+
+### 2. Production Environment Settings
+* **CORS & WebSockets**: Update environment variables (`.env`) to replace local links (`http://localhost:5000` and `ws://localhost:5000`) with production HTTPS/WSS URLs.
+* **UPSRTC API Authentication**: Ensure the public endpoint (`margdarshi.upsrtcvlt.com`) does not require API keys, credentials, or IP whitelist changes in production.
+
+### 3. Monitoring & Error Handling
+* **Error Logs**: Set up basic logging (e.g., Winston, Sentry, or Google Cloud Logging) to monitor GPS API failures or routing errors.
+* **Healthcheck monitoring**: Ensure the existing `/api/health` endpoint is integrated into a keep-alive monitor.
+
+---
+
+## 🚀 Post-Launch Roadmap (Planned Enhancements)
+
+These features are outlined in the documentation but are **not** strictly required for the initial MVP launch. They can be rolled out iteratively:
+
+1. **Real-time Passenger Reporting**: Add a button on the Live Map allowing users to report overcrowding or delays, saving crowdsourced data to the database.
+2. **Push Notifications**: Leverage service workers to alert users when a watched bus is 2 km or 5 minutes away.
+3. **Offline Caching**: Implement a Service Worker in the web application to cache route details and stop coordinates for low-signal areas.
+4. **Interactive Dark Mode Toggle**: A simple UI switch in the settings header.
+5. **Analytics Dashboard**: An admin-only portal displaying bus punctuality metrics, high-demand transit corridors, and query volumes.
+
+---
+
+## 📅 Estimated Launch Timeline
+
+Assuming active pair-programming development, here is a realistic timeline for launch:
+
+```mermaid
+gantt
+    title UPBus Launch Roadmap
+    dateFormat  YYYY-MM-DD
+    section MVP Phase (2-3 Weeks)
+    Cloud Environment Setup & DB Provisioning :active, mvp_1, 2026-06-29, 5d
+    Production Configs, SSL, & Websocket Setup : mvp_2, after mvp_1, 4d
+    End-to-End Ingestion Testing with UPSRTC Live API : mvp_3, after mvp_2, 5d
+    Internal Beta / QA testing : mvp_4, after mvp_3, 4d
+    MVP Public Launch : milestone, mvp_launch, after mvp_4, 1d
+    
+    section Post-Launch (3-4 Weeks)
+    Phase 1: Dark Mode & Offline Caching : pl_1, after mvp_launch, 7d
+    Phase 2: Passenger Delay Reporting & Notifications : pl_2, after pl_1, 10d
+    Phase 3: Admin Analytics Dashboard : pl_3, after pl_2, 8d
+```
+
+### Option A: MVP Launch (Est. 2-3 Weeks)
+* **Goal**: Launch the search, routing, and live tracking map to the public.
+* **Scope**: Solve infrastructure deployment, transition database from mock to cloud SQL, hook up production UPSRTC live data feed, and install custom domains/HTTPS.
+
+### Option B: Full-Featured Launch (Est. 5-6 Weeks)
+* **Goal**: Launch with crowding reporting, offline access, and notification support.
+* **Scope**: Implement all MVP tasks plus Passenger Reporting, Service Workers, Push Notifications, and the Admin Analytics Panel.

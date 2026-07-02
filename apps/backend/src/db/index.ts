@@ -1,5 +1,7 @@
 import { Pool } from 'pg';
 import dotenv from 'dotenv';
+import fs from 'fs';
+import path from 'path';
 
 dotenv.config();
 
@@ -11,10 +13,65 @@ try {
 } catch (e) {
   console.warn('⚠️ [Warning] Could not initialize PostgreSQL pool:', e);
 }
-let useMock = false;
+export let useMock = false;
+export function setUseMock(value: boolean) {
+  useMock = value;
+}
 
 // Seed data — UP 75-District Depot Corridor Network
 export const mockDb: any = require('./data.json');
+
+// --- Fast Index Maps for O(1) Mock DB Operations ---
+const busByRegNoMap = new Map<string, any>();
+const tripByBusIdMap = new Map<number, any>();
+const liveStateByBusIdMap = new Map<number, any>();
+const progressCacheByBusIdMap = new Map<number, any>();
+
+export function rebuildMockDbIndexes() {
+  busByRegNoMap.clear();
+  tripByBusIdMap.clear();
+  liveStateByBusIdMap.clear();
+  progressCacheByBusIdMap.clear();
+
+  if (mockDb.buses) {
+    for (const b of mockDb.buses) {
+      if (b.registration_no) {
+        busByRegNoMap.set(b.registration_no.toUpperCase().trim(), b);
+      }
+    }
+  }
+  if (mockDb.trips) {
+    for (const t of mockDb.trips) {
+      if (t.status === 'running') {
+        tripByBusIdMap.set(Number(t.bus_id), t);
+      }
+    }
+  }
+  if (mockDb.bus_live_state) {
+    for (const l of mockDb.bus_live_state) {
+      liveStateByBusIdMap.set(Number(l.bus_id), l);
+    }
+  }
+  if (mockDb.bus_progress_cache) {
+    for (const p of mockDb.bus_progress_cache) {
+      progressCacheByBusIdMap.set(Number(p.bus_id), p);
+    }
+  }
+}
+
+// Initial index build
+rebuildMockDbIndexes();
+
+function persistMockDb() {
+  try {
+    const filePath = path.join(__dirname, 'data.json');
+    fs.writeFileSync(filePath, JSON.stringify(mockDb, null, 2));
+    // Rebuild indexes after persistence changes
+    rebuildMockDbIndexes();
+  } catch (e) {
+    console.error('[Mock DB] Error persisting data.json:', e);
+  }
+}
 
 function executeMockQuery(text: string, params: any[] = []): { rows: any[]; rowCount: number } {
   const queryStr = text.replace(/\s+/g, ' ').trim();
@@ -38,6 +95,7 @@ function executeMockQuery(text: string, params: any[] = []): { rows: any[]; rowC
     const newId = mockDb.routes.reduce((max: number, r: any) => r.id > max ? r.id : max, 0) + 1;
     const newRoute = { id: newId, route_code: routeCode, route_name: routeName, source, destination, distance_km: distanceKm };
     mockDb.routes.push(newRoute);
+    persistMockDb();
     return { rows: [{ id: newId }], rowCount: 1 };
   }
   if (queryStr.startsWith('INSERT INTO route_stops')) {
@@ -47,14 +105,32 @@ function executeMockQuery(text: string, params: any[] = []): { rows: any[]; rowC
     const distanceFromStartKm = parseFloat(params[3]) || 0.0;
     const newMapping = { route_id: routeId, stop_id: stopId, sequence_no: sequenceNo, distance_from_start_km: distanceFromStartKm };
     mockDb.route_stops.push(newMapping);
+    persistMockDb();
     return { rows: [], rowCount: 1 };
   }
   if (queryStr.startsWith('UPDATE trips')) {
+    if (queryStr.includes('route_id =')) {
+      const routeId = parseInt(params[0], 10);
+      const tripId = parseInt(params[1], 10);
+      const trip = mockDb.trips.find((t: any) => t.id === tripId);
+      if (trip) {
+        trip.route_id = routeId;
+        // Keep index updated
+        tripByBusIdMap.set(Number(trip.bus_id), trip);
+        return { rows: [], rowCount: 1 };
+      }
+      return { rows: [], rowCount: 0 };
+    }
     const status = params[0];
     const tripId = parseInt(params[1], 10);
     const trip = mockDb.trips.find((t: any) => t.id === tripId);
     if (trip) {
       trip.status = status;
+      if (status !== 'running') {
+        tripByBusIdMap.delete(Number(trip.bus_id));
+      } else {
+        tripByBusIdMap.set(Number(trip.bus_id), trip);
+      }
       return { rows: [], rowCount: 1 };
     }
     return { rows: [], rowCount: 0 };
@@ -136,13 +212,21 @@ function executeMockQuery(text: string, params: any[] = []): { rows: any[]; rowC
     const rsMapping = mockDb.route_stops.filter(rs => rs.route_id === routeId);
     const joined = rsMapping.map(rs => {
       const stop = mockDb.stops.find(s => s.id === rs.stop_id)!;
+      const sequence = rs.sequence !== undefined ? rs.sequence : rs.sequence_no;
+      const distFromStart = rs.distance_from_start !== undefined ? rs.distance_from_start : Math.round(rs.distance_from_start_km * 1000);
       return {
         sequence_no: rs.sequence_no,
         distance_from_start_km: rs.distance_from_start_km,
         stop_id: stop.id,
         name: stop.name,
         latitude: stop.latitude,
-        longitude: stop.longitude
+        longitude: stop.longitude,
+        
+        // Mappings for the new Route Progress Engine
+        id: stop.id,
+        stop_name: stop.stop_name || stop.name,
+        sequence: sequence,
+        distance_from_start: distFromStart
       };
     });
     return { rows: joined, rowCount: joined.length };
@@ -212,7 +296,8 @@ function executeMockQuery(text: string, params: any[] = []): { rows: any[]; rowC
   // 7. Find bus by registration
   if (queryStr.includes('SELECT id FROM buses WHERE registration_no = $1')) {
     const regNo = params[0];
-    const bus = mockDb.buses.find(b => b.registration_no === regNo);
+    const key = String(regNo).toUpperCase().trim();
+    const bus = busByRegNoMap.get(key);
     return {
       rows: bus ? [{ id: bus.id }] : [],
       rowCount: bus ? 1 : 0
@@ -243,8 +328,8 @@ function executeMockQuery(text: string, params: any[] = []): { rows: any[]; rowC
 
   // 9. Find active trip (ingestLocation #2)
   if (queryStr.includes('SELECT id FROM trips WHERE bus_id = $1') && queryStr.includes("status = 'running'")) {
-    const busId = params[0];
-    const trip = mockDb.trips.find((t: any) => t.bus_id === busId && t.status === 'running');
+    const busId = Number(params[0]);
+    const trip = tripByBusIdMap.get(busId);
     return {
       rows: trip ? [{ id: trip.id }] : [],
       rowCount: trip ? 1 : 0
@@ -262,6 +347,124 @@ function executeMockQuery(text: string, params: any[] = []): { rows: any[]; rowC
     };
   }
 
+  // 10b. Find active trip for bus (with joined details)
+  if (queryStr.includes('FROM trips t') && queryStr.includes('t.bus_id = $1') && queryStr.includes("t.status = 'running'")) {
+    const busId = parseInt(params[0], 10);
+    const trip = mockDb.trips.find((t: any) => t.bus_id === busId && t.status === 'running');
+    if (trip) {
+      const bus = mockDb.buses.find((b: any) => b.id === busId);
+      const route = mockDb.routes.find((r: any) => r.id === trip.route_id);
+      return {
+        rows: [{
+          id: trip.id,
+          bus_id: trip.bus_id,
+          route_id: trip.route_id,
+          status: trip.status,
+          registration_no: bus?.registration_no || bus?.registration_number || '',
+          route_name: route?.route_name || ''
+        }],
+        rowCount: 1
+      };
+    }
+    return { rows: [], rowCount: 0 };
+  }
+
+  // 10c. Get live bus location heading
+  if (queryStr.includes('FROM live_bus_location') && queryStr.includes('bus_id = $1')) {
+    mockDb.live_bus_location = mockDb.live_bus_location || [];
+    const busId = parseInt(params[0], 10);
+    const loc = mockDb.live_bus_location.find((l: any) => l.bus_id === busId);
+    return { rows: loc ? [{ heading: loc.heading }] : [], rowCount: loc ? 1 : 0 };
+  }
+
+  // 10d. Passenger Reports queries
+  if (queryStr.includes('INSERT INTO passenger_reports')) {
+    mockDb.passenger_reports = mockDb.passenger_reports || [];
+    const tripId = params[0];
+    const busRegNo = params[1];
+    const reportType = params[2];
+    const description = params[3];
+    const latitude = params[4];
+    const longitude = params[5];
+    const newId = mockDb.passenger_reports.length + 1;
+    const newReport = {
+      id: newId,
+      trip_id: tripId,
+      bus_reg_no: busRegNo,
+      report_type: reportType,
+      description,
+      latitude,
+      longitude,
+      created_at: new Date()
+    };
+    mockDb.passenger_reports.push(newReport);
+    return { rows: [newReport], rowCount: 1 };
+  }
+
+  if (queryStr.includes('FROM passenger_reports') && queryStr.includes('created_at >= $1')) {
+    mockDb.passenger_reports = mockDb.passenger_reports || [];
+    const cutoffVal = (params && params.length > 0) ? params[0] : new Date(Date.now() - 2 * 60 * 60 * 1000);
+    const cutoff = new Date(cutoffVal);
+    const activeReports = mockDb.passenger_reports.filter((r: any) => new Date(r.created_at) >= cutoff);
+    return { rows: activeReports, rowCount: activeReports.length };
+  }
+
+  // 10e. Push Subscriptions queries
+  if (queryStr.includes('INSERT INTO push_subscriptions')) {
+    mockDb.push_subscriptions = mockDb.push_subscriptions || [];
+    const endpoint = params[0];
+    const p256dh = params[1];
+    const auth = params[2];
+    const newSub = { id: mockDb.push_subscriptions.length + 1, endpoint, p256dh, auth, created_at: new Date() };
+    mockDb.push_subscriptions.push(newSub);
+    return { rows: [newSub], rowCount: 1 };
+  }
+
+  if (queryStr.includes('FROM push_subscriptions')) {
+    mockDb.push_subscriptions = mockDb.push_subscriptions || [];
+    if (queryStr.includes('DELETE FROM')) {
+      const endpoint = params[0];
+      const lenBefore = mockDb.push_subscriptions.length;
+      mockDb.push_subscriptions = mockDb.push_subscriptions.filter((s: any) => s.endpoint !== endpoint);
+      const rowCount = lenBefore - mockDb.push_subscriptions.length;
+      return { rows: [], rowCount };
+    } else {
+      return { rows: mockDb.push_subscriptions, rowCount: mockDb.push_subscriptions.length };
+    }
+  }
+
+  // 10f. Stops table queries
+  if (queryStr.includes('INSERT INTO stops')) {
+    mockDb.stops = mockDb.stops || [];
+    const stopCode = params[0];
+    const name = params[1];
+    const latitude = parseFloat(params[2]);
+    const longitude = parseFloat(params[3]);
+    const existing = mockDb.stops.find((s: any) => s.stop_code === stopCode);
+    if (existing) {
+      return { rows: [{ id: existing.id }], rowCount: 1 };
+    }
+    const newId = mockDb.stops.reduce((max: number, s: any) => s.id > max ? s.id : max, 0) + 1;
+    const newStop = { id: newId, stop_code: stopCode, name, latitude, longitude };
+    mockDb.stops.push(newStop);
+    persistMockDb();
+    return { rows: [{ id: newId }], rowCount: 1 };
+  }
+
+  if (queryStr.includes('FROM stops') && queryStr.includes('WHERE')) {
+    mockDb.stops = mockDb.stops || [];
+    if (queryStr.includes('UPPER(name) =')) {
+      const targetName = params[0].toUpperCase();
+      const matched = mockDb.stops.filter((s: any) => s.name.toUpperCase() === targetName);
+      return { rows: matched, rowCount: matched.length };
+    }
+    if (queryStr.includes('stop_code =')) {
+      const code = params[0];
+      const matched = mockDb.stops.filter((s: any) => s.stop_code === code);
+      return { rows: matched, rowCount: matched.length };
+    }
+  }
+
   // 11. INSERT bus
   if (queryStr.includes('INSERT INTO buses')) {
     const regNo = params[0];
@@ -270,32 +473,41 @@ function executeMockQuery(text: string, params: any[] = []): { rows: any[]; rowC
     const newId = mockDb.buses.length + 1;
     const newBus = { id: newId, registration_no: regNo, bus_type: busType, depot_name: depot };
     mockDb.buses.push(newBus);
+    busByRegNoMap.set(String(regNo).toUpperCase().trim(), newBus);
     return { rows: [{ id: newId }], rowCount: 1 };
   }
 
   // 12. INSERT trip
   if (queryStr.includes('INSERT INTO trips')) {
-    const busId = params[0];
-    const routeId = params[1];
+    const busId = Number(params[0]);
+    const routeId = Number(params[1]);
     const newId = mockDb.trips.length + 1;
     const newTrip = { id: newId, bus_id: busId, route_id: routeId, status: 'running', scheduled_start: new Date(), created_at: new Date() };
     mockDb.trips.push(newTrip);
+    tripByBusIdMap.set(busId, newTrip);
     return { rows: [{ id: newId }], rowCount: 1 };
   }
 
   // 13. UPSERT bus_live_state
   if (queryStr.includes('INSERT INTO bus_live_state')) {
-    const busId = params[0];
-    const tripId = params[1];
-    const lat = params[2];
-    const lng = params[3];
-    const speed = params[4];
-    const heading = params[5];
+    const busId = Number(params[0]);
+    const tripId = Number(params[1]);
+    const lat = parseFloat(params[2]);
+    const lng = parseFloat(params[3]);
+    const speed = parseFloat(params[4]);
+    const heading = parseFloat(params[5]);
     const timestamp = params[6];
 
-    const idx = mockDb.bus_live_state.findIndex((l: any) => l.bus_id === busId);
-    if (idx !== -1) {
-      mockDb.bus_live_state[idx] = {
+    let live = liveStateByBusIdMap.get(busId);
+    if (live) {
+      live.trip_id = tripId;
+      live.latitude = lat;
+      live.longitude = lng;
+      live.speed = speed;
+      live.heading = heading;
+      live.last_seen_at = timestamp;
+    } else {
+      live = {
         bus_id: busId,
         trip_id: tripId,
         latitude: lat,
@@ -304,16 +516,8 @@ function executeMockQuery(text: string, params: any[] = []): { rows: any[]; rowC
         heading,
         last_seen_at: timestamp
       };
-    } else {
-      mockDb.bus_live_state.push({
-        bus_id: busId,
-        trip_id: tripId,
-        latitude: lat,
-        longitude: lng,
-        speed,
-        heading,
-        last_seen_at: timestamp
-      });
+      mockDb.bus_live_state.push(live);
+      liveStateByBusIdMap.set(busId, live);
     }
     return { rows: [], rowCount: 1 };
   }
@@ -332,17 +536,152 @@ function executeMockQuery(text: string, params: any[] = []): { rows: any[]; rowC
     
     const joinedStops = stopsForRoute.map((rs: any) => {
       const stop = mockDb.stops.find((s: any) => s.id === rs.stop_id);
+      const sequence = rs.sequence !== undefined ? rs.sequence : rs.sequence_no;
+      const distFromStart = rs.distance_from_start !== undefined ? rs.distance_from_start : Math.round(rs.distance_from_start_km * 1000);
       return {
         sequence_no: rs.sequence_no,
         distance_from_start_km: rs.distance_from_start_km,
         stop_id: stop?.id,
         name: stop?.name,
         latitude: stop?.latitude,
-        longitude: stop?.longitude
+        longitude: stop?.longitude,
+        
+        // Mappings for the new Route Progress Engine
+        id: stop?.id,
+        stop_name: stop?.stop_name || stop?.name,
+        sequence: sequence,
+        distance_from_start: distFromStart
       };
-    }).sort((a: any, b: any) => a.sequence_no - b.sequence_no);
+    }).sort((a: any, b: any) => (a.sequence !== undefined ? a.sequence : a.sequence_no) - (b.sequence !== undefined ? b.sequence : b.sequence_no));
 
     return { rows: joinedStops, rowCount: joinedStops.length };
+  }
+
+  // 8. bus_progress_cache queries
+  if (queryStr.includes('FROM bus_progress_cache') && queryStr.includes('bus_id = $1')) {
+    mockDb.bus_progress_cache = mockDb.bus_progress_cache || [];
+    const busId = parseInt(params[0], 10);
+    const cached = mockDb.bus_progress_cache.find((c: any) => c.bus_id === busId);
+    return { rows: cached ? [cached] : [], rowCount: cached ? 1 : 0 };
+  }
+  if (queryStr.includes('INSERT INTO bus_progress_cache')) {
+    mockDb.bus_progress_cache = mockDb.bus_progress_cache || [];
+    const busId = parseInt(params[0], 10);
+    const coveredDistance = parseInt(params[1], 10);
+    const currentSegmentFrom = params[2];
+    const currentSegmentTo = params[3];
+    const currentStop = params[4];
+    const state = params[5];
+    const completedStopIndex = parseInt(params[6], 10);
+
+    const idx = mockDb.bus_progress_cache.findIndex((c: any) => c.bus_id === busId);
+    const entry = {
+      bus_id: busId,
+      covered_distance: coveredDistance,
+      current_segment_from: currentSegmentFrom,
+      current_segment_to: currentSegmentTo,
+      current_stop: currentStop,
+      state: state,
+      completed_stop_index: completedStopIndex,
+      updated_at: new Date()
+    };
+    if (idx !== -1) {
+      mockDb.bus_progress_cache[idx] = entry;
+    } else {
+      mockDb.bus_progress_cache.push(entry);
+    }
+    return { rows: [], rowCount: 1 };
+  }
+
+  // 9. stop_visit_log queries
+  if (queryStr.includes('FROM stop_visit_log') && queryStr.includes('bus_id = $1')) {
+    mockDb.stop_visit_log = mockDb.stop_visit_log || [];
+    const busId = parseInt(params[0], 10);
+    const logs = mockDb.stop_visit_log.filter((l: any) => l.bus_id === busId);
+    return { rows: logs, rowCount: logs.length };
+  }
+  if (queryStr.includes('INSERT INTO stop_visit_log')) {
+    mockDb.stop_visit_log = mockDb.stop_visit_log || [];
+    const stopId = parseInt(params[0], 10);
+    const busId = parseInt(params[1], 10);
+    const arrivedAt = params[2];
+    const entry = {
+      stop_id: stopId,
+      bus_id: busId,
+      arrived_at: arrivedAt,
+      departed_at: null,
+      visited: false
+    };
+    mockDb.stop_visit_log.push(entry);
+    return { rows: [], rowCount: 1 };
+  }
+  if (queryStr.includes('UPDATE stop_visit_log')) {
+    mockDb.stop_visit_log = mockDb.stop_visit_log || [];
+    const departedAt = params[0];
+    const stopId = parseInt(params[1], 10);
+    const busId = parseInt(params[2], 10);
+    const entry = mockDb.stop_visit_log.find((l: any) => l.stop_id === stopId && l.bus_id === busId && l.visited === false);
+    if (entry) {
+      entry.departed_at = departedAt;
+      entry.visited = true;
+      return { rows: [], rowCount: 1 };
+    }
+    return { rows: [], rowCount: 0 };
+  }
+  if (queryStr.includes('DELETE FROM stop_visit_log')) {
+    mockDb.stop_visit_log = mockDb.stop_visit_log || [];
+    const stopId = parseInt(params[0], 10);
+    const busId = parseInt(params[1], 10);
+    const lengthBefore = mockDb.stop_visit_log.length;
+    mockDb.stop_visit_log = mockDb.stop_visit_log.filter((l: any) => !(l.stop_id === stopId && l.bus_id === busId));
+    return { rows: [], rowCount: lengthBefore - mockDb.stop_visit_log.length };
+  }
+
+  // 10. live_bus_location queries
+  if (queryStr.includes('INSERT INTO live_bus_location')) {
+    mockDb.live_bus_location = mockDb.live_bus_location || [];
+    const busId = parseInt(params[0], 10);
+    const latitude = parseFloat(params[1]);
+    const longitude = parseFloat(params[2]);
+    const heading = parseFloat(params[3]);
+    const speed = parseFloat(params[4]);
+    const accuracy = parseFloat(params[5]);
+
+    const idx = mockDb.live_bus_location.findIndex((l: any) => l.bus_id === busId);
+    const entry = {
+      bus_id: busId,
+      latitude,
+      longitude,
+      heading,
+      speed,
+      accuracy,
+      updated_at: new Date()
+    };
+    if (idx !== -1) {
+      mockDb.live_bus_location[idx] = entry;
+    } else {
+      mockDb.live_bus_location.push(entry);
+    }
+    return { rows: [], rowCount: 1 };
+  }
+
+  // 11. route_versions queries
+  if (queryStr.includes('FROM route_versions') && queryStr.includes('route_id = $1')) {
+    mockDb.route_versions = mockDb.route_versions || [];
+    const routeId = parseInt(params[0], 10);
+    const v = mockDb.route_versions.find((rv: any) => rv.route_id === routeId && rv.is_active === true);
+    return { rows: v ? [v] : [], rowCount: v ? 1 : 0 };
+  }
+
+  // 12b. Route name matching via ILIKE query
+  if (queryStr.includes('FROM routes WHERE route_name ILIKE $1')) {
+    const rawVal = params[0] || '';
+    const cleanVal = rawVal.replace(/%/g, '').toLowerCase().trim();
+    const route = mockDb.routes.find((r: any) => r.route_name.toLowerCase().includes(cleanVal));
+    return {
+      rows: route ? [{ id: route.id }] : [],
+      rowCount: route ? 1 : 0
+    };
   }
 
   // Default fallback

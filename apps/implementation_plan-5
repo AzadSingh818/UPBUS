@@ -1,0 +1,62 @@
+# Implementation Plan: Remaining Village Features
+
+This document outlines the status of the village features, details what is not yet implemented, and defines the technical plan to deliver them.
+
+---
+
+## 📋 Status & Gap Analysis
+
+Based on the requested specifications, here is the status of each item:
+
+| Feature / Task | Status | Implementation Plan |
+| :--- | :--- | :--- |
+| **1. Overpass API & Proximity Filter** | **Done** | Overpass node querying, distance calculations, caching, and tests are complete. |
+| **2. LiveMap Village Rendering** | **Done** | Amber dots, dotted connection lines, and zoom-gated labels are complete. |
+| **3. Pre-fetch All Routes at Startup** | **Pending** | Warm the cache at backend boot to eliminate the first-load 5-10s delay. |
+| **4. Stops Timeline Village Integration** | **Pending** | Show villages interleaved between official stops on the left panel with custom styling. |
+| **5. Village ETA Calculations** | **Pending** | Interpolate travel ETAs for villages based on surrounding stops. |
+
+---
+
+## 🛠️ Proposed Changes
+
+### 💻 Backend Services
+
+#### [MODIFY] [routeVillages.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/api/routeVillages.ts)
+* Create and export a background initializer function `preFetchAllRouteVillages()`:
+  * Queries all route IDs from the DB: `SELECT id FROM routes`.
+  * Checks if a cached file exists and is fresh for each route.
+  * If a cache miss occurs, fetches village data from Overpass and writes it to disk.
+  * Uses a sequential loop with a 2-second sleep delay to avoid rate-limiting or blocking the Overpass servers.
+
+#### [MODIFY] [index.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/index.ts)
+* Import `preFetchAllRouteVillages` from `./api/routeVillages`.
+* Call it inside the server start listener block (`server.listen`) so cache warming happens automatically on server start in the background.
+
+---
+
+### 🌐 Frontend (web-app)
+
+#### [MODIFY] [page.tsx](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/web-app/src/app/page.tsx)
+* Implement a client-side **Timeline Interleaving Algorithm**:
+  * Take the active stops array (`liveDetails.stops`) and the active villages array (`villages`).
+  * For each village, find the closest road segment between Stop $i$ and Stop $i+1$, and compute its projection ratio $t \in [0, 1]$ along that segment.
+  * Assign each village a sorting value `index = i + t`.
+  * Merge stops (assigned integer index values `0, 1, 2, ...`) and projected villages into a single unified timeline list sorted by this index.
+* **Timeline UI Update**:
+  * Render villages in the timeline using distinct formatting (smaller 8px amber dots, italicized names like `Bandukheri (Village)`).
+  * **Interpolated ETAs**: Calculate the travel time for each village by interpolating the ETAs of the surrounding stops:
+    $$ETA_{village} = ETA_{stop\_i} + t \times (ETA_{stop\_i+1} - ETA_{stop\_i})$$
+
+---
+
+## Verification Plan
+
+### Automated Tests
+* Run existing backend unit tests: `npm run test` (or the direct `ts-node` test commands) to ensure no regressions occur.
+
+### Manual Verification
+1. Restart the backend server and verify that `[Villages] Pre-fetching all route villages to warm cache...` logs appear. Check that cache files populate in `src/db/village_cache/`.
+2. Open the web app and search a route (e.g. Saharanpur to Gangoh).
+3. Confirm that the Stops Timeline on the left panel displays intermediate villages positioned chronologically between their respective stops.
+4. Verify that the villages display warm amber dots and computed fractional ETAs.

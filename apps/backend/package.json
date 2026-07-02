@@ -4,7 +4,7 @@
   "description": "Backend API and tracking ingestion engine for UP Roadways Live Tracking",
   "main": "dist/index.js",
   "scripts": {
-    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "dev": "ts-node-dev --ignore-watch src/db/data.json --respawn --transpile-only src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js"
   },

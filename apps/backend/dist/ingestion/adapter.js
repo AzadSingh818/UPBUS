@@ -38,6 +38,8 @@ exports.fetchLiveLocations = fetchLiveLocations;
 exports.startIngestion = startIngestion;
 exports.stopIngestion = stopIngestion;
 const db_1 = require("../db");
+const routeLearning_1 = require("../engine/routeLearning");
+const RouteProgressEngine_1 = require("../modules/route-progress/service/RouteProgressEngine");
 const { STOPS, simulatedBuses } = require('./simulation_data.json');
 let ingestionTimer = null;
 function calculateBearing(lat1, lon1, lat2, lon2) {
@@ -69,6 +71,22 @@ async function ingestLocation(location) {
           speed = EXCLUDED.speed,
           heading = EXCLUDED.heading,
           last_seen_at = EXCLUDED.last_seen_at`, [busId, tripId, location.latitude, location.longitude, location.speed, location.heading, location.timestamp]);
+        // Record the location ping in the route learning engine
+        (0, routeLearning_1.recordLiveLocation)(tripId, location.latitude, location.longitude, location.speed).catch(err => {
+            console.error('[Route Learning] Error recording location ping:', err);
+        });
+        // Process Route Progress Pipeline
+        RouteProgressEngine_1.RouteProgressEngine.process({
+            busId,
+            latitude: location.latitude,
+            longitude: location.longitude,
+            speed: location.speed,
+            heading: location.heading,
+            accuracy: 5,
+            timestamp: location.timestamp
+        }).catch(err => {
+            console.error('[Route Progress Engine] Error processing location update:', err);
+        });
     }
     catch (error) {
         console.error('Error ingesting location:', error);
@@ -82,16 +100,19 @@ async function fetchLiveLocations() {
         const data = JSON.parse(rawText);
         if (Array.isArray(data)) {
             for (const bus of data) {
-                if (!bus.RegNo || !bus.lat || !bus.long)
+                const regNo = bus.RegNo || bus.regNum || bus.bus_id;
+                const latVal = bus.latitude !== undefined ? bus.latitude : bus.lat;
+                const lngVal = bus.longitude !== undefined ? bus.longitude : bus.long;
+                if (!regNo || latVal === undefined || lngVal === undefined)
                     continue;
                 const speed = parseFloat(bus.speed) || 0;
                 await ingestLocation({
-                    registrationNo: bus.RegNo,
-                    latitude: parseFloat(bus.lat),
-                    longitude: parseFloat(bus.long),
+                    registrationNo: regNo,
+                    latitude: parseFloat(latVal),
+                    longitude: parseFloat(lngVal),
                     speed,
                     heading: parseFloat(bus.heading) || 0,
-                    timestamp: bus.LogrecTime ? new Date(bus.LogrecTime) : new Date(),
+                    timestamp: bus.LogrecTime || bus.timestamp ? new Date(bus.LogrecTime || bus.timestamp) : new Date(),
                     status: speed > 0 ? 'moving' : 'halted'
                 });
             }
@@ -103,7 +124,7 @@ function startIngestion() {
     if (ingestionTimer)
         return;
     fetchLiveLocations();
-    ingestionTimer = setInterval(fetchLiveLocations, 10000);
+    ingestionTimer = setInterval(fetchLiveLocations, 2000);
 }
 function stopIngestion() {
     if (ingestionTimer) {

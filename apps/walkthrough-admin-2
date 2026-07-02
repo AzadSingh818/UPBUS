@@ -1,0 +1,101 @@
+# Walkthrough - Pathfinder Optimization & Autonomous Route Seeder
+
+We have successfully completed the pathfinder routing optimization and implemented the self-learning route network seeder.
+
+---
+
+## 🛠️ Summary of Changes Implemented
+
+### 1. Route Pathfinder Optimization (1.4x Detour Pruning)
+- **File**: [graph.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/engine/graph.ts)
+- **Modifications**:
+  - Imported `haversineDistanceKm` from geographical utilities.
+  - **Loop & Intermediate Truncation**: When the destination node is reached, the search terminates/returns immediately. This prevents the pathfinder from driving past the destination to major transfer junctions and creating redundant backtracking loops.
+  - **Sequence-Accurate Detour Pruning**: Enforced a strict maximum allowed distance equal to `Math.max(geodesic * 1.4, geodesic + 30)`, computed dynamically against the *specific target stop reached* in the DFS. This prevents valid direct paths (e.g., Muzaffarnagar -> Bijnor direct, 102.0 km) from being incorrectly pruned when closer search-matched target stop variants (e.g., Bijnor Bus Stand, 56.0 km away) are present.
+
+### 2. Autonomous Route Seeder Daemon (UP-Wide Scaling)
+- **File**: [routeSeeder.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/engine/routeSeeder.ts)
+- **Ingestion Pipeline**:
+  - Polls `https://margdarshi.upsrtcvlt.com/php/getGpsLiveData.php` every **2 seconds** during active sessions.
+  - **Smart "VIA" Router**: Parses route descriptions (e.g. `X TO Y VIA Z`) to order via stops intermediately (`[X, Z, Y]`) rather than appending them as destinations.
+  - **Keyless Geocoding**:
+    - **GPS Halt Approximation**: Maps coordinates directly from stationary buses (`speed < 5 km/h`) near the target stop.
+    - **Komoot Photon Geocoder (Primary)**: Uses the fast, free, case-insensitive Photon API. Resolves coordinates in under 200ms with generous rate limits.
+    - **Overpass OSM & Nominatim (Fallbacks)**: Falls back to local Overpass index query or Nominatim if Photon is unavailable.
+    - **Fetch Timeout Protection**: Wrapped all geocoder and live GPS stream fetch requests in a `fetchWithTimeout` wrapper (3s-5s threshold) to prevent connection hangs from blocking the seeder interval.
+
+### 3. Server Hooks & Watcher Tuning
+- **Files**:
+  - [index.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/index.ts): Bootstrapped `startRouteSeeder()` inside server start and `stopRouteSeeder()` in graceful shutdown hooks.
+  - [package.json](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/package.json): Configured `ts-node-dev` with `--ignore-watch src/db/data.json` to prevent server restart write-loops when persisting discovered data.
+
+### 4. Laptop-Resilient Mock DB Persistence
+- **File**: [index.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/db/index.ts)
+- **Modifications**:
+  - Added `persistMockDb` helper to write in-memory mock database updates directly to `src/db/data.json` on disk during stops, routes, and route-stops insertions. Discovered route networks are fully persisted and survive laptop shutdowns or dev server restarts.
+
+### 5. Route Divergence Coverage & Testing
+- **File**: [divergence.test.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/tests/divergence.test.ts) (NEW)
+- **Features Tested**:
+  - **Cache Loading**: Confirmed `initDivergenceCache()` correctly initializes the cache from the database.
+  - **Spatial Branch Matching**: Verified `matchBranchForBus()` uses perpendicular projection checking to polylines, identifying which branch a bus matches when passing divergence nodes. Returns Branch 1 (`routeIds: [12]`) and Branch 2 (`routeIds: [13]`) at appropriate threshold proximities, and `null` for distant locations.
+  - **State Machine Store**: Verified `getState()`, `setState()`, and `clearState()` successfully record, update, and prune FSM lifecycles for bus tracking.
+- **Divergence Integration**:
+  - Confirmed integration in `eta.ts` where divergence matches automatically override and bind a bus to the correct diverted route segment for accurate ETA predictions.
+
+---
+
+## 🧪 Testing and Verification Results
+
+1. **Route Divergence Test Suite**:
+   - `6 passed, 0 failed`
+2. **Autonomous Network Discovery Verification**:
+   - The seeder successfully connected to the live Margdarshi stream, geocoded stops, and seeded **75 new routes** and **96 new stops** in minutes, writing them permanently to `data.json`.
+3. **Pathfinder Detour Verification (Muzaffarnagar -> Bijnor)**:
+   - Verified that a search from Muzaffarnagar to Bijnor correctly routes directly (`MUZAFFAR NAGAR -> BIJNOR` via "MUZAFFAR NAGAR TO BIJNOR" route, distance = 102.0 km, transfers = 0) and ignores detours through Moradabad.
+4. **Tests Suite compilation check**:
+   - All tests compile and run with zero errors. dev server task `task-911` is currently active and seeding.
+
+### 7. Tracking Route Slice, Timeline Pulse, and Map Bus Hover Styling
+- **Files**:
+  - [page.tsx](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/web-app/src/app/page.tsx): Updated the `filteredStops` slice indices calculation in the tracking panel view to check if `startIdx > endIdx` (e.g. reverse travel direction) and swap them. This clips the rendered map polyline coordinates precisely to the passenger's destination stop (e.g. stopping at Ambehta instead of continuing to Gangoh).
+  - [globals.css](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/web-app/src/app/globals.css):
+    - Restored the `@keyframes pulse-ring-new` CSS keyframes so that the timeline stop dots in the sidebar pulse properly again.
+    - Added transitions and hover classes to `.bus-pulse-ring` and `.bus-icon-circle` so that hovering over a bus marker on the map scales the bus icon up by `1.18x` and darkens the indigo pulse glow.
+- **Verification**:
+  - The Next.js production build (`npm run build`) compiled successfully with zero errors.
+  - Verified that the database/mockDb has successfully collected the following statistics under the active background daemon (`task-911`):
+    - **Stops**: 970 unique bus stands/stops
+    - **Routes**: 1,274 total routes
+    - **Route Stops Connections**: 3,446 link sequences
+    - **Active simulated buses & trips**: 100 each
+    - **Autonomous learned route variations**: 1,107 discovered networks (e.g. Bhagalpur-Gorakhpur, Ballia-Belthra Road, Anand Vihar-Rupaidiha)
+
+### 8. Standalone Real-Time Admin Panel & Ingestion Console (`apps/admin`)
+- **Files**:
+  - [adminMonitor.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/services/adminMonitor.ts): Singleton monitoring service managing a 100-item circular buffer of validation/seeder events and a map of active bus tracking states in memory.
+  - [admin.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/api/admin.ts): Isolated router exposing endpoints under `/api/v1/admin/monitor` for `/logs`, `/buses`, and `/stats`.
+  - [index.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/index.ts): Registered `/api/v1/admin` routes on the main server.
+  - [GPSValidator.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/modules/route-progress/algorithms/GPSValidator.ts): Hooked validation outcomes (accepts, duplicate filters, accuracy rejects) to stream live events to `adminMonitor`.
+  - [RouteProgressEngine.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/modules/route-progress/service/RouteProgressEngine.ts): Hooked live status changes (speed, heading, current stops) of active buses to `adminMonitor` tracking state.
+  - [routeSeeder.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/engine/routeSeeder.ts): Integrated seeder logs (route detection, geocoding halts, database seeding success/failures) to `adminMonitor`.
+  - [apps/admin](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/admin) [NEW]: Standalone Next.js TypeScript application initialized under the monorepo root.
+  - [apps/admin/src/app/page.tsx](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/admin/src/app/page.tsx) [NEW]: The root page (`/`) of the admin app housing the log terminal, active buses grid, and database counters, decoupled from the passenger project.
+  - [apps/admin/package.json](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/admin/package.json): Configured the dev server command to run on port `3003` (`"dev": "next dev -p 3003"`).
+- **Verification**:
+  - Ran `npm run build` inside `apps/web-app` successfully with `/admin` route fully deleted.
+  - Ran `npm run build` inside `apps/admin` successfully, outputting clean production bundle routes.
+  - Verification build on `apps/backend` compiled successfully with `tsc`.
+
+### 9. Unique Bus-ID Tracking Refactor (All 100 Buses Live)
+- **Problem**: The mock database contains 100 running trips/buses but only 20 unique registration numbers (repeated across entries). Keying by registration number caused the active tracking grid to collapse and only display 20 running buses.
+- **Files**:
+  - [adminMonitor.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/services/adminMonitor.ts): Refactored the `activeBuses` Map to key states by `busId` (number) instead of `regNo` (string). Added the `busId` field to the `ActiveBusState` payload interface, and increased the UI render limit from 50 to 150.
+  - [RouteProgressEngine.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/modules/route-progress/service/RouteProgressEngine.ts): Updated `adminMonitor.updateBus()` invocations to pass the unique `busId` as the primary key parameter.
+- **Verification**:
+  - The backend server started successfully and logged: `[Admin Monitor] Pre-loaded 100 running buses from database.`
+  - Curled `/api/v1/admin/monitor/buses` and verified that the active tracked buses count is now exactly **100**.
+  - Built `apps/admin` successfully under Next.js 16.2.10 (Turbopack) with 0 compiler errors.
+
+
+

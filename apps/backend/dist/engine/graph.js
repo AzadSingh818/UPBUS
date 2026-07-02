@@ -1,31 +1,40 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.getRouteStopsMap = exports.getStopsMap = exports.getGraph = void 0;
 exports.buildGraph = buildGraph;
 exports.findPathsDFS = findPathsDFS;
-const data_json_1 = __importDefault(require("../db/data.json"));
+exports.addLiveRouteEdges = addLiveRouteEdges;
+const db_1 = require("../db");
+const geoUtils_1 = require("./geoUtils");
 // Global graph cache
 let graph = new Map();
 let stopsMap = new Map();
 let routeStopsMap = new Map(); // route_id -> stops
+let cachedRoutes = [];
 /**
- * Initializes the graph from Mock DB
+ * Initializes the graph from DB/Mock DB
  */
 async function buildGraph() {
     graph.clear();
     stopsMap.clear();
     routeStopsMap.clear();
-    // Load stops
-    const stops = data_json_1.default.stops;
+    // Load stops from database/mock
+    const stopsRes = await (0, db_1.query)('SELECT id, stop_code, name, latitude, longitude FROM stops');
+    const stops = stopsRes.rows;
     for (const s of stops) {
-        stopsMap.set(s.id, s);
+        stopsMap.set(s.id, {
+            ...s,
+            latitude: parseFloat(s.latitude),
+            longitude: parseFloat(s.longitude)
+        });
         graph.set(s.id, []);
     }
-    // Load route_stops and routes
-    const routeStops = data_json_1.default.route_stops;
-    const routes = data_json_1.default.routes;
+    // Load route_stops and routes from database/mock
+    const routeStopsRes = await (0, db_1.query)('SELECT route_id, stop_id, sequence_no, distance_from_start_km FROM route_stops');
+    const routeStops = routeStopsRes.rows;
+    const routesRes = await (0, db_1.query)('SELECT id, route_code, route_name, source, destination, distance_km FROM routes');
+    const routes = routesRes.rows;
+    cachedRoutes = routes;
     const routeMap = new Map(routes.map((r) => [r.id, r]));
     // Group by route
     const byRoute = {};
@@ -100,7 +109,19 @@ function findPathsDFS(fromQuery, toQuery, maxTransfers = 2) {
 }
 function dfs(current, targets, maxTransfers, path, visited, results) {
     if (targets.has(current)) {
-        results.push(buildJourneyPath(path));
+        const journey = buildJourneyPath(path);
+        const startId = path.length > 0 ? path[0].fromStopId : current;
+        const startStop = stopsMap.get(startId);
+        const targetStop = stopsMap.get(current);
+        let geodesic = 0;
+        if (startStop && targetStop) {
+            geodesic = (0, geoUtils_1.haversineDistanceKm)({ lat: startStop.latitude, lng: startStop.longitude }, { lat: targetStop.latitude, lng: targetStop.longitude });
+        }
+        const maxAllowedDistance = Math.max(geodesic * 1.4, geodesic + 30);
+        if (journey.totalDistanceKm <= maxAllowedDistance) {
+            results.push(journey);
+        }
+        return; // Truncate search immediately upon reaching destination stop!
     }
     // Calculate current transfers
     let transfers = 0;
@@ -197,7 +218,7 @@ function createLeg(edges) {
 }
 function filterUniquePaths(paths) {
     const seen = new Map();
-    const routeMap = new Map(data_json_1.default.routes.map((r) => [r.id, r]));
+    const routeMap = new Map(cachedRoutes.map((r) => [r.id, r]));
     for (const p of paths) {
         // Unique key is based on the sequence of all stop IDs visited in order
         const stopIds = p.legs.flatMap(l => l.stops.map(s => s.stopId));
@@ -237,4 +258,85 @@ function filterUniquePaths(paths) {
         }
     }
     return Array.from(seen.values());
+}
+const getGraph = () => graph;
+exports.getGraph = getGraph;
+const getStopsMap = () => stopsMap;
+exports.getStopsMap = getStopsMap;
+const getRouteStopsMap = () => routeStopsMap;
+exports.getRouteStopsMap = getRouteStopsMap;
+/**
+ * Ensure a specific route's edges are present in the live in-memory graph.
+ * Called by NewBusDiscoveryService when it auto-matches a new bus to a route.
+ *
+ * - If the route is already in the graph (routeStopsMap has its stops), this is a no-op.
+ * - If the route is new/not yet loaded, it fetches its stops from DB and adds edges.
+ */
+async function addLiveRouteEdges(routeId) {
+    // Check if this route is already in the graph
+    if (routeStopsMap.has(routeId)) {
+        // Edges already exist — nothing to do
+        return;
+    }
+    try {
+        // Fetch route info
+        const routeRes = await (0, db_1.query)('SELECT id, route_code, route_name FROM routes WHERE id = $1', [routeId]);
+        if (routeRes.rows.length === 0) {
+            console.warn(`[Graph Engine] addLiveRouteEdges: route ${routeId} not found in DB`);
+            return;
+        }
+        const routeInfo = routeRes.rows[0];
+        // Fetch its route_stops with coordinates
+        const rsRes = await (0, db_1.query)(`SELECT rs.stop_id, rs.sequence_no, rs.distance_from_start_km,
+              s.latitude, s.longitude, s.name
+       FROM route_stops rs
+       JOIN stops s ON s.id = rs.stop_id
+       WHERE rs.route_id = $1
+       ORDER BY rs.sequence_no ASC`, [routeId]);
+        if (rsRes.rows.length === 0) {
+            console.warn(`[Graph Engine] addLiveRouteEdges: no stops for route ${routeId}`);
+            return;
+        }
+        const rStops = rsRes.rows;
+        // Register stops in stopsMap if not already there
+        for (const rs of rStops) {
+            if (!stopsMap.has(rs.stop_id)) {
+                stopsMap.set(rs.stop_id, {
+                    id: rs.stop_id,
+                    latitude: parseFloat(rs.latitude),
+                    longitude: parseFloat(rs.longitude),
+                    name: rs.name,
+                });
+                graph.set(rs.stop_id, []);
+            }
+        }
+        // Add edges between all stops on this route
+        let newEdgesAdded = 0;
+        for (let i = 0; i < rStops.length - 1; i++) {
+            const u = rStops[i];
+            const distU = parseFloat(u.distance_from_start_km) || 0;
+            for (let j = i + 1; j < rStops.length; j++) {
+                const v = rStops[j];
+                const distV = parseFloat(v.distance_from_start_km) || 0;
+                graph.get(u.stop_id)?.push({
+                    fromStopId: u.stop_id,
+                    toStopId: v.stop_id,
+                    routeId,
+                    routeCode: routeInfo.route_code,
+                    routeName: routeInfo.route_name,
+                    distanceKm: Math.abs(distV - distU),
+                    fromSequenceNo: u.sequence_no,
+                    toSequenceNo: v.sequence_no,
+                });
+                newEdgesAdded++;
+            }
+        }
+        // Cache this route's stops in routeStopsMap
+        routeStopsMap.set(routeId, rStops);
+        console.log(`[Graph Engine] Live route connected: "${routeInfo.route_name}" ` +
+            `(routeId=${routeId}) — ${rStops.length} stops, ${newEdgesAdded} edges added to graph.`);
+    }
+    catch (err) {
+        console.error(`[Graph Engine] addLiveRouteEdges error for routeId=${routeId}:`, err);
+    }
 }

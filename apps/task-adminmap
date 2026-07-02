@@ -1,0 +1,19 @@
+# Zero-Touch New Bus Onboarding — Tasks
+
+- [x] Research: adminMonitor.ts, graph.ts, adapter_live.ts structure
+- [x] Create newBusDiscovery.ts service
+- [x] Modify graph.ts — add addLiveRouteEdges()
+- [x] Modify adminMonitor.ts — add 'NEW_BUS' log type + isNewBus flag
+- [x] Modify adapter_live.ts — integrate newBusDiscovery calls
+- [x] TypeScript build check (zero errors)
+- [x] Verify backend logs show new bus detection flow
+
+# Live Route Network Map - Tasks
+- [x] Create backend `/monitor/map-data` route
+- [x] Install Leaflet client package & types
+- [x] Load Leaflet.css in Layout header
+- [x] Create dynamic `LiveMap.tsx` component with Dark theme
+- [x] Implement view toggle (Console vs Map) in `page.tsx`
+- [x] Verify Next.js compilation builds successfully (zero errors)
+
+

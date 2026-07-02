@@ -1,0 +1,107 @@
+# Zero-Touch New Bus Onboarding System
+
+Jab bhi UPSRTC ek naya bus khareedti hai aur uska GPS system Margdarshi API par pehli baar ping bhejta hai, hamara system automatically:
+1. Us bus ko detect kare
+2. Uska route dhundhe (GPS trajectory se match kare)
+3. Route graph mein connect kare
+4. Admin panel par "NEW BUS DETECTED" alert dikhaye
+
+## System Flow
+
+```
+Margdarshi API fetch cycle (har 30s)
+    ↓
+Naya regNo jo DB mein nahi → NewBusDiscoveryEngine.onNewBus()
+    ↓
+Bus DB mein register ho jaata hai (adapter_live.ts already karta hai)
+    ↓
+GPS pings ek trajectory buffer mein jama hote hain (5+ pings)
+    ↓
+RouteMatchEngine.findBestRoute(trajectory)
+    ↓ → Route stops ke saath haversine proximity voting
+    ↓ → Best matching route_id milta hai
+    ↓
+Trip ka route_id update hota hai
+    ↓
+Graph engine mein naye edges connect hote hain (addLiveEdge)
+    ↓
+Admin panel par "NEW_BUS" log + special badge
+```
+
+## Proposed Changes
+
+---
+
+### Core: New Service
+
+#### [NEW] newBusDiscovery.ts
+
+**Location**: `apps/backend/src/services/newBusDiscovery.ts`
+
+Yeh service:
+- `knownBusIds` Set maintain karta hai (startup pe DB se load hota hai)
+- Jab `adapter_live.ts` ek naya bus ingest karta hai, `checkAndRegister(regNo, busId)` call hota hai
+- Trajectory buffer: `Map<busId, GPSPoint[]>` — har naye bus ke GPS pings store hote hain
+- Jab buffer mein 5+ pings ho jaayein, `RouteMatchEngine.findBestRoute()` call karta hai
+- Match milne par: trip ka `route_id` update karta hai + graph mein live edge add karta hai
+- Admin monitor ko `NEW_BUS` event log karta hai
+
+#### Route Match Algorithm:
+```
+Input: trajectory (array of {lat, lng} points)
+For each known route in mockDb.routes:
+  For each GPS point in trajectory:
+    Find closest route_stop of this route within 500m
+    If found → add 1 vote for this route
+Best route = route with max votes (min 3 votes required)
+```
+
+---
+
+### Modification: Graph Engine
+
+#### [MODIFY] graph.ts
+
+Add `addLiveRouteEdges(routeId)` function:
+- Jab ek naye bus ka route confirm ho jaaye, yeh function graph mein us route ke edges load karta hai
+- Yeh tab useful hota hai jab koi naya route discover hota hai jo pehle graph mein nahi tha
+
+---
+
+### Modification: Live Adapter
+
+#### [MODIFY] adapter_live.ts
+
+`ingestLocation()` mein ek line add karni hai:
+```ts
+// After bus registration:
+await newBusDiscovery.checkAndRegister(location.registrationNo, busId);
+// Then for every ping of a pending bus:
+newBusDiscovery.recordPing(busId, location.latitude, location.longitude);
+```
+
+---
+
+### Modification: Admin Monitor
+
+#### [MODIFY] adminMonitor.ts
+
+`AdminLogItem` type mein `'NEW_BUS'` type add karna hai taaki admin panel par special styling ho sake.
+
+---
+
+## Verification Plan
+
+### Backend Logs Check
+After restart, backend log mein yeh dikhna chahiye:
+```
+[New Bus Discovery] NEW BUS DETECTED: UP12LM1234 (busId=10001)
+[New Bus Discovery] Trajectory collected: 5 pings for bus 10001
+[New Bus Discovery] Route matched: R_LKO_KAN (score=7/5 votes) for bus UP12LM1234
+[New Bus Discovery] Trip 10001 updated to route_id=5
+[Graph Engine] Live edges added for route 5
+```
+
+### Admin Panel Check
+- New bus entry with "NEW" badge in Active Buses list
+- GPS Ingestion Logs mein `NEW_BUS` type entries visible

@@ -4,14 +4,17 @@ import http from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import dotenv from 'dotenv';
 import { query } from './db';
-import { startIngestion, stopIngestion } from './ingestion/adapter';
+import { startIngestion, stopIngestion } from './ingestion/adapter_live';
+import { startRouteSeeder, stopRouteSeeder } from './engine/routeSeeder';
 import { getTripETAs } from './engine/eta';
 import { buildRouteGeometries, dumpGeometrySummary, getRouteGeometry } from './engine/routeGeometry';
 import { initDivergenceCache } from './engine/divergenceBinding';
 import { router as routeVillagesRouter } from './api/routeVillages';
 import { fetchMargdarshiLiveData } from './services/margdarshiClient';
 import { router as routeLearningDebugRouter } from './api/routeLearningDebug';
+import { router as adminRouter } from './api/admin';
 import { recordLiveLocation } from './engine/routeLearning';
+import { RouteProgressController } from './modules/route-progress/controller/RouteProgressController';
 
 function doesBusRouteMatch(busRouteStr: string, legRouteName: string, routeSource: string, routeDest: string): boolean {
   const busStr = busRouteStr.toUpperCase();
@@ -92,6 +95,11 @@ app.get('/api/v1/route/:routeId/waypoints', (req, res) => {
 // POST /api/v1/routes/:routeId/villages/refresh  → force Overpass re-fetch
 app.use('/api/v1/routes', routeVillagesRouter);
 app.use('/api/v1/debug/learning', routeLearningDebugRouter);
+app.use('/api/v1/admin', adminRouter);
+
+// Route Progress Endpoints (REST API)
+app.get('/api/bus/:busId/progress', RouteProgressController.getProgress);
+app.get('/api/v1/bus/:busId/progress', RouteProgressController.getProgress);
 
 // 2. Search routes (Fuzzy route search by From -> To)
 app.get('/api/v1/search/routes', async (req, res) => {
@@ -234,6 +242,18 @@ app.get('/api/v1/search/routes', async (req, res) => {
   }
 });
 
+// Get all stops (for frontend autocomplete suggestions)
+app.get('/api/v1/stops', async (req, res) => {
+  try {
+    const stopsRes = await query(`SELECT id, name, latitude, longitude FROM stops`);
+    const sortedStops = [...stopsRes.rows].sort((a: any, b: any) => a.name.localeCompare(b.name));
+    res.json({ stops: sortedStops });
+  } catch (error) {
+    console.error('Error fetching stops:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
 // 3. Get all stops on a specific route
 app.get('/api/v1/routes/:routeId/stops', async (req, res) => {
   const { routeId } = req.params;
@@ -368,12 +388,16 @@ app.get('/api/v1/journey', async (req, res) => {
           routeCode: actualRouteCode,
           busType: 'UPSRTC',
           registrationNo: busInfo ? busInfo.RegNo : 'Scheduled',
-          busInfo: {
+          busInfo: busInfo ? {
             trip_id: Math.floor(Math.random() * 100000),
-            registration_no: busInfo ? busInfo.RegNo : 'Scheduled',
+            registration_no: busInfo.RegNo,
             bus_type: 'UPSRTC',
-            depot_name: 'Margdarshi Live'
-          },
+            depot_name: 'Margdarshi Live',
+            bus_latitude: parseFloat(busInfo.lat) || null,
+            bus_longitude: parseFloat(busInfo.long) || null,
+            current_speed_kmph: parseFloat(busInfo.speed) || 0,
+            heading: parseFloat(busInfo.heading) || 0
+          } : null,
           stops: leg.stops.map(s => ({
             stopId: s.stopId,
             name: s.name,
@@ -613,6 +637,30 @@ wss.on('connection', (ws: WebSocket) => {
         }
       }
 
+      if (data.event === 'subscribe_progress' && data.busId) {
+        const busId = parseInt(data.busId, 10);
+        const { ProgressSocketHandler } = require('./modules/route-progress/socket/ProgressSocketHandler');
+        ProgressSocketHandler.register(ws, busId);
+
+        // Send initial state immediately if exists
+        const { RouteProgressService } = require('./modules/route-progress/service/RouteProgressService');
+        const initialProgress = await RouteProgressService.getProgress(busId);
+        if (initialProgress) {
+          ws.send(JSON.stringify({
+            event: 'BUS_PROGRESS_UPDATED',
+            payload: {
+              busId,
+              completed: initialProgress.completedStops,
+              current: initialProgress.current,
+              remaining: initialProgress.remainingStops,
+              coveredDistance: initialProgress.coveredDistance,
+              routeDistance: initialProgress.routeDistance,
+              currentState: initialProgress.currentState
+            }
+          }));
+        }
+      }
+
       if (data.event === 'report_location' && data.tripId) {
         const tripId = parseInt(data.tripId, 10);
         const { latitude, longitude, speed, heading, source } = data;
@@ -729,12 +777,16 @@ await initDivergenceCache();
 
   // Boot GPS Ingestion Engine
   startIngestion();
+
+  // Boot Autonomous Route Seeder
+  startRouteSeeder();
 });
 
 // Graceful Shutdown
 const shutdown = () => {
   console.log('Shutting down server...');
   stopIngestion();
+  stopRouteSeeder();
   server.close(() => {
     console.log('Server stopped.');
     process.exit(0);

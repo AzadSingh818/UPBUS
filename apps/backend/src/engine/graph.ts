@@ -1,5 +1,6 @@
 import mockDb from '../db/data.json';
 import { query } from '../db';
+import { haversineDistanceKm } from './geoUtils';
 
 export interface GraphEdge {
   fromStopId: number;
@@ -167,7 +168,22 @@ function dfs(
   results: JourneyPath[]
 ) {
   if (targets.has(current)) {
-    results.push(buildJourneyPath(path));
+    const journey = buildJourneyPath(path);
+    const startId = path.length > 0 ? path[0].fromStopId : current;
+    const startStop = stopsMap.get(startId);
+    const targetStop = stopsMap.get(current);
+    let geodesic = 0;
+    if (startStop && targetStop) {
+      geodesic = haversineDistanceKm(
+        { lat: startStop.latitude, lng: startStop.longitude },
+        { lat: targetStop.latitude, lng: targetStop.longitude }
+      );
+    }
+    const maxAllowedDistance = Math.max(geodesic * 1.4, geodesic + 30);
+    if (journey.totalDistanceKm <= maxAllowedDistance) {
+      results.push(journey);
+    }
+    return; // Truncate search immediately upon reaching destination stop!
   }
 
   // Calculate current transfers
@@ -324,3 +340,97 @@ function filterUniquePaths(paths: JourneyPath[]): JourneyPath[] {
 export const getGraph = () => graph;
 export const getStopsMap = () => stopsMap;
 export const getRouteStopsMap = () => routeStopsMap;
+
+/**
+ * Ensure a specific route's edges are present in the live in-memory graph.
+ * Called by NewBusDiscoveryService when it auto-matches a new bus to a route.
+ *
+ * - If the route is already in the graph (routeStopsMap has its stops), this is a no-op.
+ * - If the route is new/not yet loaded, it fetches its stops from DB and adds edges.
+ */
+export async function addLiveRouteEdges(routeId: number): Promise<void> {
+  // Check if this route is already in the graph
+  if (routeStopsMap.has(routeId)) {
+    // Edges already exist — nothing to do
+    return;
+  }
+
+  try {
+    // Fetch route info
+    const routeRes = await query(
+      'SELECT id, route_code, route_name FROM routes WHERE id = $1',
+      [routeId]
+    );
+    if (routeRes.rows.length === 0) {
+      console.warn(`[Graph Engine] addLiveRouteEdges: route ${routeId} not found in DB`);
+      return;
+    }
+    const routeInfo = routeRes.rows[0];
+
+    // Fetch its route_stops with coordinates
+    const rsRes = await query(
+      `SELECT rs.stop_id, rs.sequence_no, rs.distance_from_start_km,
+              s.latitude, s.longitude, s.name
+       FROM route_stops rs
+       JOIN stops s ON s.id = rs.stop_id
+       WHERE rs.route_id = $1
+       ORDER BY rs.sequence_no ASC`,
+      [routeId]
+    );
+
+    if (rsRes.rows.length === 0) {
+      console.warn(`[Graph Engine] addLiveRouteEdges: no stops for route ${routeId}`);
+      return;
+    }
+
+    const rStops = rsRes.rows;
+
+    // Register stops in stopsMap if not already there
+    for (const rs of rStops) {
+      if (!stopsMap.has(rs.stop_id)) {
+        stopsMap.set(rs.stop_id, {
+          id: rs.stop_id,
+          latitude: parseFloat(rs.latitude),
+          longitude: parseFloat(rs.longitude),
+          name: rs.name,
+        });
+        graph.set(rs.stop_id, []);
+      }
+    }
+
+    // Add edges between all stops on this route
+    let newEdgesAdded = 0;
+    for (let i = 0; i < rStops.length - 1; i++) {
+      const u = rStops[i];
+      const distU = parseFloat(u.distance_from_start_km) || 0;
+
+      for (let j = i + 1; j < rStops.length; j++) {
+        const v = rStops[j];
+        const distV = parseFloat(v.distance_from_start_km) || 0;
+
+        graph.get(u.stop_id)?.push({
+          fromStopId: u.stop_id,
+          toStopId: v.stop_id,
+          routeId,
+          routeCode: routeInfo.route_code,
+          routeName: routeInfo.route_name,
+          distanceKm: Math.abs(distV - distU),
+          fromSequenceNo: u.sequence_no,
+          toSequenceNo: v.sequence_no,
+        });
+        newEdgesAdded++;
+      }
+    }
+
+    // Cache this route's stops in routeStopsMap
+    routeStopsMap.set(routeId, rStops);
+
+    console.log(
+      `[Graph Engine] Live route connected: "${routeInfo.route_name}" ` +
+      `(routeId=${routeId}) — ${rStops.length} stops, ${newEdgesAdded} edges added to graph.`
+    );
+  } catch (err) {
+    console.error(`[Graph Engine] addLiveRouteEdges error for routeId=${routeId}:`, err);
+  }
+}
+

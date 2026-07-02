@@ -1,0 +1,6 @@
+# Task List
+
+- [x] Wait for geocoding script `geocode_stations.py` to finish
+- [x] Write python seeding script `seed_bus_stations.py`
+- [x] Run seeding script to populate PostgreSQL and `data.json`
+- [x] Verify stops count in PostgreSQL and `data.json`

@@ -1,0 +1,47 @@
+# Walkthrough - Admin Network Map Refinement
+
+Aapke request ke mutabik humne admin panel map view ko refine kiya hai:
+1. **Removed Bus & Stop Circles**: Map se active buses (green/red circles) aur geocoded stops (grey circles) ke markers ko poori tarah remove kar diya hai, jisse focus sirf routes par hi rahe.
+2. **Dynamic Zoom-Gated Route Names**: Jab aap map ko zoom-in (zoom >= 10) karenge, toh automatic saare routes ke names permanently unke centroid par as a custom badge show hone lagenge. Zoom-out (zoom < 10) karne par badges hide ho jayenge aur normal hover (sticky tooltip) behavior reactivate ho jayega.
+3. **Custom Sleek Tooltips**: Map tooltips ko modern dark theme ke sath align kiya hai. Default Leaflet border, white background, aur arrows ko bypass karke ek elegant dark-themed glassmorphism tooltip design kiya hai.
+
+---
+
+## 🛠️ Summary of Changes Implemented
+
+### 1. Custom CSS Styles for Tooltips
+- **File**: [page.tsx](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/admin/src/app/page.tsx)
+- **Modifications**:
+  - Style sheet me `.custom-route-tooltip` class add ki hai jo default Leaflet tooltips ka solid background, border, padding, aur shadow override karti hai.
+  - Tooltip arrows (`::before` pseudoclass) ko hide kiya hai.
+
+### 2. Dynamic Tooltip & Zoom Listener in Leaflet
+- **File**: [LiveMap.tsx](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/admin/src/components/LiveMap.tsx)
+- **Modifications**:
+  - Polylines array add kiya hai jo page load hone par saare dynamic route polylines aur names track karta hai.
+  - Route line tooltips ko custom dark HTML bubble design me render kiya hai.
+  - `zoomend` map event listener configure kiya hai jo zoom level check karke tooltip properties (`permanent`, `sticky`) ko real-time update karta hai:
+    - **Zoom >= 10**: Har route line ke center me route name permanently show hoga.
+    - **Zoom < 10**: Tooltips collapse ho jayenge, sirf hover karne par visible honge.
+
+---
+
+## 🧪 Compilation & Verification
+
+### 1. Build Verification
+- Next.js production build (`npm run build`) runs and completes with **zero warnings/errors**:
+  ```bash
+  npm run build (in apps/admin) -> Successful ✅
+  ```
+- Backend compilation check:
+  ```bash
+  npm run build (in apps/backend) -> Successful (tsc compiled) ✅
+  ```
+
+### 2. Manual Verification Steps
+1. Open the Admin Console at `http://localhost:3003` and click on **Map View**.
+2. **Verify Markers**: Check that there are **no red, green, or grey circles/dots** representing buses or stops on the map. The map should only display clean route polylines.
+3. **Verify Zoom Behavior**:
+   - At default zoom (level 7), you will only see the orange network paths. Hovering over a path highlights it neon-green and shows its name.
+   - Zoom in twice (zoom >= 10). You will see all route names appear permanently at their centerpoints.
+   - Zoom back out (zoom < 10) to see them clean up dynamically.

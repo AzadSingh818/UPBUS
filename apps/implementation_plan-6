@@ -1,0 +1,93 @@
+# Implementation Plan - Self-Learning Dynamic Route Engine
+
+This plan outlines the design and implementation of an automated route-discovery and learning engine. The system will track live bus GPS traces during trips, reconstruct the actual sequence of stops traversed, automatically register new route variants in the database, and update the graph engine dynamically.
+
+## User Review Required
+
+> [!IMPORTANT]
+> - **In-Memory and Postgres Fallback Support**: To keep the existing implementation safe, the database queries in `apps/backend/src/db/index.ts` will be updated to support loading stops, routes, and route mappings, ensuring that the self-learning functionality operates correctly in both live Postgres database mode and the mock `data.json` fallback mode.
+> - **Self-Learning Trigger**: Trips will automatically complete and trigger route learning when the bus reaches within 200 meters of the final destination stop, or when manually triggered via a new debug endpoint.
+
+## Open Questions
+
+*None at this stage. All requirements have been factored into this design.*
+
+---
+
+## Proposed Changes
+
+### Database Layer
+
+#### [MODIFY] [index.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/db/index.ts)
+- Add exports for `mockDb` so that other components can access the shared, live-updated mock database in fallback mode.
+- Extend `executeMockQuery` to handle standard query patterns for:
+  - `SELECT id, stop_code, name, latitude, longitude FROM stops`
+  - `SELECT id, route_code, route_name, source, destination, distance_km FROM routes`
+  - `SELECT route_id, stop_id, sequence_no, distance_from_start_km FROM route_stops`
+  - `INSERT INTO routes` (to persist new routes in-memory during mock-mode)
+  - `INSERT INTO route_stops` (to persist new sequences in-memory during mock-mode)
+  - `UPDATE trips SET status = $1 WHERE id = $2`
+
+---
+
+### Route Learning Engine
+
+#### [NEW] [routeLearning.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/engine/routeLearning.ts)
+- Implement location-tracking buffers to keep track of the sequence of stops visited by each active trip: `visitedStopsMap: Map<number, number[]>` (maps `tripId` to an array of `stopId`).
+- Implement `recordLiveLocation(tripId: number, latitude: number, longitude: number, speed: number)`:
+  - Find all stops close to the bus coordinate (distance <= 0.2 km).
+  - If a stop is found, append its ID to the visited list for the trip (if it is different from the last visited stop).
+  - If this stop is the final destination of the trip's scheduled route, trigger `completeTripAndLearnRoute(tripId)`.
+- Implement `completeTripAndLearnRoute(tripId: number)`:
+  - Fetch the sequence of visited stops.
+  - If the trip has traversed fewer than 2 stops, ignore (no route can be learned).
+  - Fetch all existing routes connecting the same Source and Destination.
+  - Compare the traversed stop sequence with the sequences of all matching routes.
+  - If no match is found:
+    - Generate a new route code (e.g. `R_LKO_KAN_VAR_1`).
+    - Generate a descriptive route name containing intermediate stops.
+    - Insert the new route and its stop sequences (calculating prefix distances using the haversine formula) into the database.
+    - Re-trigger `buildGraph()` to dynamically load the new route into the pathfinder.
+    - Mark the trip as `'completed'` in the database.
+  - Clean up tracking cache for the completed trip.
+
+---
+
+### Graph Pathfinder
+
+#### [MODIFY] [graph.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/engine/graph.ts)
+- Update `buildGraph()` to query the database wrapper (`query`) for stops, routes, and route stops instead of statically importing from `data.json`.
+- This ensures any new routes inserted during runtime (either in PostgreSQL or in the mock database) are instantly integrated into the graph pathfinder.
+
+---
+
+### Ingestion and API Layer
+
+#### [MODIFY] [adapter.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/ingestion/adapter.ts)
+- Call `recordLiveLocation(tripId, location.latitude, location.longitude, location.speed)` inside the `ingestLocation` method to feed GPS pings from the simulation into the learning engine.
+
+#### [NEW] [routeLearningDebug.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/api/routeLearningDebug.ts)
+- Create a debug router containing helper endpoints:
+  - `POST /api/v1/debug/learning/ping` - Feeds a manual GPS coordinate into the learning tracker for a trip.
+  - `POST /api/v1/debug/learning/complete` - Manually triggers trip completion and learning.
+  - `GET /api/v1/debug/learning/visited` - Inspects the current traversed sequence of stops.
+
+#### [MODIFY] [index.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/index.ts)
+- Register the new route learning debug router: `app.use('/api/v1/debug/learning', routeLearningDebugRouter)`.
+- Import and call `recordLiveLocation` inside the WebSocket `report_location` handler to feed crowd-sourced GPS locations into the learning engine.
+
+---
+
+## Verification Plan
+
+### Automated Tests
+- Run `node test_route_learning.js` to execute a full integration test of the self-learning route engine.
+  - The script will:
+    1. Create a trip with a known source/destination.
+    2. Simulate GPS pings along a new route sequence: Lucknow -> Alambagh -> Kailashpur -> Kanpur.
+    3. Trigger trip completion.
+    4. Verify that a new route variant is added to the database.
+    5. Verify that `findPathsDFS` automatically returns this new route variant for Lucknow -> Kanpur searches.
+
+### Manual Verification
+- Verify the search results via the web-app UI or by calling `/api/v1/search/routes` before and after running the test script to see the new route variant appear dynamically.

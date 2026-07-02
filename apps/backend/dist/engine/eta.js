@@ -35,6 +35,8 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getTripETAs = getTripETAs;
 const db_1 = require("../db");
+const stopStateFSM_1 = require("./stopStateFSM");
+const routeGeometry_1 = require("./routeGeometry");
 // Haversine distance formula
 function calculateDistance(lat1, lon1, lat2, lon2) {
     const R = 6371; // Earth radius in km
@@ -73,7 +75,19 @@ async function getTripETAs(tripId, regNo, routeCode) {
                         trip = tripRes.rows[0];
                         trip.registration_no = bus.RegNo || bus.regNum || trip.registration_no;
                         fallbackRouteId = null;
-                        if (bus.route_description) {
+                        let matchedRoute = null;
+                        if (routeCode) {
+                            const rRes = await (0, db_1.query)(`SELECT id, route_code, route_name FROM routes WHERE route_code = $1 LIMIT 1`, [routeCode]);
+                            if (rRes.rowCount && rRes.rowCount > 0) {
+                                matchedRoute = rRes.rows[0];
+                            }
+                        }
+                        if (matchedRoute) {
+                            fallbackRouteId = matchedRoute.id;
+                            trip.route_code = matchedRoute.route_code;
+                            trip.route_name = matchedRoute.route_name;
+                        }
+                        else if (bus.route_description) {
                             const routesRes = await (0, db_1.query)(`SELECT id, route_code, route_name, source, destination FROM routes`);
                             const routes = routesRes.rows;
                             const matchingRoutes = routes.filter(r => {
@@ -82,7 +96,7 @@ async function getTripETAs(tripId, regNo, routeCode) {
                             });
                             if (matchingRoutes.length > 0) {
                                 let bestScore = -1;
-                                let matchedRoute = null;
+                                let matchedRouteDesc = null;
                                 const routeStr = bus.route_description.toUpperCase();
                                 for (const r of matchingRoutes) {
                                     let score = 0;
@@ -95,22 +109,14 @@ async function getTripETAs(tripId, regNo, routeCode) {
                                     }
                                     if (score > bestScore) {
                                         bestScore = score;
-                                        matchedRoute = r;
+                                        matchedRouteDesc = r;
                                     }
                                 }
-                                if (matchedRoute) {
-                                    fallbackRouteId = matchedRoute.id;
-                                    trip.route_code = matchedRoute.route_code;
-                                    trip.route_name = matchedRoute.route_name;
+                                if (matchedRouteDesc) {
+                                    fallbackRouteId = matchedRouteDesc.id;
+                                    trip.route_code = matchedRouteDesc.route_code;
+                                    trip.route_name = matchedRouteDesc.route_name;
                                 }
-                            }
-                        }
-                        else if (routeCode) {
-                            const matchedRoute = (await (0, db_1.query)(`SELECT id, route_code, route_name FROM routes WHERE route_code = $1 LIMIT 1`, [routeCode])).rows[0];
-                            if (matchedRoute) {
-                                fallbackRouteId = matchedRoute.id;
-                                trip.route_code = matchedRoute.route_code;
-                                trip.route_name = matchedRoute.route_name;
                             }
                         }
                     }
@@ -118,36 +124,59 @@ async function getTripETAs(tripId, regNo, routeCode) {
                         // Try to find the best matching route in DB by checking sub-route keywords in the description
                         const routesRes = await (0, db_1.query)(`SELECT id, route_code, route_name, source, destination FROM routes`);
                         const routes = routesRes.rows;
-                        const matchingRoutes = routes.filter(r => {
-                            if (!bus.route_description)
-                                return false;
-                            const routeStr = bus.route_description.toUpperCase();
-                            return routeStr.includes(r.source.toUpperCase()) && routeStr.includes(r.destination.toUpperCase());
-                        });
                         let matchedRoute = null;
-                        if (matchingRoutes.length > 0) {
-                            if (matchingRoutes.length === 1) {
-                                matchedRoute = matchingRoutes[0];
-                            }
-                            else {
-                                let bestScore = -1;
-                                const routeStr = (bus.route_description || '').toUpperCase();
-                                for (const r of matchingRoutes) {
-                                    let score = 0;
-                                    const dbRouteName = r.route_name.toUpperCase();
-                                    const keywords = dbRouteName.replace(/[^A-Z0-9\s]/g, ' ').split(/\s+/).filter((w) => w.length > 3 && w !== 'DEPOT' && w !== 'BUS' && w !== 'STAND' && w !== 'EXPRESS' && w !== 'RETURN');
-                                    for (const word of keywords) {
-                                        if (routeStr.includes(word)) {
-                                            score += 10;
+                        if (routeCode) {
+                            matchedRoute = routes.find(r => r.route_code === routeCode);
+                        }
+                        if (!matchedRoute) {
+                            // Check for divergence override based on current coordinates
+                            try {
+                                const { matchBranchForBus, divergenceCache } = require('./divergenceBinding');
+                                for (const node of (divergenceCache || [])) {
+                                    const branch = matchBranchForBus(bus.lat || bus.latitude, bus.long || bus.longitude, node.id);
+                                    if (branch && branch.routeIds.length > 0) {
+                                        matchedRoute = routes.find(r => r.id === branch.routeIds[0]);
+                                        if (matchedRoute) {
+                                            break;
                                         }
                                     }
-                                    if (score > bestScore) {
-                                        bestScore = score;
-                                        matchedRoute = r;
-                                    }
                                 }
-                                if (!matchedRoute)
+                            }
+                            catch (err) {
+                                console.error('[Divergence] Error checking route divergence:', err);
+                            }
+                        }
+                        if (!matchedRoute) {
+                            const matchingRoutes = routes.filter(r => {
+                                if (!bus.route_description)
+                                    return false;
+                                const routeStr = bus.route_description.toUpperCase();
+                                return routeStr.includes(r.source.toUpperCase()) && routeStr.includes(r.destination.toUpperCase());
+                            });
+                            if (matchingRoutes.length > 0) {
+                                if (matchingRoutes.length === 1) {
                                     matchedRoute = matchingRoutes[0];
+                                }
+                                else {
+                                    let bestScore = -1;
+                                    const routeStr = (bus.route_description || '').toUpperCase();
+                                    for (const r of matchingRoutes) {
+                                        let score = 0;
+                                        const dbRouteName = r.route_name.toUpperCase();
+                                        const keywords = dbRouteName.replace(/[^A-Z0-9\s]/g, ' ').split(/\s+/).filter((w) => w.length > 3 && w !== 'DEPOT' && w !== 'BUS' && w !== 'STAND' && w !== 'EXPRESS' && w !== 'RETURN');
+                                        for (const word of keywords) {
+                                            if (routeStr.includes(word)) {
+                                                score += 10;
+                                            }
+                                        }
+                                        if (score > bestScore) {
+                                            bestScore = score;
+                                            matchedRoute = r;
+                                        }
+                                    }
+                                    if (!matchedRoute)
+                                        matchedRoute = matchingRoutes[0];
+                                }
                             }
                         }
                         if (!matchedRoute) {
@@ -197,7 +226,12 @@ async function getTripETAs(tripId, regNo, routeCode) {
                 }
             }
             catch (e) {
-                console.error('Fallback fetch failed', e);
+                if (e.code === 'ECONNRESET' || e.code === 'ENOTFOUND') {
+                    console.warn(`⚠️ [ETA Engine] UPSRTC API is currently unreachable (${e.code}). Using local schedule fallback.`);
+                }
+                else {
+                    console.error('Fallback fetch failed:', e.message || e);
+                }
                 if ((tripRes.rowCount || 0) > 0) {
                     trip = tripRes.rows[0];
                 }
@@ -269,20 +303,75 @@ async function getTripETAs(tripId, regNo, routeCode) {
         // Speed smoothing: Use current speed if > 25 km/h, otherwise floor to 40 km/h (average highway speed)
         // to prevent division by zero or inflated ETAs when stationary at a traffic light or depot
         const speedFloorKmph = busSpeed > 25 ? busSpeed : 45;
-        // 4. Find the closest stop to the bus
-        let closestIndex = 0;
+        // Fetch bus ID from buses table and load progress cache if available
+        const busIdRes = await (0, db_1.query)(`SELECT id FROM buses WHERE registration_no = $1`, [trip.registration_no]);
+        const busId = busIdRes.rowCount && busIdRes.rowCount > 0 ? busIdRes.rows[0].id : null;
+        let progressCache = null;
+        let visitLogs = [];
+        if (busId) {
+            const { RouteProgressRepository } = require('../modules/route-progress/repository/RouteProgressRepository');
+            progressCache = await RouteProgressRepository.getLastProgress(busId);
+            visitLogs = await RouteProgressRepository.getStopVisitLogs(busId);
+        }
+        // 4. Project bus location onto route path if available
+        const routeIdForGeom = trip.route_id || fallbackRouteId;
+        let busPos = null;
+        if (routeIdForGeom) {
+            try {
+                busPos = (0, routeGeometry_1.computeBusPositionOnRoute)(routeIdForGeom, busLat, busLng);
+            }
+            catch (e) {
+                console.warn('[ETA] Could not compute bus position for passed check:', e);
+            }
+        }
+        // 5a. Find the closest stop sequence based on distance (fallback)
+        let closestIndexByDist = 0;
         let minDistance = Infinity;
         for (let i = 0; i < routeStops.length; i++) {
             const stop = routeStops[i];
             const dist = calculateDistance(busLat, busLng, parseFloat(stop.latitude), parseFloat(stop.longitude));
             if (dist < minDistance) {
                 minDistance = dist;
+                closestIndexByDist = i;
+            }
+        }
+        // 5b. Build the set of sequence numbers considered "passed" (using projected distance or distance fallback)
+        const passedSeqs = new Set();
+        if (busPos && busPos.busDistKm !== undefined) {
+            routeStops.forEach((s) => {
+                if (parseFloat(s.distance_from_start_km) < busPos.busDistKm) {
+                    passedSeqs.add(s.sequence_no);
+                }
+            });
+        }
+        else {
+            for (let i = 0; i < closestIndexByDist; i++) {
+                passedSeqs.add(routeStops[i].sequence_no);
+            }
+        }
+        // 5c. Define the current upcoming stop index (first stop not passed)
+        let closestIndex = 0;
+        for (let i = 0; i < routeStops.length; i++) {
+            if (!passedSeqs.has(routeStops[i].sequence_no)) {
+                closestIndex = i;
+                break;
+            }
+            if (i === routeStops.length - 1) {
                 closestIndex = i;
             }
         }
         const closestStop = routeStops[closestIndex];
         const closestSeq = closestStop.sequence_no;
-        // 5. Calculate ETAs for each stop
+        // 5d. Feed current GPS ping into the Stop-State FSM so it can evolve
+        const regNoKey = trip.registration_no || `trip_${tripId}`;
+        (0, stopStateFSM_1.updateBusFSM)(regNoKey, busLat, busLng, busSpeed, routeStops.map((s) => ({
+            stopId: s.stop_id,
+            sequenceNo: s.sequence_no,
+            name: s.name || '',
+            latitude: parseFloat(s.latitude),
+            longitude: parseFloat(s.longitude)
+        })), passedSeqs);
+        // 5c. Calculate ETAs for each stop
         const etas = [];
         for (let i = 0; i < routeStops.length; i++) {
             const stop = routeStops[i];
@@ -292,38 +381,79 @@ async function getTripETAs(tripId, regNo, routeCode) {
             let distanceRemainingKm = 0;
             let etaMinutes = 0;
             let status = 'upcoming';
-            if (seq < closestSeq) {
-                // Stop is in the past
-                distanceRemainingKm = 0;
-                etaMinutes = 0;
-                status = 'passed';
-            }
-            else if (seq === closestSeq) {
-                // Bus is close to this stop or has just reached it
-                distanceRemainingKm = calculateDistance(busLat, busLng, stopLat, stopLng);
-                etaMinutes = Math.round((distanceRemainingKm / speedFloorKmph) * 60);
-                if (distanceRemainingKm < 0.3) {
-                    status = 'arriving_soon';
-                    etaMinutes = 0; // At terminal
+            if (progressCache) {
+                // Use calculations based on Route Progress Engine cache
+                const stopDistMeters = parseFloat(stop.distance_from_start_km) * 1000;
+                const isStopPassed = i <= progressCache.completed_stop_index;
+                if (isStopPassed) {
+                    status = 'passed';
+                    distanceRemainingKm = 0;
+                    etaMinutes = 0;
                 }
                 else {
-                    status = 'upcoming';
+                    distanceRemainingKm = Math.max(0, stopDistMeters - progressCache.covered_distance) / 1000;
+                    const isAtStop = progressCache.state === 'AT_STOP' &&
+                        (progressCache.current_stop === stop.name || progressCache.current_segment_from === stop.name);
+                    if (isAtStop) {
+                        status = 'on_stop';
+                        etaMinutes = 0;
+                    }
+                    else if (distanceRemainingKm <= 0.5) {
+                        status = 'arriving_now';
+                        etaMinutes = Math.round((distanceRemainingKm / speedFloorKmph) * 60);
+                    }
+                    else {
+                        status = 'upcoming';
+                        // Calculate travel time + halt delay
+                        const intermediateStopsCount = i - Math.max(0, progressCache.completed_stop_index);
+                        const baseTime = Math.round((distanceRemainingKm / speedFloorKmph) * 60);
+                        const haltDelay = Math.max(0, intermediateStopsCount - 1) * 2;
+                        etaMinutes = baseTime + haltDelay;
+                    }
                 }
             }
             else {
-                // Future stop: Cumulative segment distance along the route
-                // Dist = Dist(Bus -> ClosestStop) + Dist(ClosestStop -> NextStop) + ... + Dist(NextStop -> TargetStop)
-                let routeDist = calculateDistance(busLat, busLng, parseFloat(closestStop.latitude), parseFloat(closestStop.longitude));
-                for (let j = closestIndex; j < i; j++) {
-                    const s1 = routeStops[j];
-                    const s2 = routeStops[j + 1];
-                    routeDist += calculateDistance(parseFloat(s1.latitude), parseFloat(s1.longitude), parseFloat(s2.latitude), parseFloat(s2.longitude));
+                // Fallback to original FSM and distance calculations
+                if (seq < closestSeq) {
+                    distanceRemainingKm = 0;
+                    etaMinutes = 0;
+                    status = 'passed';
                 }
-                distanceRemainingKm = routeDist;
-                // Time = (Distance / Speed) * 60 + Halt delay of 2 mins per intermediate stop
-                const intermediateStopsCount = i - closestIndex;
-                etaMinutes = Math.round((distanceRemainingKm / speedFloorKmph) * 60) + (intermediateStopsCount * 2);
-                status = 'upcoming';
+                else if (seq === closestSeq) {
+                    distanceRemainingKm = calculateDistance(busLat, busLng, stopLat, stopLng);
+                    const fsmState = (0, stopStateFSM_1.getStopFSMState)(regNoKey, stop.stop_id);
+                    const isFirstStop = closestSeq === routeStops[0]?.sequence_no;
+                    const isPreTrip = trip.trip_status === 'scheduled';
+                    if (fsmState === 'on_stop') {
+                        if (isFirstStop && isPreTrip) {
+                            status = 'scheduled_to_depart';
+                        }
+                        else {
+                            status = 'on_stop';
+                        }
+                        etaMinutes = 0;
+                    }
+                    else if (fsmState === 'arriving_now') {
+                        status = 'arriving_now';
+                        etaMinutes = 0;
+                    }
+                    else {
+                        etaMinutes = Math.round((distanceRemainingKm / speedFloorKmph) * 60);
+                        status = 'upcoming';
+                    }
+                }
+                else {
+                    let routeDist = calculateDistance(busLat, busLng, parseFloat(closestStop.latitude), parseFloat(closestStop.longitude));
+                    for (let j = closestIndex; j < i; j++) {
+                        const s1 = routeStops[j];
+                        const s2 = routeStops[j + 1];
+                        routeDist += calculateDistance(parseFloat(s1.latitude), parseFloat(s1.longitude), parseFloat(s2.latitude), parseFloat(s2.longitude));
+                    }
+                    distanceRemainingKm = routeDist;
+                    const intermediateStopsCount = i - closestIndex;
+                    etaMinutes = Math.round((distanceRemainingKm / speedFloorKmph) * 60) + (intermediateStopsCount * 2);
+                    status = 'upcoming';
+                }
             }
             etas.push({
                 stopId: stop.stop_id,
@@ -336,13 +466,20 @@ async function getTripETAs(tripId, regNo, routeCode) {
                 status
             });
         }
+        // 6. Compute village waypoints using prefix-sum + binary search
+        let waypoints = [];
+        try {
+            if (routeIdForGeom && busPos) {
+                waypoints = (0, routeGeometry_1.getWaypointETAs)(routeIdForGeom, busPos.busDistKm, busSpeed, closestSeq);
+            }
+        }
+        catch (e) {
+            // Gracefully degrade — waypoints are bonus info, not critical
+            console.warn('[ETA] Could not compute waypoints:', e);
+        }
         return {
             tripId,
-            // If we found a closest stop, visually snap the bus towards the polyline between closestStop and the surrounding stops
-            // For now, we will just pass the real coordinate, BUT the frontend will snap it or draw it better if it has real routeStops!
-            // Actually, since the bus is truly on this route, its latitude/longitude WILL physically match the drawn route line very closely!
-            // If the user wants to see the bus directly on the line, we could return closestStop's lat/lng, but that's jumpy.
-            // The real coordinates are best.
+            routeId: trip.route_id || fallbackRouteId,
             busRegNo: trip.registration_no,
             busType: trip.bus_type,
             routeCode: trip.route_code,
@@ -353,7 +490,8 @@ async function getTripETAs(tripId, regNo, routeCode) {
             heading,
             lastSeen: live.last_seen_at,
             status: trip.trip_status,
-            stops: etas
+            stops: etas,
+            waypoints
         };
     }
     catch (error) {

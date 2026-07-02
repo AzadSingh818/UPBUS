@@ -1,0 +1,59 @@
+# Implementation Plan - Admin Console Live Network Map
+
+Aapke request ke mutabik hum admin panel par bina Google Maps ka use kiye, ek **OpenStreetMap (Leaflet.js) based dynamic Dark-Themed Map** implement karenge. Yeh map:
+1. UP ke poore active bus route graph ko draw karega (Lines).
+2. Geocoded Bus Stands ko points ki tarah show karega (Markers).
+3. Live buses ko real-time coordinate updates ke sath map par move karega.
+
+## Proposed Changes
+
+---
+
+### Backend API Updates
+
+#### [MODIFY] [admin.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/api/admin.ts)
+Add a new endpoint `/monitor/map-data` that aggregates:
+- All stops coordinates from the graph stops list.
+- All route sequences mapped to lat/lng polylines.
+This is called once by the map component on load.
+
+---
+
+### Dependency Installation
+
+#### [INSTALL] Leaflet NPM Packages
+Install `leaflet` and `@types/leaflet` in the admin package directory to handle map instance rendering.
+
+---
+
+### Admin Panel Page & Layout
+
+#### [MODIFY] [layout.tsx](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/admin/src/app/layout.tsx)
+Add Leaflet's standard CSS stylesheet via a CDN link in the HTML `<head>` so map controls and layers render correctly.
+
+#### [NEW] [LiveMap.tsx](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/admin/src/components/LiveMap.tsx)
+Create an isolated Leaflet Map component:
+- Uses a `div` reference to instantiate a Leaflet map.
+- Uses **CartoDB Dark Matter** tile layers for a premium black/dark UI theme.
+- Draws all stops as small light-grey circular nodes.
+- Draws all route paths as semi-transparent thin amber/orange lines.
+- Renders active buses as circular icons (green for moving, red for stationary) with rotation corresponding to their GPS heading. Clicking/hovering on a bus shows tooltips with registration and route info.
+- Automatically handles Next.js SSR issues by checking for window execution.
+
+#### [MODIFY] [page.tsx](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/admin/src/app/page.tsx)
+- Add a view selector tab (Toggle button: **Console View** / **Map View**) at the top of the admin console.
+- Dynamically import the `LiveMap` component with `ssr: false` so it loads on the client side without throwing hydration mismatch warnings.
+- Pass the live `buses` state list directly to the map component so the markers update automatically on every 2-second poll.
+
+---
+
+## Verification Plan
+
+### Compilation Check
+- Run `npm run build` on both `apps/backend` and `apps/admin` to verify no compilation errors.
+
+### Manual Verification
+- Open the Admin Console at `http://localhost:3003`.
+- Click on **Map View**.
+- Verify that a dark map of UP is shown with orange roads network and active buses moving in real time.
+- Verify that toggle back to **Console View** works and logs/active bus list are completely intact and untouched.
