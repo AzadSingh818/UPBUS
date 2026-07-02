@@ -1,0 +1,7 @@
+- [x] Extend DB client schema and queries to support dynamic route and stop retrieval in `db/index.ts`
+- [x] Modify `graph.ts` to dynamically fetch stops, routes, and mappings from the DB instead of importing `data.json` directly
+- [x] Build the dynamic route learning engine in `engine/routeLearning.ts`
+- [x] Integrate location tracking in `ingestion/adapter.ts` and `index.ts` WebSocket server
+- [x] Implement debug APIs in `api/routeLearningDebug.ts` and register them in `index.ts`
+- [x] Write integration test script `test_route_learning.js` to simulate location pings and verify auto-learning
+- [x] Verify execution and compilation of the whole system

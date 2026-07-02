@@ -42,8 +42,17 @@ const http_1 = __importDefault(require("http"));
 const ws_1 = require("ws");
 const dotenv_1 = __importDefault(require("dotenv"));
 const db_1 = require("./db");
-const adapter_1 = require("./ingestion/adapter");
+const adapter_live_1 = require("./ingestion/adapter_live");
+const routeSeeder_1 = require("./engine/routeSeeder");
 const eta_1 = require("./engine/eta");
+const routeGeometry_1 = require("./engine/routeGeometry");
+const divergenceBinding_1 = require("./engine/divergenceBinding");
+const routeVillages_1 = require("./api/routeVillages");
+const margdarshiClient_1 = require("./services/margdarshiClient");
+const routeLearningDebug_1 = require("./api/routeLearningDebug");
+const admin_1 = require("./api/admin");
+const routeLearning_1 = require("./engine/routeLearning");
+const RouteProgressController_1 = require("./modules/route-progress/controller/RouteProgressController");
 function doesBusRouteMatch(busRouteStr, legRouteName, routeSource, routeDest) {
     const busStr = busRouteStr.toUpperCase();
     const rName = legRouteName.toUpperCase();
@@ -69,6 +78,50 @@ app.use(express_1.default.json());
 app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', service: 'upbus-backend' });
 });
+// ── Stop-State FSM debug & config endpoints ─────────────────────────────────
+// GET /api/v1/debug/fsm-state   → dump all active FSM records
+app.get('/api/v1/debug/fsm-state', async (_req, res) => {
+    const { dumpFSMState } = await Promise.resolve().then(() => __importStar(require('./engine/stopStateFSM')));
+    res.json(dumpFSMState());
+});
+// PATCH /api/v1/debug/fsm-config  body: { ARRIVING_RADIUS_KM, ON_STOP_RADIUS_KM, ... }
+// Allows live-tuning of FSM thresholds without a server restart
+app.patch('/api/v1/debug/fsm-config', async (req, res) => {
+    try {
+        const { configureFSM } = await Promise.resolve().then(() => __importStar(require('./engine/stopStateFSM')));
+        configureFSM(req.body);
+        const { dumpFSMState, ARRIVING_RADIUS_KM, ON_STOP_RADIUS_KM, ON_STOP_EXIT_RADIUS_KM, SPEED_THRESHOLD_KMPH, DWELL_PINGS } = await Promise.resolve().then(() => __importStar(require('./engine/stopStateFSM')));
+        res.json({ ok: true, current: { ARRIVING_RADIUS_KM, ON_STOP_RADIUS_KM, ON_STOP_EXIT_RADIUS_KM, SPEED_THRESHOLD_KMPH, DWELL_PINGS } });
+    }
+    catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+// ── Route Geometry debug endpoints ───────────────────────────────────────────
+// GET /api/v1/debug/geometry  → dump prefix-sum geometry sizes per route
+app.get('/api/v1/debug/geometry', (_req, res) => {
+    res.json((0, routeGeometry_1.dumpGeometrySummary)());
+});
+// GET /api/v1/route/:routeId/waypoints  → all village waypoints for a route
+app.get('/api/v1/route/:routeId/waypoints', (req, res) => {
+    const routeId = parseInt(req.params.routeId, 10);
+    const geom = (0, routeGeometry_1.getRouteGeometry)(routeId);
+    if (!geom)
+        return res.status(404).json({ error: 'Route not found or no geometry' });
+    const villages = geom.points
+        .filter(p => p.type === 'village')
+        .map((p) => ({ ...p, prefixKm: geom.prefixKm[geom.points.indexOf(p)] }));
+    res.json({ routeId, totalPoints: geom.points.length, totalKm: geom.totalKm, villages });
+});
+// ── Village markers per route ────────────────────────────────────────────────
+// GET  /api/v1/routes/:routeId/villages   → list villages near the route
+// POST /api/v1/routes/:routeId/villages/refresh  → force Overpass re-fetch
+app.use('/api/v1/routes', routeVillages_1.router);
+app.use('/api/v1/debug/learning', routeLearningDebug_1.router);
+app.use('/api/v1/admin', admin_1.router);
+// Route Progress Endpoints (REST API)
+app.get('/api/bus/:busId/progress', RouteProgressController_1.RouteProgressController.getProgress);
+app.get('/api/v1/bus/:busId/progress', RouteProgressController_1.RouteProgressController.getProgress);
 // 2. Search routes (Fuzzy route search by From -> To)
 app.get('/api/v1/search/routes', async (req, res) => {
     const { from, to } = req.query;
@@ -80,20 +133,7 @@ app.get('/api/v1/search/routes', async (req, res) => {
         // Fetch all paths with 0 transfers (direct routes)
         const directPaths = findPathsDFS(from, to, 0);
         const result = [];
-        const fetch = (await Promise.resolve().then(() => __importStar(require('node-fetch')))).default;
-        let liveData = [];
-        try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 2000);
-            const response = await fetch('http://117.218.157.195/margdarshi/api/busdata?routeId=ALL', { signal: controller.signal });
-            clearTimeout(timeoutId);
-            if (response.ok) {
-                liveData = await response.json();
-            }
-        }
-        catch (e) {
-            console.warn('⚠️ [Warning] Margdarshi live API is currently unreachable. Returning static routes.');
-        }
+        const liveData = await (0, margdarshiClient_1.fetchMargdarshiLiveData)();
         for (const path of directPaths) {
             const leg = path.legs[0]; // 0 transfers means exactly 1 leg
             const missedTrips = [];
@@ -213,6 +253,18 @@ app.get('/api/v1/search/routes', async (req, res) => {
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });
+// Get all stops (for frontend autocomplete suggestions)
+app.get('/api/v1/stops', async (req, res) => {
+    try {
+        const stopsRes = await (0, db_1.query)(`SELECT id, name, latitude, longitude FROM stops`);
+        const sortedStops = [...stopsRes.rows].sort((a, b) => a.name.localeCompare(b.name));
+        res.json({ stops: sortedStops });
+    }
+    catch (error) {
+        console.error('Error fetching stops:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
 // 3. Get all stops on a specific route
 app.get('/api/v1/routes/:routeId/stops', async (req, res) => {
     const { routeId } = req.params;
@@ -260,18 +312,7 @@ app.get('/api/v1/journey', async (req, res) => {
         if (!paths || paths.length === 0) {
             return res.json({ legs: [], journeys: [], message: 'No route found. Try a different combination.' });
         }
-        let liveData = [];
-        try {
-            const fetch = (await Promise.resolve().then(() => __importStar(require('node-fetch')))).default;
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 2000);
-            const liveRes = await fetch('http://117.218.157.195/margdarshi/api/busdata?routeId=ALL', { signal: controller.signal });
-            clearTimeout(timeoutId);
-            liveData = await liveRes.json();
-        }
-        catch (e) {
-            console.warn('⚠️ [Warning] Margdarshi live API is currently unreachable. Returning static schedules.');
-        }
+        const liveData = await (0, margdarshiClient_1.fetchMargdarshiLiveData)();
         // Map all paths to the journey format
         const journeys = [];
         for (const path of paths) {
@@ -335,18 +376,23 @@ app.get('/api/v1/journey', async (req, res) => {
                 }
                 const durationMins = Math.round((leg.distanceKm / 40) * 60);
                 legs.push({
+                    routeId: leg.routeId,
                     from: leg.fromStopName,
                     to: leg.toStopName,
                     routeName: actualRouteName,
                     routeCode: actualRouteCode,
                     busType: 'UPSRTC',
                     registrationNo: busInfo ? busInfo.RegNo : 'Scheduled',
-                    busInfo: {
+                    busInfo: busInfo ? {
                         trip_id: Math.floor(Math.random() * 100000),
-                        registration_no: busInfo ? busInfo.RegNo : 'Scheduled',
+                        registration_no: busInfo.RegNo,
                         bus_type: 'UPSRTC',
-                        depot_name: 'Margdarshi Live'
-                    },
+                        depot_name: 'Margdarshi Live',
+                        bus_latitude: parseFloat(busInfo.lat) || null,
+                        bus_longitude: parseFloat(busInfo.long) || null,
+                        current_speed_kmph: parseFloat(busInfo.speed) || 0,
+                        heading: parseFloat(busInfo.heading) || 0
+                    } : null,
                     stops: leg.stops.map(s => ({
                         stopId: s.stopId,
                         name: s.name,
@@ -438,6 +484,87 @@ app.get('/api/v1/search/bus/:regNo', async (req, res) => {
         res.status(500).json({ message: 'Failed to fetch real-time data.' });
     }
 });
+// 6. Save a passenger report
+app.post('/api/v1/reports', async (req, res) => {
+    try {
+        const { tripId, busRegNo, reportType, description, latitude, longitude } = req.body;
+        if (!busRegNo || !reportType) {
+            return res.status(400).json({ error: 'busRegNo and reportType are required.' });
+        }
+        await (0, db_1.query)(`INSERT INTO passenger_reports (trip_id, bus_reg_no, report_type, description, latitude, longitude)
+       VALUES ($1, $2, $3, $4, $5, $6)`, [
+            tripId ? parseInt(tripId, 10) : null,
+            busRegNo,
+            reportType,
+            description || null,
+            latitude ? parseFloat(latitude) : null,
+            longitude ? parseFloat(longitude) : null
+        ]);
+        res.status(201).json({ success: true, message: 'Report submitted successfully.' });
+    }
+    catch (error) {
+        console.error('Error saving passenger report:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+// 7. Get active passenger reports (within last 2 hours)
+app.get('/api/v1/reports/active', async (req, res) => {
+    try {
+        const cutoff = new Date(Date.now() - 2 * 60 * 60 * 1000);
+        const reportsRes = await (0, db_1.query)(`SELECT id, trip_id, bus_reg_no, report_type, description, latitude, longitude, created_at
+       FROM passenger_reports
+       WHERE created_at >= $1
+       ORDER BY created_at DESC`, [cutoff]);
+        res.json({ reports: reportsRes.rows });
+    }
+    catch (error) {
+        console.error('Error fetching passenger reports:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+// 8. Get VAPID public key for Web Push
+app.get('/api/v1/push/key', (req, res) => {
+    try {
+        const { getVapidPublicKey } = require('./services/notificationService');
+        res.json({ publicKey: getVapidPublicKey() });
+    }
+    catch (error) {
+        console.error('Error getting VAPID public key:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+// 9. Subscribe to push notifications
+app.post('/api/v1/push/subscribe', async (req, res) => {
+    try {
+        const { subscription } = req.body;
+        if (!subscription) {
+            return res.status(400).json({ error: 'subscription is required.' });
+        }
+        const { saveSubscription } = require('./services/notificationService');
+        await saveSubscription(subscription);
+        res.status(201).json({ success: true, message: 'Subscribed successfully.' });
+    }
+    catch (error) {
+        console.error('Error registering push subscription:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+// 10. Unsubscribe from push notifications
+app.post('/api/v1/push/unsubscribe', async (req, res) => {
+    try {
+        const { endpoint } = req.body;
+        if (!endpoint) {
+            return res.status(400).json({ error: 'endpoint is required.' });
+        }
+        const { removeSubscription } = require('./services/notificationService');
+        await removeSubscription(endpoint);
+        res.json({ success: true, message: 'Unsubscribed successfully.' });
+    }
+    catch (error) {
+        console.error('Error unsubscribing:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
 // Create HTTP server
 const server = http_1.default.createServer(app);
 // ----------------------------------------------------
@@ -468,6 +595,28 @@ wss.on('connection', (ws) => {
                     ws.send(JSON.stringify({ event: 'trip_update', data: initialData }));
                 }
             }
+            if (data.event === 'subscribe_progress' && data.busId) {
+                const busId = parseInt(data.busId, 10);
+                const { ProgressSocketHandler } = require('./modules/route-progress/socket/ProgressSocketHandler');
+                ProgressSocketHandler.register(ws, busId);
+                // Send initial state immediately if exists
+                const { RouteProgressService } = require('./modules/route-progress/service/RouteProgressService');
+                const initialProgress = await RouteProgressService.getProgress(busId);
+                if (initialProgress) {
+                    ws.send(JSON.stringify({
+                        event: 'BUS_PROGRESS_UPDATED',
+                        payload: {
+                            busId,
+                            completed: initialProgress.completedStops,
+                            current: initialProgress.current,
+                            remaining: initialProgress.remainingStops,
+                            coveredDistance: initialProgress.coveredDistance,
+                            routeDistance: initialProgress.routeDistance,
+                            currentState: initialProgress.currentState
+                        }
+                    }));
+                }
+            }
             if (data.event === 'report_location' && data.tripId) {
                 const tripId = parseInt(data.tripId, 10);
                 const { latitude, longitude, speed, heading, source } = data;
@@ -486,6 +635,10 @@ wss.on('connection', (ws) => {
                 speed = EXCLUDED.speed,
                 heading = EXCLUDED.heading,
                 last_seen_at = NOW()`, [busId, tripId, latitude, longitude, speed || 0, heading || 0]);
+                    // Record location in the route learning engine
+                    (0, routeLearning_1.recordLiveLocation)(tripId, latitude, longitude, speed || 0).catch(err => {
+                        console.error('[Route Learning] Error recording crowd-sourced location:', err);
+                    });
                     // Mark this trip as having active crowd-sourced updates to prevent simulator overrides
                     global.activeCrowdSourcedTrips = global.activeCrowdSourcedTrips || {};
                     global.activeCrowdSourcedTrips[tripId] = {
@@ -495,7 +648,7 @@ wss.on('connection', (ws) => {
                     // Broadcast update immediately to all clients subscribed to this trip
                     for (const sub of subscriptions) {
                         if (sub.tripId === tripId && sub.ws.readyState === ws_1.WebSocket.OPEN) {
-                            const updatedData = await (0, eta_1.getTripETAs)(tripId, sub.regNo);
+                            const updatedData = await (0, eta_1.getTripETAs)(tripId, sub.regNo, sub.routeCode);
                             if (updatedData) {
                                 updatedData.trackingMethod = source;
                                 sub.ws.send(JSON.stringify({ event: 'trip_update', data: updatedData }));
@@ -547,13 +700,36 @@ server.listen(port, async () => {
     // Boot Graph Engine
     const { buildGraph } = await Promise.resolve().then(() => __importStar(require('./engine/graph')));
     await buildGraph();
+    await (0, divergenceBinding_1.initDivergenceCache)();
+    // Boot Route Geometry Engine (prefix-sum for village waypoints)
+    try {
+        const fs = await Promise.resolve().then(() => __importStar(require('fs')));
+        const path = await Promise.resolve().then(() => __importStar(require('path')));
+        const waypointsPath = path.join(__dirname, 'db/waypoints.json');
+        if (fs.existsSync(waypointsPath)) {
+            const waypointsData = JSON.parse(fs.readFileSync(waypointsPath, 'utf8'));
+            (0, routeGeometry_1.buildRouteGeometries)(waypointsData);
+            console.log('[Startup] Route geometries with village waypoints loaded.');
+        }
+        else {
+            console.warn('[Startup] waypoints.json not found — run scripts/fetch_osm_villages.ts to generate it. Village waypoints will be empty.');
+            (0, routeGeometry_1.buildRouteGeometries)(null);
+        }
+    }
+    catch (e) {
+        console.warn('[Startup] Failed to load waypoints.json:', e);
+        (0, routeGeometry_1.buildRouteGeometries)(null);
+    }
     // Boot GPS Ingestion Engine
-    (0, adapter_1.startIngestion)();
+    (0, adapter_live_1.startIngestion)();
+    // Boot Autonomous Route Seeder
+    (0, routeSeeder_1.startRouteSeeder)();
 });
 // Graceful Shutdown
 const shutdown = () => {
     console.log('Shutting down server...');
-    (0, adapter_1.stopIngestion)();
+    (0, adapter_live_1.stopIngestion)();
+    (0, routeSeeder_1.stopRouteSeeder)();
     server.close(() => {
         console.log('Server stopped.');
         process.exit(0);

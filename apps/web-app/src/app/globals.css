@@ -997,6 +997,12 @@ body {
   animation: pulse-ring-new 2s infinite;
 }
 
+@keyframes pulse-ring-new {
+  0% { transform: scale(1); opacity: 0; }
+  50% { opacity: 0.5; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+
 .stop-line {
   width: 4px;
   position: absolute;
@@ -1328,85 +1334,108 @@ body {
 
 .bus-pulse-ring {
   position: absolute;
-  top: -20px;
-  left: -20px;
-  width: 80px;
-  height: 80px;
+  top: -28px;
+  left: -28px;
+  width: 96px;
+  height: 96px;
   border-radius: 50%;
-  background: rgba(59, 130, 246, 0.18);
-  border: 2px solid rgba(59, 130, 246, 0.45);
-  box-shadow: 0 0 15px rgba(59, 130, 246, 0.4);
-  animation: busPulse 2s infinite cubic-bezier(0.24, 0, 0.38, 1);
+  /* Deep indigo filled ring — much more visible against map background */
+  background: radial-gradient(circle, rgba(79, 70, 229, 0.22) 0%, rgba(79, 70, 229, 0.06) 60%, transparent 80%);
+  border: 2.5px solid rgba(79, 70, 229, 0.70);
+  box-shadow:
+    0 0 0 3px rgba(79, 70, 229, 0.25),
+    0 0 18px rgba(79, 70, 229, 0.55),
+    0 0 40px rgba(79, 70, 229, 0.20);
+  animation: busPulse 1.6s infinite cubic-bezier(0.24, 0, 0.38, 1);
   pointer-events: none;
   z-index: 1;
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.bus-marker-wrapper:hover .bus-pulse-ring {
+  background: radial-gradient(circle, rgba(79, 70, 229, 0.35) 0%, rgba(79, 70, 229, 0.12) 60%, transparent 80%);
+  border-color: rgba(79, 70, 229, 0.95);
+  box-shadow:
+    0 0 0 4px rgba(79, 70, 229, 0.35),
+    0 0 26px rgba(79, 70, 229, 0.85),
+    0 0 60px rgba(79, 70, 229, 0.35);
+}
+
+
+/* Second outer ghost ring for depth */
+.bus-pulse-ring::after {
+  content: '';
+  position: absolute;
+  top: -12px;
+  left: -12px;
+  width: calc(100% + 24px);
+  height: calc(100% + 24px);
+  border-radius: 50%;
+  border: 1.5px solid rgba(79, 70, 229, 0.30);
+  animation: busPulseOuter 1.6s 0.4s infinite cubic-bezier(0.24, 0, 0.38, 1);
+  pointer-events: none;
 }
 
 @keyframes busPulse {
-  0% {
-    transform: scale(0.4);
-    opacity: 0.1;
-  }
-  50% {
-    opacity: 0.8;
-  }
-  100% {
-    transform: scale(1.2);
-    opacity: 0;
-  }
+  0%   { transform: scale(0.45); opacity: 0; }
+  30%  { opacity: 1; }
+  100% { transform: scale(1.1); opacity: 0; }
 }
 
+@keyframes busPulseOuter {
+  0%   { transform: scale(0.55); opacity: 0; }
+  30%  { opacity: 0.5; }
+  100% { transform: scale(1.05); opacity: 0; }
+}
 
+/* ── Bus icon circle — rich amber with hover lift ─────────────────────────── */
 .bus-icon-circle {
-  width: 36px;
-  height: 36px;
-  background: linear-gradient(135deg, var(--accent) 0%, #d97706 100%);
-  border: 2px solid #ffffff;
+  width: 38px;
+  height: 38px;
+  background: linear-gradient(145deg, #f59e0b 0%, #b45309 100%);
+  border: 3px solid #ffffff;
   border-radius: 50%;
-  box-shadow: 0 4px 15px rgba(255, 159, 28, 0.5);
+  box-shadow:
+    0 4px 18px rgba(180, 83, 9, 0.7),
+    0 2px 6px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255,255,255,0.25);
   display: flex;
   align-items: center;
   justify-content: center;
   color: #ffffff;
   z-index: 5;
   position: relative;
-  transition: var(--transition-smooth);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  cursor: pointer;
+}
+
+.bus-marker-wrapper:hover .bus-icon-circle {
+  transform: scale(1.18);
+  box-shadow:
+    0 6px 24px rgba(180, 83, 9, 0.85),
+    0 3px 10px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255,255,255,0.3);
 }
 
 .bus-icon-circle svg {
   width: 20px;
   height: 20px;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.35));
 }
 
+/* Direction arrow triangle */
 .bus-direction-arrow {
   position: absolute;
-  top: -6px;
+  top: -8px;
   width: 0;
   height: 0;
-  border-left: 6px solid transparent;
-  border-right: 6px solid transparent;
-  border-bottom: 8px solid var(--accent);
-  filter: drop-shadow(0 -1px 2px rgba(255, 159, 28, 0.5));
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-bottom: 10px solid #b45309;
+  filter: drop-shadow(0 -2px 3px rgba(180, 83, 9, 0.7));
   z-index: 6;
-  transform-origin: 50% 26px;
+  transform-origin: 50% 28px;
   transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.bus-pulse-ring {
-  position: absolute;
-  width: 36px;
-  height: 36px;
-  border: 3px solid var(--accent);
-  border-radius: 50%;
-  animation: pulse-ring-new 2.5s infinite cubic-bezier(0.215, 0.610, 0.355, 1);
-  opacity: 0;
-  z-index: 1;
-}
-
-@keyframes pulse-ring-new {
-  0% { transform: scale(1); opacity: 0; }
-  50% { opacity: 0.5; }
-  100% { transform: scale(2.2); opacity: 0; }
 }
 
 .spin {
@@ -1705,5 +1734,99 @@ input:checked + .toggle-slider:before {
   backdrop-filter: blur(4px);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
   letter-spacing: 0.02em;
+}
+
+/* --- Autocomplete Dropdown --- */
+.autocomplete-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: var(--bg-dark-secondary, #0c1122);
+  border: 1px solid var(--card-border, rgba(255, 255, 255, 0.07));
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+  z-index: 1000;
+  max-height: 220px;
+  overflow-y: auto;
+  backdrop-filter: blur(12px);
+}
+
+.autocomplete-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  font-size: 13.5px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: var(--transition-smooth);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.02);
+}
+
+.autocomplete-item:last-child {
+  border-bottom: none;
+}
+
+.autocomplete-item:hover {
+  background: rgba(79, 70, 229, 0.15);
+  color: #ffffff;
+}
+
+.dropdown-item-icon {
+  color: var(--primary);
+  opacity: 0.7;
+}
+
+/* --- Layover Transfer Visualizer --- */
+.transfer-node-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.transfer-details-card {
+  margin-left: 28px;
+  background: rgba(255, 159, 28, 0.04);
+  border: 1.5px dashed rgba(255, 159, 28, 0.25);
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  transition: var(--transition-smooth);
+}
+
+.transfer-details-card:hover {
+  background: rgba(255, 159, 28, 0.06);
+  border-color: rgba(255, 159, 28, 0.35);
+}
+
+.transfer-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+
+.transfer-card-icon {
+  color: var(--accent);
+  animation: pulse-orange 2s infinite ease-in-out;
+}
+
+.transfer-card-body {
+  line-height: 1.45;
+}
+
+.transfer-highlight {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+@keyframes pulse-orange {
+  0%, 100% { opacity: 0.8; }
+  50% { opacity: 1; transform: scale(1.05); }
 }
 

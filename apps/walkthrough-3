@@ -1,0 +1,52 @@
+# Walkthrough - Seeding Database with 241 Official UPSRTC Bus Stations
+
+I have successfully parsed, geocoded, and seeded the official list of 241 category-wise bus stations into the project's data storage layers.
+
+## What Was Accomplished
+
+1. **Downloaded Official PDF**:
+   - Fetched the official document from `https://upsrtc.up.gov.in/site/writereaddata/siteContent/202306131412297723CATEGORYWISE-BUS-STN.pdf`.
+   
+2. **Parsed PDF to JSON**:
+   - Wrote [`parse_pdf_to_json.py`](file:///C:/Users/Azad%20Singh/.gemini/antigravity-ide/brain/d5d2fdd0-9c6b-457e-a02a-fb7a8cca8c9c/scratch/parse_pdf_to_json.py) to extract the name, district, and category (Super A, A, B, C, D) for all 241 bus stations without errors.
+
+3. **Geocoded Using Nominatim (OSM)**:
+   - Wrote [`geocode_stations.py`](file:///C:/Users/Azad%20Singh/.gemini/antigravity-ide/brain/d5d2fdd0-9c6b-457e-a02a-fb7a8cca8c9c/scratch/geocode_stations.py) to look up coordinates for each station.
+   - Used an optimized query pattern (searching `{name}, {district}` first) to speed up matching.
+   - For stations not found exactly, the script automatically fell back to coordinates of their respective District Center to ensure valid mapping.
+
+4. **Seeded the Database**:
+   - Created the TypeScript seeding script [`seed_bus_stations.ts`](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/scripts/seed_bus_stations.ts).
+   - Executed the script which:
+     - Appended the 238 newly discovered stops to the mock database fallback file [`data.json`](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/db/data.json).
+     - Executed SQL inserts to seed the PostgreSQL database `stops` table.
+
+---
+
+## Verification & Results
+
+- **Mock DB Seeding**: The total number of stops in [`data.json`](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/db/data.json) successfully increased from **173** to **411** stops.
+- **Auto-restart**: The backend's file-watcher automatically detected the update to `data.json` and successfully reloaded the newly seeded data in real-time.
+- **Search Readiness**: All newly added stops (e.g. `Ayodhya`, `Firozabad`, `Fatehpur Seekri`, etc.) are now fully indexed and searchable in the app.
+
+---
+
+## Bus Map Marker Pulsing Ring & Live Timeline Update
+
+I have successfully added a pulsing indicator to the bus map marker and optimized the stops timeline update.
+
+### What Was Accomplished
+
+1. **Google Maps Style Pulsing Ring**:
+   - Added styling for `.bus-pulse-ring` and `@keyframes busPulse` in [`globals.css`](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/web-app/src/app/globals.css) to render a smooth, glowing halo that expands and pulses around the active bus marker on the Leaflet map.
+
+2. **Precise Stop Progress Synchronization**:
+   - Replaced the simple "closest-stop-by-distance" logic in [`eta.ts`](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/engine/eta.ts) with a route projection lookup. 
+   - We now check the bus's exact projected distance along the route path (`busPos.busDistKm`). Any stop whose distance from start is less than the bus's distance is immediately flagged as `passed`.
+   - This prevents the bus from appearing "stuck" at the previous stop on the timeline while it is physically moving on the map between stops, keeping the timeline perfectly in sync with the map coordinates.
+
+### Verification
+
+- Run `npx tsc --noEmit` on both backend and frontend to verify zero compile or type errors.
+- Confirmed that as the bus moves along the route, the timeline updates dynamically, correctly placing the bus icon between stops or exactly at a stop when appropriate.
+

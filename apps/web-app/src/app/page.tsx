@@ -19,7 +19,7 @@ interface NextTrip extends TripLiveDetails { etaToBoardingMinutes: number; }
 interface Route { id: number; route_code: string; route_name: string; source: string; destination: string; distance_km: string; missedTrips: MissedTrip[]; nextTrips: NextTrip[]; stops: StopETA[]; }
 interface StopETA { stopId: number; name: string; sequenceNo: number; latitude: number; longitude: number; distanceRemainingKm: number; etaMinutes: number; status: 'passed' | 'arriving_now' | 'arriving_soon' | 'on_stop' | 'upcoming'; }
 interface TripLiveDetails { tripId: number; busRegNo: string; busType: string; routeCode: string; routeName: string; busLatitude: number; busLongitude: number; currentSpeedKmph: number; heading: number; lastSeen: string; status: string; stops: StopETA[]; error?: string; }
-interface JourneyStop { stop_id: number; name: string; latitude: number; longitude: number; sequence_no: number; distance_from_start_km: number; }
+interface JourneyStop { stopId: number; name: string; latitude: number; longitude: number; sequenceNo: number; etaMinutes?: number; status?: string; }
 interface JourneyLeg { routeId: number; routeName: string; routeCode: string; fromCity?: string; toCity?: string; from: string; to: string; distanceKm: number; durationMins: number; departureOffsetMins: number; arrivalOffsetMins: number; busInfo: { trip_id: number; registration_no: string; bus_type: string; depot_name: string; bus_latitude?: number | null; bus_longitude?: number | null; current_speed_kmph?: number; heading?: number; } | null; stops: JourneyStop[]; }
 interface Journey { from: string; to: string; totalLegs: number; totalDistanceKm: number; totalDurationMins: number; legs: JourneyLeg[]; totalTransfers: number; message?: string; }
 
@@ -249,15 +249,26 @@ function JourneyTimeline({ journey, onTrackBus }: { journey: Journey; onTrackBus
 
               {/* Transfer node (for middle legs) */}
               {legIdx < journey.legs.length - 1 && (
-                <div className="timeline-node transfer-node">
-                  <div className="node-dot transfer" />
-                  <div className="node-info">
-                    <div className="node-name">{arrivalStop?.name || leg.toCity}</div>
-                    <div className="node-state transfer-badge">🔄 Change Bus Here</div>
+                <div className="timeline-node transfer-node-container" style={{ width: '100%' }}>
+                  <div className="timeline-node transfer-node" style={{ borderBottom: 'none', paddingBottom: 0 }}>
+                    <div className="node-dot transfer" />
+                    <div className="node-info">
+                      <div className="node-name">{arrivalStop?.name || leg.toCity}</div>
+                      <div className="node-state transfer-badge">🔄 Bus Change</div>
+                    </div>
+                    <div className="node-time">
+                      <div className="time-offset">+{fmtDuration(leg.arrivalOffsetMins)}</div>
+                      <div className="time-clock">{fmtTime(baseTime, leg.arrivalOffsetMins)}</div>
+                    </div>
                   </div>
-                  <div className="node-time">
-                    <div className="time-offset">+{fmtDuration(leg.arrivalOffsetMins)}</div>
-                    <div className="time-clock">{fmtTime(baseTime, leg.arrivalOffsetMins)}</div>
+                  <div className="transfer-details-card">
+                    <div className="transfer-card-header">
+                      <ArrowLeftRight size={13} className="transfer-card-icon" />
+                      <span>Transfer Point (15 mins layover buffer)</span>
+                    </div>
+                    <div className="transfer-card-body">
+                      Change from <strong className="transfer-highlight">{leg.routeName}</strong> to <strong className="transfer-highlight">{journey.legs[legIdx + 1].routeName}</strong>
+                    </div>
                   </div>
                 </div>
               )}
@@ -285,6 +296,48 @@ function JourneyTimeline({ journey, onTrackBus }: { journey: Journey; onTrackBus
 export default function Home() {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
+  const [allStops, setAllStops] = useState<{ id: number; name: string }[]>([]);
+  const [showFromSuggestions, setShowFromSuggestions] = useState(false);
+  const [showToSuggestions, setShowToSuggestions] = useState(false);
+  const [fromSuggestions, setFromSuggestions] = useState<{ id: number; name: string }[]>([]);
+  const [toSuggestions, setToSuggestions] = useState<{ id: number; name: string }[]>([]);
+
+  const handleFromChange = (val: string) => {
+    setFrom(val);
+    if (!val.trim()) {
+      setFromSuggestions([]);
+      return;
+    }
+    const filtered = allStops.filter(s => 
+      s.name.toLowerCase().includes(val.toLowerCase())
+    ).slice(0, 10);
+    setFromSuggestions(filtered);
+    setShowFromSuggestions(true);
+  };
+
+  const handleToChange = (val: string) => {
+    setTo(val);
+    if (!val.trim()) {
+      setToSuggestions([]);
+      return;
+    }
+    const filtered = allStops.filter(s => 
+      s.name.toLowerCase().includes(val.toLowerCase())
+    ).slice(0, 10);
+    setToSuggestions(filtered);
+    setShowToSuggestions(true);
+  };
+
+  const selectFromSuggestion = (name: string) => {
+    setFrom(name);
+    setShowFromSuggestions(false);
+  };
+
+  const selectToSuggestion = (name: string) => {
+    setTo(name);
+    setShowToSuggestions(false);
+  };
+
   const [loading, setLoading] = useState(false);
   const [routes, setRoutes] = useState<Route[]>([]);
   const [journeys, setJourneys] = useState<Journey[]>([]);
@@ -323,6 +376,19 @@ export default function Home() {
 
   // Mount logic: Service worker registration & active report fetching
   useEffect(() => {
+    const fetchStops = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/stops`);
+        if (res.ok) {
+          const data = await res.json();
+          setAllStops(data.stops || []);
+        }
+      } catch (e) {
+        console.warn('Failed to fetch stops list:', e);
+      }
+    };
+    fetchStops();
+
     // Register Service Worker and check subscription
     import('./utils/swHelper').then(async (m) => {
       await m.registerServiceWorker();
@@ -702,6 +768,73 @@ export default function Home() {
     if (reportIntervalRef.current) clearInterval(reportIntervalRef.current);
   }, []);
 
+  // ── Helper: clip a stop list to only the from→to segment ──────────────────
+  // Passenger only cares about stops between their origin and destination,
+  // not the full bus route (e.g. Saharanpur→Gangoh for a Phandpuri→Ambehta trip)
+  function clipStopsToSegment(stops: any[], fromQuery: string, toQuery: string) {
+    if (!fromQuery || !toQuery || stops.length === 0) return stops;
+    const fq = fromQuery.toLowerCase().trim();
+    const tq = toQuery.toLowerCase().trim();
+    let fromIdx = stops.findIndex(s => s.name?.toLowerCase().includes(fq));
+    let toIdx = stops.findIndex(s => s.name?.toLowerCase().includes(tq));
+    if (fromIdx === -1 || toIdx === -1) return stops;   // fallback: show all
+    if (fromIdx > toIdx) [fromIdx, toIdx] = [toIdx, fromIdx]; // handle reversed
+    return stops.slice(fromIdx, toIdx + 1);
+  }
+
+  // Helper variables for LiveMap in non-tracking modes
+  let mapBusLat = 29.964;
+  let mapBusLng = 77.546;
+  let mapBusRegNo = '';
+  let mapBusHeading = 0;
+  let mapBusSpeed = 0;
+  let mapBusRouteName = '';
+
+  if (viewMode === 'journey' && journeys.length > 0) {
+    const selectedJourney = journeys[selectedJourneyIdx];
+    if (selectedJourney) {
+      // Set map center to start stop of first leg
+      const firstStop = selectedJourney.legs?.[0]?.stops?.[0];
+      if (firstStop) {
+        mapBusLat = firstStop.latitude;
+        mapBusLng = firstStop.longitude;
+      }
+      // Check for active bus on any leg of this journey
+      const activeLeg = selectedJourney.legs?.find(
+        l => l.busInfo && typeof l.busInfo.bus_latitude === 'number' && typeof l.busInfo.bus_longitude === 'number'
+      );
+      if (activeLeg && activeLeg.busInfo && typeof activeLeg.busInfo.bus_latitude === 'number' && typeof activeLeg.busInfo.bus_longitude === 'number') {
+        mapBusLat = activeLeg.busInfo.bus_latitude;
+        mapBusLng = activeLeg.busInfo.bus_longitude;
+        mapBusRegNo = activeLeg.busInfo.registration_no;
+        mapBusHeading = activeLeg.busInfo.heading || 0;
+        mapBusSpeed = activeLeg.busInfo.current_speed_kmph || 0;
+        mapBusRouteName = activeLeg.routeName;
+      }
+    }
+  } else if (viewMode === 'direct' && routes.length > 0) {
+    const selectedRoute = routes[selectedRouteIdx];
+    if (selectedRoute) {
+      const firstStop = selectedRoute.stops?.[0];
+      if (firstStop) {
+        mapBusLat = firstStop.latitude;
+        mapBusLng = firstStop.longitude;
+      }
+      // Check for active bus on nextTrips
+      const activeTrip = selectedRoute.nextTrips?.find(
+        t => typeof t.busLatitude === 'number' && typeof t.busLongitude === 'number'
+      );
+      if (activeTrip && typeof activeTrip.busLatitude === 'number' && typeof activeTrip.busLongitude === 'number') {
+        mapBusLat = activeTrip.busLatitude;
+        mapBusLng = activeTrip.busLongitude;
+        mapBusRegNo = activeTrip.busRegNo;
+        mapBusHeading = activeTrip.heading || 0;
+        mapBusSpeed = activeTrip.currentSpeedKmph || 0;
+        mapBusRouteName = activeTrip.routeName;
+      }
+    }
+  }
+
   // ── Render ───────────────────────────────────────────────────────────────
   const hasDirectRoutes = routes.length > 0;
   const hasJourney = journey && journey.legs && journey.legs.length > 0;
@@ -761,32 +894,64 @@ export default function Home() {
               </div>
             ) : (
               <div className="input-group">
-                <div className="input-wrapper">
+                <div className="input-wrapper" style={{ position: 'relative' }}>
                   <MapPin size={16} className="input-icon from-icon" />
                   <input
                     id="from-input"
                     type="text"
                     value={from}
-                    onChange={e => setFrom(e.target.value)}
+                    onChange={e => handleFromChange(e.target.value)}
+                    onBlur={() => setTimeout(() => setShowFromSuggestions(false), 250)}
+                    onFocus={() => { if (from.trim()) setShowFromSuggestions(true); }}
                     placeholder="From (e.g. Saharanpur)"
                     className="search-input"
                     autoComplete="off"
                   />
+                  {showFromSuggestions && fromSuggestions.length > 0 && (
+                    <div className="autocomplete-dropdown">
+                      {fromSuggestions.map(s => (
+                        <div
+                          key={s.id}
+                          className="autocomplete-item"
+                          onClick={() => selectFromSuggestion(s.name)}
+                        >
+                          <MapPin size={12} className="dropdown-item-icon" />
+                          <span>{s.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <button type="button" className="swap-btn" onClick={swapCities} title="Swap">
                   <ArrowLeftRight size={16} />
                 </button>
-                <div className="input-wrapper">
+                <div className="input-wrapper" style={{ position: 'relative' }}>
                   <MapPin size={16} className="input-icon to-icon" />
                   <input
                     id="to-input"
                     type="text"
                     value={to}
-                    onChange={e => setTo(e.target.value)}
+                    onChange={e => handleToChange(e.target.value)}
+                    onBlur={() => setTimeout(() => setShowToSuggestions(false), 250)}
+                    onFocus={() => { if (to.trim()) setShowToSuggestions(true); }}
                     placeholder="To (e.g. Mirzapur)"
                     className="search-input"
                     autoComplete="off"
                   />
+                  {showToSuggestions && toSuggestions.length > 0 && (
+                    <div className="autocomplete-dropdown">
+                      {toSuggestions.map(s => (
+                        <div
+                          key={s.id}
+                          className="autocomplete-item"
+                          onClick={() => selectToSuggestion(s.name)}
+                        >
+                          <MapPin size={12} className="dropdown-item-icon" />
+                          <span>{s.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -1118,9 +1283,13 @@ export default function Home() {
                   if (idx !== -1) endIdx = idx;
                 }
 
-                const filteredStops = startIdx <= endIdx
-                  ? liveDetails.stops.slice(startIdx, endIdx + 1)
-                  : liveDetails.stops;
+                let sIdx = startIdx;
+                let eIdx = endIdx;
+                if (sIdx > eIdx) {
+                  [sIdx, eIdx] = [eIdx, sIdx];
+                }
+
+                const filteredStops = liveDetails.stops.slice(sIdx, eIdx + 1);
 
                 return (
                   <>
@@ -1248,26 +1417,33 @@ export default function Home() {
           ) : viewMode === 'journey' && journeys.length > 0 ? (
             <div className="map-wrapper">
               <LiveMap
-                latitude={journeys[selectedJourneyIdx]?.legs?.[0]?.stops?.[0]?.latitude || 29.964}
-                longitude={journeys[selectedJourneyIdx]?.legs?.[0]?.stops?.[0]?.longitude || 77.546}
+                latitude={mapBusLat}
+                longitude={mapBusLng}
                 stops={[]}
-                busRegNo={''}
-                heading={0}
+                busRegNo={mapBusRegNo}
+                heading={mapBusHeading}
                 villages={villages}
                 reports={passengerReports}
-                multipleRoutes={journeys.map((j, i) => ({
-                  stops: j.legs.flatMap(leg => leg.stops || []).map(s => ({
-                    stopId: s.stop_id,
+                currentSpeedKmph={mapBusSpeed}
+                routeName={mapBusRouteName}
+                multipleRoutes={journeys.map((j, i) => {
+                  // Flatten all leg stops then clip to the passenger's from→to segment
+                  const allStops = j.legs.flatMap(leg => leg.stops || []).map(s => ({
+                    stopId: s.stopId,
                     name: s.name,
-                    sequenceNo: s.sequence_no,
+                    sequenceNo: s.sequenceNo,
                     latitude: s.latitude,
                     longitude: s.longitude,
                     status: 'upcoming' as const
-                  })) || [],
-                  color: i === selectedJourneyIdx ? '#4f46e5' : '#6b7280',
-                  weight: i === selectedJourneyIdx ? 6 : 3,
-                  opacity: i === selectedJourneyIdx ? 0.9 : 0.4
-                }))}
+                  }));
+                  const clipped = clipStopsToSegment(allStops, from, to);
+                  return {
+                    stops: clipped,
+                    color: i === selectedJourneyIdx ? '#4f46e5' : '#6b7280',
+                    weight: i === selectedJourneyIdx ? 6 : 3,
+                    opacity: i === selectedJourneyIdx ? 0.9 : 0.4
+                  };
+                })}
                 onSelectRoute={async (idx) => {
                   setSelectedJourneyIdx(idx);
                   // Fetch villages — routeId from leg or routeCode fallback
@@ -1287,15 +1463,18 @@ export default function Home() {
           ) : viewMode === 'direct' && routes.length > 0 ? (
             <div className="map-wrapper">
               <LiveMap
-                latitude={routes[selectedRouteIdx]?.stops?.[0]?.latitude || 29.964}
-                longitude={routes[selectedRouteIdx]?.stops?.[0]?.longitude || 77.546}
+                latitude={mapBusLat}
+                longitude={mapBusLng}
                 stops={[]}
-                busRegNo={''}
-                heading={0}
+                busRegNo={mapBusRegNo}
+                heading={mapBusHeading}
                 villages={villages}
                 reports={passengerReports}
+                currentSpeedKmph={mapBusSpeed}
+                routeName={mapBusRouteName}
                 multipleRoutes={routes.map((r, i) => ({
-                  stops: r.stops || [],
+                  // Clip full route stops to only the passenger's from→to segment
+                  stops: clipStopsToSegment(r.stops || [], from, to),
                   color: i === selectedRouteIdx ? '#4f46e5' : '#6b7280',
                   weight: i === selectedRouteIdx ? 6 : 3,
                   opacity: i === selectedRouteIdx ? 0.9 : 0.4

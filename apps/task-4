@@ -1,0 +1,17 @@
+# Task List — Option B Launch Features
+
+- `[x]` Database & Fallback Configuration
+  - `[x]` Update [schema.sql](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/db/schema.sql) with passenger_reports and push_subscriptions tables
+  - `[x]` Add mock query support inside [db/index.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/db/index.ts)
+- `[x]` Implement Backend Ingestion & Notifications
+  - `[x]` Create [notificationService.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/services/notificationService.ts) and configure VAPID broadaster logic
+  - `[x]` Integrate [stopStateFSM.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/engine/stopStateFSM.ts) triggers and [eta.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/engine/eta.ts) bindings
+- `[x]` Implement Service Worker & Offline Support
+  - `[x]` Create service worker script [sw.js](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/web-app/public/sw.js) with routing/stops caching and push listeners
+  - `[x]` Create helper script [swHelper.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/web-app/src/app/utils/swHelper.ts) for browser registration and notification opt-in
+- `[x]` Implement Frontend UI & Map Features
+  - `[x]` Update [LiveMap.tsx](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/web-app/src/app/components/LiveMap.tsx) to render passenger report icons on the map
+  - `[x]` Update [page.tsx](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/web-app/src/app/page.tsx) to mount service worker, add reporting dialog modal, and "Notify Me" trigger
+- `[x]` Implement Verification & Testing
+  - `[x]` Create and run API unit tests inside [api_reports.test.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/tests/api_reports.test.ts)
+  - `[x]` Manually verify offline caching and push notifications

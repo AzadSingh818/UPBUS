@@ -1,5 +1,6 @@
 import { query } from '../db';
 import { recordLiveLocation } from '../engine/routeLearning';
+import { RouteProgressEngine } from '../modules/route-progress/service/RouteProgressEngine';
 
 export interface CanonicalVehicleLocation {
   registrationNo: string;
@@ -55,6 +56,19 @@ export async function ingestLocation(location: CanonicalVehicleLocation) {
     recordLiveLocation(tripId, location.latitude, location.longitude, location.speed).catch(err => {
       console.error('[Route Learning] Error recording location ping:', err);
     });
+
+    // Process Route Progress Pipeline
+    RouteProgressEngine.process({
+      busId,
+      latitude: location.latitude,
+      longitude: location.longitude,
+      speed: location.speed,
+      heading: location.heading,
+      accuracy: 5,
+      timestamp: location.timestamp
+    }).catch(err => {
+      console.error('[Route Progress Engine] Error processing location update:', err);
+    });
   } catch (error) {
     console.error('Error ingesting location:', error);
   }
@@ -69,15 +83,19 @@ export async function fetchLiveLocations() {
 
     if (Array.isArray(data)) {
       for (const bus of data) {
-        if (!bus.RegNo || !bus.lat || !bus.long) continue;
+        const regNo = bus.RegNo || bus.regNum || bus.bus_id;
+        const latVal = bus.latitude !== undefined ? bus.latitude : bus.lat;
+        const lngVal = bus.longitude !== undefined ? bus.longitude : bus.long;
+
+        if (!regNo || latVal === undefined || lngVal === undefined) continue;
         const speed = parseFloat(bus.speed) || 0;
         await ingestLocation({
-          registrationNo: bus.RegNo,
-          latitude: parseFloat(bus.lat),
-          longitude: parseFloat(bus.long),
+          registrationNo: regNo,
+          latitude: parseFloat(latVal),
+          longitude: parseFloat(lngVal),
           speed,
           heading: parseFloat(bus.heading) || 0,
-          timestamp: bus.LogrecTime ? new Date(bus.LogrecTime) : new Date(),
+          timestamp: bus.LogrecTime || bus.timestamp ? new Date(bus.LogrecTime || bus.timestamp) : new Date(),
           status: speed > 0 ? 'moving' : 'halted'
         });
       }
@@ -88,7 +106,7 @@ export async function fetchLiveLocations() {
 export function startIngestion() {
   if (ingestionTimer) return;
   fetchLiveLocations();
-  ingestionTimer = setInterval(fetchLiveLocations, 10000);
+  ingestionTimer = setInterval(fetchLiveLocations, 2000);
 }
 
 export function stopIngestion() {

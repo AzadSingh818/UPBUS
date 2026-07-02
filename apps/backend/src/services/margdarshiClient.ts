@@ -7,7 +7,7 @@ export async function fetchMargdarshiLiveData(): Promise<any[]> {
   try {
     const fetch = (await import('node-fetch')).default;
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5-second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15-second timeout
 
     const response = await fetch(
       'https://margdarshi.upsrtcvlt.com/php/getGpsLiveData.php',

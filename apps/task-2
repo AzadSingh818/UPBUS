@@ -1,0 +1,5 @@
+- [x] Optimize the DFS pathfinder in `graph.ts` (pruning detours > 1.4x straight-line distance, intermediate stop leg truncation, minimum transfers sorting).
+- [x] Create the Autonomous Route Seeder daemon/service in `src/engine/routeSeeder.ts` to poll Margdarshi every 2 seconds, parse route descriptions, geocode via Nominatim/Overpass/GPS-halts, and save/resume incrementally.
+- [x] Connect the Route Seeder to the backend application initialization in `index.ts` to run it as a background task.
+- [x] Create a migration or schema script to support staging tables for route learning if needed, and verify compilation.
+- [x] Run verification tests and compile checks to confirm correctness.

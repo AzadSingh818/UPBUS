@@ -309,85 +309,96 @@ export default function LiveMap({
     }
 
     // 3. Bus marker with direction arrow
-    let selectedIcon;
-    if (isNavigationMode) {
-      selectedIcon = L.divIcon({
-        className: 'nav-marker-icon',
-        html: `
-          <div class="nav-marker-wrapper" style="position: relative; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center;">
-            <div class="nav-pulse-ring" style="
-              position: absolute;
-              width: 40px;
-              height: 40px;
-              background: rgba(0, 122, 255, 0.4);
-              border-radius: 50%;
-              animation: navPulse 1.8s infinite ease-in-out;
-            "></div>
-            <div class="nav-arrow-circle" style="
-              position: absolute;
-              width: 28px;
-              height: 28px;
-              background: #007aff;
-              border: 3px solid #ffffff;
-              border-radius: 50%;
-              box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              transform: rotate(${heading}deg);
-              transition: transform 0.3s ease-out;
-            ">
-              <svg viewBox="0 0 24 24" fill="white" style="width: 16px; height: 16px;">
-                <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/>
-              </svg>
-            </div>
-          </div>
-        `,
-        iconSize: [50, 50],
-        iconAnchor: [25, 25]
-      });
+    if (!busRegNo) {
+      if (busMarkerRef.current) {
+        busMarkerRef.current.remove();
+        busMarkerRef.current = null;
+      }
     } else {
-      selectedIcon = L.divIcon({
-        className: 'bus-marker-icon',
-        html: `
-          <div class="bus-marker-wrapper">
-            <div class="bus-pulse-ring"></div>
-            <div class="bus-direction-arrow" style="transform: rotate(${heading}deg);"></div>
-            <div class="bus-icon-circle">
-              <svg viewBox="0 0 24 24" fill="currentColor">
-                <path d="M18 11.03V7.05c0-2.22-3.23-2.92-6-2.92s-6 .7-6 2.92v3.98c-1.2.35-2 1.34-2 2.53v5.47c0 .83.67 1.5 1.5 1.5h.5v1c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5v-1h7v1c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5v-1h.5c.83 0 1.5-.67 1.5-1.5v-5.47c0-1.19-.8-2.18-2-2.53zM7.5 16c-.83 0-1.5-.67-1.5-1.5S6.67 13 7.5 13s1.5.67 1.5 1.5S8.33 16 7.5 16zm9 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm1.5-6H6V7h12v3z"/>
-              </svg>
+      let selectedIcon;
+      if (isNavigationMode) {
+        selectedIcon = L.divIcon({
+          className: 'nav-marker-icon',
+          html: `
+            <div class="nav-marker-wrapper" style="position: relative; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center;">
+              <div class="nav-pulse-ring" style="
+                position: absolute;
+                width: 40px;
+                height: 40px;
+                background: rgba(0, 122, 255, 0.4);
+                border-radius: 50%;
+                animation: navPulse 1.8s infinite ease-in-out;
+              "></div>
+              <div class="nav-arrow-circle" style="
+                position: absolute;
+                width: 28px;
+                height: 28px;
+                background: #007aff;
+                border: 3px solid #ffffff;
+                border-radius: 50%;
+                box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transform: rotate(${heading}deg);
+                transition: transform 0.3s ease-out;
+              ">
+                <svg viewBox="0 0 24 24" fill="white" style="width: 16px; height: 16px;">
+                  <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/>
+                </svg>
+              </div>
             </div>
-          </div>
-        `,
-        iconSize: [40, 40],
-        iconAnchor: [20, 20]
-      });
-    }
+          `,
+          iconSize: [50, 50],
+          iconAnchor: [25, 25]
+        });
+      } else {
+        selectedIcon = L.divIcon({
+          className: 'bus-marker-icon',
+          html: `
+            <div class="bus-marker-wrapper">
+              <div class="bus-pulse-ring"></div>
+              <div class="bus-direction-arrow" style="transform: rotate(${heading}deg);"></div>
+              <div class="bus-icon-circle">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M18 11.03V7.05c0-2.22-3.23-2.92-6-2.92s-6 .7-6 2.92v3.98c-1.2.35-2 1.34-2 2.53v5.47c0 .83.67 1.5 1.5 1.5h.5v1c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5v-1h7v1c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5v-1h.5c.83 0 1.5-.67 1.5-1.5v-5.47c0-1.19-.8-2.18-2-2.53zM7.5 16c-.83 0-1.5-.67-1.5-1.5S6.67 13 7.5 13s1.5.67 1.5 1.5S8.33 16 7.5 16zm9 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm1.5-6H6V7h12v3z"/>
+                </svg>
+              </div>
+            </div>
+          `,
+          iconSize: [40, 40],
+          iconAnchor: [20, 20]
+        });
+      }
 
-    const popupContent = `
-      <div style="color: black; font-family: Inter, sans-serif; font-size: 13px; min-width: 160px;">
-        <b style="color: #4f46e5; font-size: 14px;">🚌 Bus: ${busRegNo}</b><br/>
-        <span style="font-weight: 600;">Route:</span> ${routeName || 'Unknown Route'}<br/>
-        <span style="font-weight: 600;">Speed:</span> ${Math.round(currentSpeedKmph ?? 0)} km/h<br/>
-        <span style="font-weight: 600;">Status:</span> ${stops && stops.length > 0 ? `Heading to ${stops[stops.length-1].name}` : 'Active & Tracking'}
-      </div>
-    `;
+      const popupContent = `
+        <div style="color: black; font-family: Inter, sans-serif; font-size: 13px; min-width: 160px;">
+          <b style="color: #4f46e5; font-size: 14px;">🚌 Bus: ${busRegNo}</b><br/>
+          <span style="font-weight: 600;">Route:</span> ${routeName || 'Unknown Route'}<br/>
+          <span style="font-weight: 600;">Speed:</span> ${Math.round(currentSpeedKmph ?? 0)} km/h<br/>
+          <span style="font-weight: 600;">Status:</span> ${stops && stops.length > 0 ? `Heading to ${stops[stops.length-1].name}` : 'Active & Tracking'}
+        </div>
+      `;
 
-    if (busMarkerRef.current) {
-      busMarkerRef.current.setLatLng([latitude, longitude]);
-      busMarkerRef.current.setIcon(selectedIcon);
-      busMarkerRef.current.setPopupContent(popupContent);
-    } else {
-      busMarkerRef.current = L.marker([latitude, longitude], { icon: selectedIcon })
-        .addTo(map)
-        .bindPopup(popupContent);
+      if (busMarkerRef.current) {
+        busMarkerRef.current.setLatLng([latitude, longitude]);
+        busMarkerRef.current.setIcon(selectedIcon);
+        busMarkerRef.current.setPopupContent(popupContent);
+      } else {
+        busMarkerRef.current = L.marker([latitude, longitude], { icon: selectedIcon })
+          .addTo(map)
+          .bindPopup(popupContent);
+      }
     }
 
     if (isNavigationMode) {
       map.setView([latitude, longitude], 15);
-    } else {
-      map.panTo([latitude, longitude]);
+    } else if (!multipleRoutes || multipleRoutes.length === 0) {
+      // Only pan to bus location when NOT showing a route polyline
+      // (fitBounds already handles map center for route display)
+      if (latitude && longitude && !isNaN(latitude) && !isNaN(longitude)) {
+        map.panTo([latitude, longitude]);
+      }
     }
 
     return () => {

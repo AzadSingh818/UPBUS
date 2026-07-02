@@ -1,0 +1,65 @@
+# Admin Panel Monitoring System (Live Ingestion Console & Dashboard)
+
+Create a dedicated, modular admin interface to monitor real-time route learning, geocoding status, GPS packet flow, and discovered route variations. This panel will be modularly isolated to serve as the foundation of the admin side of the project.
+
+---
+
+## User Review Required
+
+> [!IMPORTANT]
+> - **Zero Commuter Impact**: All admin code will reside in a separate Next.js route `/admin` and independent API endpoints `/api/v1/admin/*`. The user-facing page remains fully decoupled and unaffected.
+> - **In-Memory Logging**: To prevent disk I/O bottlenecks and avoid writing logs continuously to database tables, logs are kept in a circular buffer (in-memory) of the last 100 events.
+
+---
+
+## Proposed Changes
+
+### Backend Module (`apps/backend`)
+
+#### [NEW] [adminMonitor.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/services/adminMonitor.ts)
+- A singleton service (`AdminMonitorService`) keeping:
+  - An array of the last 100 log items: `{ timestamp, type: 'VALIDATION' | 'SEEDER' | 'LEARNING' | 'ERROR', busId, regNo, status: 'duplicate' | 'accepted' | 'rejected', message }`.
+  - Current state of tracked buses: registration number, coordinates, speed, heading, and last active timestamp.
+  - Interface methods: `addLog(item)`, `getLogs()`, `updateBus(regNo, data)`.
+
+#### [NEW] [admin.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/api/admin.ts)
+- Express router mapping:
+  - `GET /api/v1/admin/monitor/logs` -> Returns the circular buffer of live GPS logs.
+  - `GET /api/v1/admin/monitor/buses` -> Returns active bus states tracked by the seeder/engine.
+  - `GET /api/v1/admin/monitor/stats` -> Returns current DB stats (stop counts, routes, learned routes).
+
+#### [MODIFY] [index.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/index.ts)
+- Mount `/api/v1/admin` endpoints on the server.
+- Hook into the main ingestion route to push basic stats to the `AdminMonitorService`.
+
+#### [MODIFY] [RouteProgressEngine.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/modules/route-progress/service/RouteProgressEngine.ts)
+- Hook into the validation success/fail blocks (lines 22, 30) to record logs in `AdminMonitorService` for active tracking buses.
+
+#### [MODIFY] [routeSeeder.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/engine/routeSeeder.ts)
+- Hook into the seeder processes (e.g. geocoding, halt approximation, route saving) to log actions to `AdminMonitorService` in real-time.
+
+---
+
+### Frontend Module (`apps/web-app`)
+
+#### [NEW] [admin/page.tsx](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/web-app/src/app/admin/page.tsx)
+- Create a dedicated admin page.
+- **Layout & Visuals**:
+  - Dark mode grid style matching the main app design language.
+  - **Live Console Panel (Scrolling log terminal)**: A retro-green monospaced console that polls `/api/v1/admin/monitor/logs` every 2 seconds, displaying scrolling logs of validations, geocoding halts, and seeder events.
+  - **Active Buses Monitor**: A table displaying all active buses, their current coordinates, speed, and last ping time.
+  - **Discovered Network Summary**: A stats board summarizing Stops, Routes, and Route Variations discovered so far, with a progress ratio.
+  - **Interactive Map Overlay (Optional placeholder)**: Small interactive view showing locations of active buses.
+
+---
+
+## Verification Plan
+
+### Automated Tests
+- Build verification: Run `npm run build` on both modules to ensure TypeScript types and Next.js routes compile perfectly.
+
+### Manual Verification
+- Access `http://localhost:3001/admin` to verify that:
+  - Live console updates and scrolls in real-time.
+  - Active buses are displayed in the dashboard grid.
+  - Total database statistics are loaded correctly.

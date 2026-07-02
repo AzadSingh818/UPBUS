@@ -1,0 +1,6 @@
+- [ ] Initialize Next.js project in `apps/admin` folder using `create-next-app`.
+- [ ] Install `lucide-react` in `apps/admin`.
+- [ ] Move Admin Dashboard layout/components/logic to `apps/admin/src/app/page.tsx`.
+- [ ] Configure `apps/admin` dev script port to `3003`.
+- [ ] Delete `apps/web-app/src/app/admin` directory.
+- [ ] Verify both apps build successfully.

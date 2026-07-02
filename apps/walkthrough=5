@@ -1,0 +1,150 @@
+# Option B Launch Features: Walkthrough & Verification
+
+This walkthrough summarizes the changes made to implement passenger reporting, offline caching, and web push notifications, and presents the verification outputs.
+
+---
+
+## 🛠️ Changes Implemented
+
+### 1. Database & Mock Storage
+* **[schema.sql](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/db/schema.sql)**: Added table schemas for `passenger_reports` (storing delay types, descriptions, and GPS locations) and `push_subscriptions` (storing browser endpoints and auth keys).
+* **[index.ts (DB)](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/db/index.ts)**: Extended the local mock database queries to intercept reports and subscriptions, allowing full local simulation and testing without a live PostgreSQL instance.
+
+### 2. Backend API & Ingestion
+* **[notificationService.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/services/notificationService.ts) [NEW]**: Configured `web-push` to manage public/private VAPID credentials (with auto-generation on session start if missing from `.env`), save subscriptions, and push alerts.
+* **[index.ts (App)](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/index.ts)**:
+  * Implemented REST endpoints for submitting reports (`POST /api/v1/reports`), fetching active reports (`GET /api/v1/reports/active`), retrieving the VAPID key (`GET /api/v1/push/key`), subscribing (`POST /api/v1/push/subscribe`), and unsubscribing (`POST /api/v1/push/unsubscribe`).
+* **[stopStateFSM.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/engine/stopStateFSM.ts)**: Configured stop-state transitions (`arriving_now` and `on_stop`) to trigger push alerts automatically when a bus enters a stop geofence.
+* **[eta.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/engine/eta.ts)**: Updated the FSM updating payload in the ETA engine to supply stop names so push alerts have descriptive stops info.
+
+### 3. Frontend Service Worker & Caching
+* **[sw.js](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/web-app/public/sw.js) [NEW]**: Built a service worker that:
+  * Caches static app shell resources.
+  * Caches dynamic stops endpoints (`/api/v1/routes/:id/stops` and `/api/v1/search/*`) using a network-first strategy for offline lookup.
+  * Listens to the `push` event to trigger native system-level notifications.
+* **[swHelper.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/web-app/src/app/utils/swHelper.ts) [NEW]**: Added helper utilities to handle client-side worker registration, request notification permissions, and register/deregister VAPID subscriptions.
+
+### 4. Frontend UI & Live Map
+* **[LiveMap.tsx](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/web-app/src/app/components/LiveMap.tsx)**: Updated Leaflet configurations to accept an array of passenger reports and display them as warning markers on the map, with custom click popups based on report type.
+* **[page.tsx](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/web-app/src/app/page.tsx)**:
+  * Registered the service worker on mount.
+  * Added active report polling (every 10 seconds) to feed the maps.
+  * Added **Notify Me** button which subscribes the user to notifications when tracking a bus.
+  * Added **Report Status** button rendering a modal form where passengers can log delays or overcrowding.
+
+---
+
+## 🧪 Verification & Test Results
+
+### 1. Automated API & Query Unit Tests
+We executed the unit tests inside `apps/backend` to verify the DB query mappings:
+```powershell
+npx ts-node -e "require('./tests/routeVillages.test')" ; npx ts-node -e "require('./tests/api_reports.test')"
+```
+
+#### Test Suite Output:
+```text
+── overpass.buildOverpassQuery ──
+  ✅  contains the bbox coordinates
+  ✅  queries village, hamlet, and locality
+  ✅  requests JSON output
+
+── overpass.parseOverpassVillages ──
+  ✅  returns correct count (named elements only)
+  ✅  correctly parses node lat/lon
+  ✅  correctly parses way center
+  ✅  prefers name_hi over name
+  ✅  handles empty elements array gracefully
+  ✅  handles null/undefined input gracefully
+
+── villageFilter.filterVillagesByDistance ──
+  ✅  includes villages within maxDistanceKm
+  ✅  excludes villages beyond maxDistanceKm
+  ✅  returns empty array when no villages are within range
+  ✅  respects custom maxDistanceKm
+  ✅  all included distances are <= maxDistanceKm
+  ✅  results are sorted nearest-first
+  ✅  handles polyline shorter than 2 points gracefully
+  ✅  uses DEFAULT_MAX_DISTANCE_KM = 5 when no arg given
+
+── overpass.computeBbox ──
+  ✅  south < north and west < east
+  ✅  padding expands the bbox
+
+──────────────────────────────────────────────────
+Results: 19 passed, 0 failed
+
+── DB Mock: Passenger Reports ──
+
+── DB Mock: Push Subscriptions ──
+⚠️ [Warning] PostgreSQL query error, falling back to mock DB: 
+  ✅  can save, list, and delete push subscriptions
+⚠️ [Warning] PostgreSQL query error, falling back to mock DB: 
+  ✅  can insert passenger report and fetch it back in active list
+
+──────────────────────────────────────────────────
+Results: 2 passed, 0 failed
+```
+
+---
+
+### 2. Frontend Production Build Compilation
+We successfully compiled the Next.js production build:
+```powershell
+npm run build
+```
+
+#### Build Output Log:
+```text
+▲ Next.js 16.2.9 (Turbopack)
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 7.2s
+  Running TypeScript ...
+  Finished TypeScript in 7.0s ...
+  Collecting page data using 5 workers ...
+  Generating static pages using 5 workers (0/4) ...
+  Generating static pages using 5 workers (1/4) 
+  Generating static pages using 5 workers (2/4) 
+  Generating static pages using 5 workers (3/4) 
+✓ Generating static pages using 5 workers (4/4) in 1478ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+└ ○ /_not-found
+```
+No syntax, types, or code integration compilation errors occurred.
+
+---
+
+## 📋 Engineering PRD Audit & Alignment
+
+We conducted a thorough audit of the project against the "MY BUS — Engineering PRD" requirements and implemented the missing components and alignments:
+
+### 1. Divergence Nodes Configuration & Ingestion
+* **[data.json](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/db/data.json)**: Seeded the `divergence_nodes` configuration with Phandpuri Junction (lat: 29.93, lng: 77.45) and defined its two split branches pointing to Nakur (`routeIds: [9, 12]`) and Ambehta (`routeIds: [200, 201, 246]`).
+* **[divergenceBinding.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/engine/divergenceBinding.ts)**: Exported the loaded `divergenceCache` list so it can be dynamically queried.
+* **[eta.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/engine/eta.ts)**: Integrated the divergence branch matching algorithm into the live route resolver. If a bus approaches the junction, its coordinates now override the generic text-description route association, matching it to the correct active path.
+
+### 2. Intermediate Village Corridor Filtering (150m-200m)
+* **[routeVillages.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/api/routeVillages.ts)**: Restructured the cache-saving logic to maintain the full 5 km candidate dataset on disk, while default searches filter and return only the intermediate villages situated within a tight 200m (0.2 km) corridor of the route line as specified in Section 1.3 of the PRD.
+
+### 3. Alternative Routing Card & Geofence Tunings
+* **[page.tsx](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/web-app/src/app/page.tsx)**: Implemented Alternative Routing Card Integration in the frontend routes list, displaying the active bus registration badge (e.g. `[UP 11 FT 4321]`) next to the route's distance indicator if a bus is running on the variant branch.
+* **[stopStateFSM.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/engine/stopStateFSM.ts)**: Updated FSM geofencing constants to match the PRD's 50m geofence requirements (`ON_STOP_RADIUS_KM = 0.05` and `ON_STOP_EXIT_RADIUS_KM = 0.10`).
+
+### 4. Route Matching Bugfix (Console Error Resolution)
+* **[divergenceBinding.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/engine/divergenceBinding.ts)**: Fixed the runtime `TypeError` (`pointToPolylineDistKm is not a function`) by importing and using the correct `distanceToPolylineKm` function with formatted `Coordinate` objects.
+* **[eta.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/engine/eta.ts)** & **[page.tsx](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/web-app/src/app/page.tsx)**: Exposed the resolved `routeId` from the backend's live tracking details, and updated the frontend `handleTrackBus` to query villages using this `routeId` directly. This resolves the `No route matched for routeCode` console warning.
+
+### 5. Timeline & Map Route Truncation to Search Bounds
+* **[page.tsx](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/web-app/src/app/page.tsx)**: Restructured the live tracking render block to dynamically slice the stops array based on the user's `from` and `to` search queries. When a passenger tracks a bus for a sub-route (e.g. Saharanpur to Phandpuri), the Stops & Live Progress timeline and map polyline are truncated at the user's destination (Phandpuri) instead of drawing all the way to the route end depot (Gangoh).
+
+### 6. Leaflet Map Invalidation Race Condition Bugfix
+* **[LiveMap.tsx](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/web-app/src/app/components/LiveMap.tsx)**: Fixed the unhandled exception `TypeError: Cannot read properties of undefined (reading '_leaflet_pos')` by storing the `setTimeout` reference during map container size invalidation (`map.invalidateSize()`) and properly clearing it via `clearTimeout` in the `useEffect` cleanup return block.
+
+### 🧪 Verification
+* Ran backend unit tests: All **21 unit tests passed** successfully.
+* Ran Next.js production build: Compiled successfully with **0 errors**.
+

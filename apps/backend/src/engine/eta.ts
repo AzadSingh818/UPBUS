@@ -317,6 +317,18 @@ export async function getTripETAs(tripId: number, regNo?: string, routeCode?: st
     // to prevent division by zero or inflated ETAs when stationary at a traffic light or depot
     const speedFloorKmph = busSpeed > 25 ? busSpeed : 45;
 
+    // Fetch bus ID from buses table and load progress cache if available
+    const busIdRes = await query(`SELECT id FROM buses WHERE registration_no = $1`, [trip.registration_no]);
+    const busId = busIdRes.rowCount && busIdRes.rowCount > 0 ? busIdRes.rows[0].id : null;
+
+    let progressCache: any = null;
+    let visitLogs: any[] = [];
+    if (busId) {
+      const { RouteProgressRepository } = require('../modules/route-progress/repository/RouteProgressRepository');
+      progressCache = await RouteProgressRepository.getLastProgress(busId);
+      visitLogs = await RouteProgressRepository.getStopVisitLogs(busId);
+    }
+
     // 4. Project bus location onto route path if available
     const routeIdForGeom = trip.route_id || fallbackRouteId;
     let busPos: any = null;
@@ -398,55 +410,79 @@ export async function getTripETAs(tripId: number, regNo?: string, routeCode?: st
       let etaMinutes = 0;
       let status: 'passed' | 'arriving_now' | 'on_stop' | 'scheduled_to_depart' | 'upcoming' = 'upcoming';
 
-      if (seq < closestSeq) {
-        // Stop is in the past — force FSM to departed (it should already be)
-        distanceRemainingKm = 0;
-        etaMinutes = 0;
-        status = 'passed';
-      } else if (seq === closestSeq) {
-        // Bus is close to this stop — let FSM decide the fine-grained status
-        distanceRemainingKm = calculateDistance(busLat, busLng, stopLat, stopLng);
+      if (progressCache) {
+        // Use calculations based on Route Progress Engine cache
+        const stopDistMeters = parseFloat(stop.distance_from_start_km) * 1000;
+        const isStopPassed = i <= progressCache.completed_stop_index;
 
-        const fsmState = getStopFSMState(regNoKey, stop.stop_id);
-        const isFirstStop = closestSeq === routeStops[0]?.sequence_no;
-        const isPreTrip = trip.trip_status === 'scheduled';
-
-        if (fsmState === 'on_stop') {
-          // Pre-trip: bus parked at origin depot before scheduled departure
-          if (isFirstStop && isPreTrip) {
-            status = 'scheduled_to_depart';
-          } else {
-            status = 'on_stop';
-          }
-          etaMinutes = 0;
-        } else if (fsmState === 'arriving_now') {
-          status = 'arriving_now';
+        if (isStopPassed) {
+          status = 'passed';
+          distanceRemainingKm = 0;
           etaMinutes = 0;
         } else {
-          // FSM says upcoming/departed — use distance-based ETA
-          etaMinutes = Math.round((distanceRemainingKm / speedFloorKmph) * 60);
-          status = 'upcoming';
+          distanceRemainingKm = Math.max(0, stopDistMeters - progressCache.covered_distance) / 1000;
+          
+          const isAtStop = progressCache.state === 'AT_STOP' && 
+            (progressCache.current_stop === stop.name || progressCache.current_segment_from === stop.name);
+
+          if (isAtStop) {
+            status = 'on_stop';
+            etaMinutes = 0;
+          } else if (distanceRemainingKm <= 0.5) {
+            status = 'arriving_now';
+            etaMinutes = Math.round((distanceRemainingKm / speedFloorKmph) * 60);
+          } else {
+            status = 'upcoming';
+            // Calculate travel time + halt delay
+            const intermediateStopsCount = i - Math.max(0, progressCache.completed_stop_index);
+            const baseTime = Math.round((distanceRemainingKm / speedFloorKmph) * 60);
+            const haltDelay = Math.max(0, intermediateStopsCount - 1) * 2;
+            etaMinutes = baseTime + haltDelay;
+          }
         }
       } else {
-        // Future stop: Cumulative segment distance along the route
-        // Dist = Dist(Bus -> ClosestStop) + Dist(ClosestStop -> NextStop) + ... + Dist(NextStop -> TargetStop)
-        let routeDist = calculateDistance(busLat, busLng, parseFloat(closestStop.latitude), parseFloat(closestStop.longitude));
-        
-        for (let j = closestIndex; j < i; j++) {
-          const s1 = routeStops[j];
-          const s2 = routeStops[j + 1];
-          routeDist += calculateDistance(
-            parseFloat(s1.latitude), parseFloat(s1.longitude),
-            parseFloat(s2.latitude), parseFloat(s2.longitude)
-          );
-        }
+        // Fallback to original FSM and distance calculations
+        if (seq < closestSeq) {
+          distanceRemainingKm = 0;
+          etaMinutes = 0;
+          status = 'passed';
+        } else if (seq === closestSeq) {
+          distanceRemainingKm = calculateDistance(busLat, busLng, stopLat, stopLng);
 
-        distanceRemainingKm = routeDist;
-        
-        // Time = (Distance / Speed) * 60 + Halt delay of 2 mins per intermediate stop
-        const intermediateStopsCount = i - closestIndex;
-        etaMinutes = Math.round((distanceRemainingKm / speedFloorKmph) * 60) + (intermediateStopsCount * 2);
-        status = 'upcoming';
+          const fsmState = getStopFSMState(regNoKey, stop.stop_id);
+          const isFirstStop = closestSeq === routeStops[0]?.sequence_no;
+          const isPreTrip = trip.trip_status === 'scheduled';
+
+          if (fsmState === 'on_stop') {
+            if (isFirstStop && isPreTrip) {
+              status = 'scheduled_to_depart';
+            } else {
+              status = 'on_stop';
+            }
+            etaMinutes = 0;
+          } else if (fsmState === 'arriving_now') {
+            status = 'arriving_now';
+            etaMinutes = 0;
+          } else {
+            etaMinutes = Math.round((distanceRemainingKm / speedFloorKmph) * 60);
+            status = 'upcoming';
+          }
+        } else {
+          let routeDist = calculateDistance(busLat, busLng, parseFloat(closestStop.latitude), parseFloat(closestStop.longitude));
+          for (let j = closestIndex; j < i; j++) {
+            const s1 = routeStops[j];
+            const s2 = routeStops[j + 1];
+            routeDist += calculateDistance(
+              parseFloat(s1.latitude), parseFloat(s1.longitude),
+              parseFloat(s2.latitude), parseFloat(s2.longitude)
+            );
+          }
+
+          distanceRemainingKm = routeDist;
+          const intermediateStopsCount = i - closestIndex;
+          etaMinutes = Math.round((distanceRemainingKm / speedFloorKmph) * 60) + (intermediateStopsCount * 2);
+          status = 'upcoming';
+        }
       }
 
       etas.push({

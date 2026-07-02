@@ -1,0 +1,50 @@
+# Decouple Admin Panel to Standalone Application (`apps/admin`)
+
+Isolate the Admin Dashboard and Live Ingestion Console from the public-facing passenger commuter application (`apps/web-app`) into a brand new standalone Next.js project inside `apps/admin`.
+
+---
+
+## User Review Required
+
+> [!IMPORTANT]
+> - **Port Configuration**: The new standalone admin application will run on port `3003` in development mode (`npm run dev`), keeping it completely isolated from `web-app` (port `3001`) and `backend` (port `5000`).
+> - **Shared Server Compatibility**: The backend CORS config already allows connections from all origins, so the admin page on port `3003` will communicate perfectly with the REST endpoints on port `5000`.
+
+---
+
+## Proposed Changes
+
+### New Standalone Workspace App (`apps/admin`)
+
+#### [NEW] Initialization of `apps/admin` Workspace
+- Create the target folder [admin](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/admin).
+- Initialize Next.js project template using:
+  `npx -y create-next-app@latest ./ --ts --app --src-dir --eslint --use-npm --disable-git --yes`
+- Install [lucide-react](https://npmjs.com/package/lucide-react) icons library in the admin app:
+  `npm install lucide-react`
+
+#### [NEW] [page.tsx](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/admin/src/app/page.tsx)
+- Recreate the Admin Dashboard Monitor as the main root page (`/`) of the new admin app.
+- This will render the stats blocks, the retro scrolling terminal log, and the active tracked buses grid on access.
+
+#### [NEW] Port Configuration in `package.json`
+- Modify the `dev` script in `apps/admin/package.json` to force Next.js to start on port `3003`:
+  `"dev": "next dev -p 3003"`
+
+---
+
+### Passenger App (`apps/web-app`)
+
+#### [DELETE] [admin/page.tsx](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/web-app/src/app/admin/page.tsx)
+- Completely remove the old admin subdirectory inside `web-app/src/app` so that the passenger web app bundle is 100% clean of admin dependencies and console logic.
+
+---
+
+## Verification Plan
+
+### Automated Tests
+- Run `npm run build` inside `apps/admin` to verify successful standalone production compilation with zero errors.
+
+### Manual Verification
+- Launch the admin app using `npm run dev` in `apps/admin`.
+- Open `http://localhost:3003` in the browser to verify the terminal logs and active buses track properly.

@@ -1,0 +1,212 @@
+# 🏘️ Village Markers Feature — Full Status Report
+
+## What Was Requested
+
+Show intermediate villages (e.g. Bandukheri, Khera Afgan) that lie between bus stops on a route. These are NOT official stops — they're small settlements the bus passes through. Show them as amber dots with labels on the map, connected to the route with dotted lines.
+
+---
+
+## ✅ Work DONE (Backend)
+
+### 1. [overpass.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/utils/overpass.ts) — `NEW`
+- Builds Overpass QL queries to fetch `village`, `hamlet`, `locality` nodes from OpenStreetMap
+- Parses raw Overpass JSON into `{ name, latitude, longitude }` array
+- Prefers Hindi name (`name_hi`) if available
+- Computes bounding box from route coordinates with 5km padding
+- **Multi-endpoint fallback**: tries 3 Overpass mirrors (overpass-api.de → kumi.systems → mail.ru)
+- Uses `node-fetch` (not native fetch) with proper `Accept: application/json` header
+- 70-second timeout with `AbortController`
+
+### 2. [villageFilter.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/utils/villageFilter.ts) — `NEW`
+- Pure distance-filtering function: keeps villages within `maxDistanceKm` of route polyline
+- Uses existing `distanceToPolylineKm()` from `geoUtils.ts` (Cartesian projection)
+- Default threshold: **5 km** (configurable)
+- Sorted by distance ascending (nearest first)
+- Completely isolated from ETA/live-distance logic
+
+### 3. [routeVillages.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/api/routeVillages.ts) — `NEW`
+- Express router with 2 endpoints:
+  - `GET /:routeId/villages?maxDistanceKm=5` — returns filtered villages
+  - `POST /:routeId/villages/refresh` — forces Overpass re-fetch
+- **File-based cache** at `src/db/village_cache/<routeId>.json`
+- 7-day TTL; serves stale cache as fallback if Overpass is unreachable
+- Re-filters from cache on custom `maxDistanceKm` requests
+
+### 4. [index.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/index.ts) — `MODIFIED`
+- Imported `routeVillagesRouter`
+- Mounted at `app.use('/api/v1/routes', routeVillagesRouter)`
+- Added `routeId` to journey leg response so frontend can fetch villages
+
+### 5. [routeVillages.test.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/tests/routeVillages.test.ts) — `NEW`
+- 19 unit tests (all passing ✅)
+- Tests Overpass query builder, response parser, bbox calculation, distance filtering
+
+---
+
+## ✅ Work DONE (Frontend)
+
+### 6. [LiveMap.tsx](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/web-app/src/app/components/LiveMap.tsx) — `MODIFIED`
+- Added `villages?: Village[]` prop and `Village` type export
+- **Village rendering** in a separate `useEffect` (independent of stop/bus rendering):
+  - Amber dots (10px) with white border and glow — **always visible** at all zoom levels
+  - Village name labels — visible at zoom ≥ 11
+  - **Dotted amber lines** from each village to its nearest stop
+- Shows village count badge: "X villages on this route"
+- Debug console.log: `[LiveMap] Rendering X villages on map`
+
+### 7. [globals.css](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/web-app/src/app/globals.css) — `MODIFIED`
+- `.village-marker-icon` — transparent Leaflet container
+- `.village-marker-wrapper` — flex layout with pointer-events passthrough
+- `.village-dot` — 10px amber circle with white border and double-glow shadow
+- `.village-label` — warm amber pill badge with blur backdrop
+
+### 8. [page.tsx](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/web-app/src/app/page.tsx) — `MODIFIED`
+- Added `villages` state: `useState<Village[]>([])`
+- Village fetch in **3 places**:
+  1. **Direct Routes search** → fetches for first/selected route
+  2. **Journey Plan search** → fetches for first leg's routeId (with routeCode fallback)
+  3. **Track Live** → fetches for matched route (with 3-level fallback: exact code → partial name → first route)
+- Route switch (`onSelectRoute`) re-fetches villages for newly selected route
+- Clears villages on new search
+- Debug console.log: `[Villages] Fetching for route X`, `[Villages] Got X villages`
+
+### 9. [LiveMap.village.test.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/web-app/tests/LiveMap.village.test.ts) — `NEW`
+- 18 unit tests (all passing ✅)
+- Tests Village type shape, icon HTML generation, zoom threshold logic, visibility toggle
+
+---
+
+## ⚠️ Known Issues / Risks
+
+| Issue | Impact | Notes |
+|---|---|---|
+| Overpass returns only villages in OSM database | Some small settlements might be missing from OSM | Can't fix — OSM data quality varies by region |
+| Route polyline is straight-line between stops | Villages near the actual curved road but far from the straight line may be excluded | Increase `maxDistanceKm` (currently 5) or add road-snapped waypoints |
+| Backend logs `waypoints.json not found` at startup | Village waypoints in `routeGeometry.ts` are empty (but this is separate from the Overpass-based village markers) | Run `scripts/fetch_osm_villages.ts` to generate, or ignore — the new village system doesn't need it |
+| PostgreSQL not connected (falling back to mock DB) | Not related to villages — affects live trip data | Set up PostgreSQL or continue with mock data |
+
+---
+
+## 🔴 Work REMAINING — What's NOT Done Yet
+
+### 1. **Manual Verification / Browser Testing**
+- [ ] Restart backend: `npm run dev` in `apps/backend/`
+- [ ] Refresh frontend (Next.js auto-reloads, or restart `npm run dev` in `apps/web-app/`)
+- [ ] Search Saharanpur → Gangoh
+- [ ] Click "Track Live" or switch to "Direct Routes"
+- [ ] Confirm amber dots + dotted lines + village labels appear on map
+- [ ] Check browser console (F12) for `[Villages]` and `[LiveMap]` logs
+- [ ] If no villages appear: check if backend logged `[Villages] Overpass returned X candidates`
+
+### 2. **Stops Timeline Village Integration** (Optional Enhancement)
+- [ ] Currently the stops timeline (left panel) only shows official stops
+- [ ] Could add village names between stops in the timeline with a different style (smaller text, amber color)
+- [ ] This was shown in user's original reference images but hasn't been implemented
+
+### 3. **Pre-fetch All Routes at Startup** (Performance Enhancement)
+- [ ] Currently villages are fetched on-demand per route (first request triggers Overpass)
+- [ ] Could pre-fetch all routes at backend startup to warm the cache
+- [ ] Would eliminate the ~5-10 second delay on first load
+
+### 4. **Road-Snapped Route Polyline** (Accuracy Enhancement)
+- [ ] Current polyline is straight lines between stops → villages along curved roads get missed
+- [ ] Could use OSRM or Google Directions API to get actual road geometry
+- [ ] Would significantly improve village detection accuracy
+
+### 5. **Village ETA Integration** (Optional)
+- [ ] Show estimated time to each village (like stop ETAs)
+- [ ] Would use the existing `getWaypointETAs()` function in `routeGeometry.ts`
+- [ ] Requires village distance-along-route computation
+
+---
+
+## 📁 Complete File Map
+
+```
+apps/backend/
+├── src/
+│   ├── api/
+│   │   └── routeVillages.ts          ← NEW (API endpoint + caching)
+│   ├── utils/
+│   │   ├── overpass.ts                ← NEW (Overpass query + parser)
+│   │   └── villageFilter.ts           ← NEW (distance filtering)
+│   ├── db/
+│   │   └── village_cache/             ← NEW (auto-created cache dir)
+│   ├── engine/
+│   │   ├── geoUtils.ts                ← EXISTING (used by villageFilter)
+│   │   └── routeGeometry.ts           ← EXISTING (provides route polyline)
+│   └── index.ts                       ← MODIFIED (mounted router + added routeId to journey)
+├── tests/
+│   └── routeVillages.test.ts          ← NEW (19 tests)
+└── scripts/
+    └── fetch_osm_villages.ts          ← EXISTING (separate village system, NOT used by new feature)
+
+apps/web-app/
+├── src/app/
+│   ├── components/
+│   │   └── LiveMap.tsx                ← MODIFIED (village markers + dotted lines)
+│   ├── globals.css                    ← MODIFIED (village marker CSS)
+│   └── page.tsx                       ← MODIFIED (village state + fetch logic)
+└── tests/
+    └── LiveMap.village.test.ts        ← NEW (18 tests)
+```
+
+---
+
+## 🔧 API Reference
+
+### GET `/api/v1/routes/:routeId/villages`
+
+| Param | Type | Default | Description |
+|---|---|---|---|
+| `routeId` | path | required | Route ID from the routes table |
+| `maxDistanceKm` | query | 5 | Max perpendicular distance from route polyline |
+
+**Response:**
+```json
+{
+  "villages": [
+    { "name": "Bandukheri", "latitude": 29.972, "longitude": 77.553 },
+    { "name": "Khera Afgan", "latitude": 29.975, "longitude": 77.551 }
+  ],
+  "_meta": { "source": "cache|overpass|stale_cache", "count": 2 }
+}
+```
+
+### POST `/api/v1/routes/:routeId/villages/refresh`
+Forces a fresh Overpass fetch and replaces the cache.
+
+---
+
+## 🧪 Test Results
+
+```
+Backend (routeVillages.test.ts):    19/19 passed ✅
+Frontend (LiveMap.village.test.ts): 18/18 passed ✅
+TypeScript (web-app):                0 errors  ✅
+```
+
+---
+
+## 🚀 How to Test Right Now
+
+```bash
+# Terminal 1 — Backend
+cd apps/backend
+npm run dev
+# Should show: "API Server running on port 5000"
+
+# Terminal 2 — Frontend  
+cd apps/web-app
+npm run dev
+# Should show: "Ready on http://localhost:3000"
+```
+
+1. Open `http://localhost:3000`
+2. Search **Saharanpur → Gangoh**
+3. Select a route option → Click **Track Live** or switch to **Direct Routes** tab
+4. Map should show:
+   - 🟢 Green/blue route line with stop dots
+   - 🟠 **Amber village dots** with name labels connected by **dotted amber lines** to nearest stop
+   - Badge showing "X villages on this route"
+5. Open browser console (F12) → Filter for `[Villages]` to see fetch logs
