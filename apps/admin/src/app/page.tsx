@@ -58,12 +58,14 @@ export default function AdminMonitor() {
   const [isLive, setIsLive] = useState(true);
   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
   const [isMounted, setIsMounted] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 50;
 
-  const [viewMode, setViewMode] = useState<'console' | 'map'>('console');
+  const [viewMode, setViewMode] = useState<'console' | 'map' | 'coverage'>('coverage');
   const [speedFilter, setSpeedFilter] = useState<'all' | 'moving' | 'halted'>('all');
 
   const terminalEndRef = useRef<HTMLDivElement>(null);
@@ -96,32 +98,46 @@ export default function AdminMonitor() {
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedBuses = filteredBuses.slice(startIndex, startIndex + itemsPerPage);
 
+  const TARGET_ROUTES = 5047;
+  const currentRoutes = stats?.routesCount || 0;
+  const coveragePercent = Math.min(100, (currentRoutes / TARGET_ROUTES) * 100).toFixed(1);
+  const donutRadius = 55;
+  const donutCircumference = 2 * Math.PI * donutRadius;
+  const donutStrokeDasharray = `${(parseFloat(coveragePercent) / 100) * donutCircumference} ${donutCircumference}`;
+
   useEffect(() => {
     setIsMounted(true);
   }, []);
   const API_BASE = 'http://localhost:5000/api/v1/admin';
 
   // Fetch all administrative data
-  const fetchData = async () => {
+  const fetchData = async (isManual = false) => {
+    if (isManual) setIsRefreshing(true);
     try {
+      const ts = Date.now();
       // 1. Logs
-      const logsRes = await fetch(`${API_BASE}/monitor/logs`);
+      const logsRes = await fetch(`${API_BASE}/monitor/logs?t=${ts}`, { cache: 'no-store' });
       const logsData = await logsRes.json();
       setLogs(logsData.logs || []);
 
       // 2. Active Buses
-      const busesRes = await fetch(`${API_BASE}/monitor/buses`);
+      const busesRes = await fetch(`${API_BASE}/monitor/buses?t=${ts}`, { cache: 'no-store' });
       const busesData = await busesRes.json();
       setBuses(busesData.buses || []);
 
       // 3. Stats
-      const statsRes = await fetch(`${API_BASE}/monitor/stats`);
+      const statsRes = await fetch(`${API_BASE}/monitor/stats?t=${ts}`, { cache: 'no-store' });
       const statsData = await statsRes.json();
       setStats(statsData.stats || null);
 
       setLastRefreshed(new Date());
+      if (isManual) setRefreshTrigger(prev => prev + 1);
     } catch (err) {
       console.error('[Admin Console] Error polling admin data:', err);
+    } finally {
+      if (isManual) {
+        setTimeout(() => setIsRefreshing(false), 500); // minimum visual feedback
+      }
     }
   };
 
@@ -250,6 +266,101 @@ export default function AdminMonitor() {
           0% { opacity: 0.4; }
           50% { opacity: 1; }
           100% { opacity: 0.4; }
+        }
+
+        /* Coverage Tracker */
+        .coverage-container {
+          background: rgba(17, 24, 39, 0.6);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 12px;
+          padding: 24px 32px;
+          margin-bottom: 24px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 40px;
+        }
+
+        .coverage-left {
+          flex: 1;
+        }
+
+        .coverage-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 12px;
+        }
+
+        .coverage-title {
+          font-size: 14px;
+          font-weight: 600;
+          color: #f3f4f6;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .coverage-stats {
+          font-size: 13px;
+          color: #9ca3af;
+        }
+
+        .progress-track {
+          height: 8px;
+          background: rgba(255, 255, 255, 0.1);
+          border-radius: 4px;
+          overflow: hidden;
+          width: 100%;
+        }
+
+        .progress-fill {
+          height: 100%;
+          background: linear-gradient(90deg, #10b981 0%, #34d399 100%);
+          transition: width 1s ease-in-out;
+        }
+        
+        .coverage-right {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 16px;
+        }
+        
+        .donut-container {
+          position: relative;
+          width: 140px;
+          height: 140px;
+        }
+        
+        .donut-hole-text {
+          position: absolute;
+          inset: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 24px;
+          font-weight: 700;
+          color: #f3f4f6;
+        }
+        
+        .donut-legend {
+          display: flex;
+          gap: 16px;
+          font-size: 12px;
+          color: #9ca3af;
+        }
+        
+        .legend-item {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+        
+        .legend-dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
         }
 
         /* Stats Cards */
@@ -682,6 +793,23 @@ export default function AdminMonitor() {
             >
               Map View
             </button>
+            <button 
+              style={{
+                padding: '6px 14px',
+                fontSize: '12.5px',
+                borderRadius: '6px',
+                border: 'none',
+                cursor: 'pointer',
+                background: viewMode === 'coverage' ? '#f59e0b' : 'transparent',
+                color: viewMode === 'coverage' ? '#0b0f19' : '#f3f4f6',
+                fontWeight: 600,
+                transition: 'all 0.2s',
+                outline: 'none'
+              }}
+              onClick={() => setViewMode('coverage')}
+            >
+              Coverage
+            </button>
           </div>
           
           <span style={{ color: '#374151' }}>|</span>
@@ -689,6 +817,19 @@ export default function AdminMonitor() {
           <span style={{ fontSize: '12px', color: '#6b7280' }}>
             Refreshed: {isMounted ? formatTime(lastRefreshed.toISOString()) : ''}
           </span>
+          <button
+            className="btn-live-toggle"
+            onClick={() => fetchData(true)}
+            disabled={isRefreshing}
+            title="Manually refresh data now"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: isRefreshing ? 0.7 : 1 }}
+          >
+            <RefreshCw 
+              size={13} 
+              className={isRefreshing ? 'animate-spin' : ''}
+            />
+            {isRefreshing ? 'Refreshing...' : 'Refresh Now'}
+          </button>
           <button className="btn-live-toggle" onClick={() => setIsLive(!isLive)}>
             {isLive ? 'Pause Polling' : 'Resume Polling'}
           </button>
@@ -946,9 +1087,67 @@ export default function AdminMonitor() {
           </div>
 
         </div>
-      ) : (
+      ) : viewMode === 'map' ? (
         <div style={{ height: 'calc(100vh - 200px)', minHeight: '560px', background: 'rgba(17, 24, 39, 0.6)', border: '1px solid rgba(255, 255, 255, 0.06)', borderRadius: '12px', padding: '12px', boxSizing: 'border-box' }}>
-          <LiveMap buses={buses} />
+          <LiveMap buses={buses} refreshTrigger={refreshTrigger} />
+        </div>
+      ) : (
+        <div style={{ height: 'calc(100vh - 200px)', minHeight: '560px', background: 'rgba(17, 24, 39, 0.6)', border: '1px solid rgba(255, 255, 255, 0.06)', borderRadius: '12px', padding: '40px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+          
+          <div className="coverage-container" style={{ width: '100%', maxWidth: '800px', marginBottom: '0' }}>
+            <div className="coverage-left">
+              <div className="coverage-header">
+                <div className="coverage-title">
+                  <Compass size={16} color="#10b981" />
+                  <span>UP Route Network Coverage</span>
+                </div>
+                <div className="coverage-stats">
+                  <strong>{currentRoutes}</strong> / {TARGET_ROUTES} Estimated Routes ({coveragePercent}%)
+                </div>
+              </div>
+              <div className="progress-track">
+                <div className="progress-fill" style={{ width: `${coveragePercent}%` }}></div>
+              </div>
+            </div>
+            
+            <div className="coverage-right">
+              <div className="donut-container">
+                <svg width="140" height="140" viewBox="0 0 140 140" style={{ transform: 'rotate(-90deg)' }}>
+                  {/* Remaining / Background (Blue) */}
+                  <circle 
+                    cx="70" cy="70" r={donutRadius} 
+                    fill="transparent" 
+                    stroke="#2563eb" 
+                    strokeWidth="24" 
+                  />
+                  {/* Completed (Green) */}
+                  <circle 
+                    cx="70" cy="70" r={donutRadius} 
+                    fill="transparent" 
+                    stroke="#10b981" 
+                    strokeWidth="24" 
+                    strokeDasharray={donutStrokeDasharray}
+                    strokeLinecap="butt"
+                    style={{ transition: 'stroke-dasharray 1s ease-in-out' }}
+                  />
+                </svg>
+                <div className="donut-hole-text">
+                  {coveragePercent}%
+                </div>
+              </div>
+              <div className="donut-legend">
+                <div className="legend-item">
+                  <div className="legend-dot" style={{ background: '#10b981' }}></div>
+                  <span>Completed</span>
+                </div>
+                <div className="legend-item">
+                  <div className="legend-dot" style={{ background: '#2563eb' }}></div>
+                  <span>Remaining</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          
         </div>
       )}
     </div>

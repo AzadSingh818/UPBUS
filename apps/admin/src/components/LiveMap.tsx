@@ -19,21 +19,24 @@ interface ActiveBusState {
 
 interface LiveMapProps {
   buses: ActiveBusState[];
+  refreshTrigger?: number;
 }
 
-export default function LiveMap({ buses }: LiveMapProps) {
+export default function LiveMap({ buses, refreshTrigger = 0 }: LiveMapProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
-  const busMarkersRef = useRef<Map<number, L.Marker>>(new Map());
+  const busMarkersRef = useRef<Map<string, L.Marker>>(new Map());
   
   const [mapData, setMapData] = useState<{ stops: any[]; routes: any[] } | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Fetch static route network and stops once on mount
+  // Fetch static route network and stops when mounted or when refreshed manually
   useEffect(() => {
     async function fetchMapData() {
       try {
-        const res = await fetch('http://localhost:5000/api/v1/admin/monitor/map-data');
+        setLoading(true);
+        const ts = Date.now();
+        const res = await fetch(`http://localhost:5000/api/v1/admin/monitor/map-data?t=${ts}`, { cache: 'no-store' });
         const data = await res.json();
         setMapData(data);
       } catch (err) {
@@ -43,7 +46,7 @@ export default function LiveMap({ buses }: LiveMapProps) {
       }
     }
     fetchMapData();
-  }, []);
+  }, [refreshTrigger]);
 
   // Initialize Leaflet Map
   useEffect(() => {
@@ -105,12 +108,11 @@ export default function LiveMap({ buses }: LiveMapProps) {
           lineJoin: 'round'
         });
 
-        // Set initial tooltip configuration based on current zoom
-        const isZoomedIn = map.getZoom() >= 10;
+        // Set initial tooltip configuration (always hover-only, non-permanent)
         polyline.bindTooltip(getTooltipContent(route.routeName), {
-          permanent: isZoomedIn,
-          sticky: !isZoomedIn,
-          direction: 'center',
+          permanent: false,
+          sticky: true,
+          direction: 'auto',
           opacity: 0.9,
           className: 'custom-route-tooltip'
         });
@@ -136,29 +138,7 @@ export default function LiveMap({ buses }: LiveMapProps) {
         polylines.push({ polyline, routeName: route.routeName });
       });
 
-      // Update tooltip mode dynamically on zoom change
-      const updateTooltips = () => {
-        const currentZoom = map.getZoom();
-        const shouldBePermanent = currentZoom >= 10;
 
-        polylines.forEach(({ polyline, routeName }) => {
-          const tooltip = polyline.getTooltip();
-          if (tooltip && tooltip.options.permanent === shouldBePermanent) {
-            return;
-          }
-
-          polyline.unbindTooltip();
-          polyline.bindTooltip(getTooltipContent(routeName), {
-            permanent: shouldBePermanent,
-            sticky: !shouldBePermanent,
-            direction: 'center',
-            opacity: 0.9,
-            className: 'custom-route-tooltip'
-          });
-        });
-      };
-
-      map.on('zoomend', updateTooltips);
     }
 
     // Cleanup on unmount
@@ -175,6 +155,8 @@ export default function LiveMap({ buses }: LiveMapProps) {
       }
     };
   }, [loading, mapData]);
+
+  // Bus Markers intentionally removed per user request.
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
