@@ -108,7 +108,7 @@ export default function AdminMonitor() {
   useEffect(() => {
     setIsMounted(true);
   }, []);
-  const API_BASE = 'http://localhost:5000/api/v1/admin';
+  const API_BASE = '/api/v1/admin';
 
   // Fetch all administrative data
   const fetchData = async (isManual = false) => {
