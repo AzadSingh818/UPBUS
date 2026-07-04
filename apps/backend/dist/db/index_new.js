@@ -6,12 +6,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.query = void 0;
 const pg_1 = require("pg");
 const dotenv_1 = __importDefault(require("dotenv"));
+const fs_1 = __importDefault(require("fs"));
+const path_1 = __importDefault(require("path"));
 dotenv_1.default.config();
 const connectionString = process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/upbus';
 let pool = null;
 let useMock = false;
 // Seed data — UP 75-District Depot Corridor Network
-const mockDb = {
+let mockDb = {
     routes: [
         { id: 1, route_code: 'R_LKO_KAN', route_name: 'Lucknow - Kanpur Express', source: 'Lucknow', destination: 'Kanpur', distance_km: 80.00 },
         { id: 2, route_code: 'R_DEL_MRT', route_name: 'Delhi - Meerut Express', source: 'Delhi', destination: 'Meerut', distance_km: 70.00 },
@@ -1213,6 +1215,29 @@ catch (e) {
     console.warn('Error setting up pg pool. Falling back to In-Memory DB Mock.');
     useMock = true;
 }
+const persistentDbPath = path_1.default.join(__dirname, 'mock_db_store.json');
+if (fs_1.default.existsSync(persistentDbPath)) {
+    try {
+        const loadedData = JSON.parse(fs_1.default.readFileSync(persistentDbPath, 'utf8'));
+        mockDb = loadedData;
+        console.log(`[Persistence] Loaded MockDB from disk: ${mockDb.routes?.length || 0} routes.`);
+    }
+    catch (e) {
+        console.error('[Persistence] Error loading MockDB from disk:', e);
+    }
+}
+// Auto-save every 1 minute
+setInterval(() => {
+    if (useMock) {
+        try {
+            fs_1.default.writeFileSync(persistentDbPath, JSON.stringify(mockDb, null, 2), 'utf8');
+            console.log(`[Persistence] Auto-saved MockDB to disk (${mockDb.routes?.length || 0} routes).`);
+        }
+        catch (e) {
+            console.error('[Persistence] Error saving MockDB:', e);
+        }
+    }
+}, 60 * 1000);
 // In-Memory query executor
 function executeMockQuery(text, params = []) {
     const queryStr = text.replace(/\s+/g, ' ').trim();
