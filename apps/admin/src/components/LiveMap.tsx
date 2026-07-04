@@ -36,7 +36,7 @@ export default function LiveMap({ buses, refreshTrigger = 0 }: LiveMapProps) {
       try {
         setLoading(true);
         const ts = Date.now();
-        const res = await fetch(`http://localhost:5000/api/v1/admin/monitor/map-data?t=${ts}`, { cache: 'no-store' });
+        const res = await fetch(`/api/v1/admin/monitor/map-data?t=${ts}`, { cache: 'no-store' });
         const data = await res.json();
         setMapData(data);
       } catch (err) {
