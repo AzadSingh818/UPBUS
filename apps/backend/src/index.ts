@@ -302,7 +302,33 @@ app.get('/api/v1/journey', async (req, res) => {
       return res.json({ legs: [], journeys: [], message: 'No route found. Try a different combination.' });
     }
 
-    const liveData = await fetchMargdarshiLiveData();
+    const activeBusesRes = await query(`
+      SELECT 
+        b.registration_no, 
+        bls.latitude, 
+        bls.longitude, 
+        bls.speed, 
+        bls.heading, 
+        bls.last_seen_at, 
+        t.id as trip_id,
+        t.route_id, 
+        r.route_name, 
+        r.route_code 
+      FROM bus_live_state bls
+      JOIN trips t ON bls.trip_id = t.id
+      JOIN buses b ON bls.bus_id = b.id
+      LEFT JOIN routes r ON t.route_id = r.id
+      WHERE bls.last_seen_at >= NOW() - INTERVAL '3 hours'
+    `);
+    const activeBuses = activeBusesRes.rows;
+
+    const R = 6371;
+    const haversineKm = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    };
 
     // Map all paths to the journey format
     const journeys: any[] = [];
@@ -311,63 +337,42 @@ app.get('/api/v1/journey', async (req, res) => {
       let cumulativeMinutes = 0;
       
       for (const leg of path.legs) {
-        let routeSource = '';
-        let routeDest = '';
-        try {
-          const routeRes = await query(`SELECT source, destination FROM routes WHERE route_code = $1 LIMIT 1`, [leg.routeCode]);
-          if (routeRes.rowCount && routeRes.rowCount > 0) {
-            routeSource = routeRes.rows[0].source;
-            routeDest = routeRes.rows[0].destination;
+        const routeIdsForLeg = new Set<number>();
+        routeIdsForLeg.add(leg.routeId);
+        if (leg.allRoutes) {
+          for (const r of leg.allRoutes) {
+            routeIdsForLeg.add(r.routeId);
           }
-        } catch (dbErr) {
-          console.error('Error fetching route details for matching:', dbErr);
         }
 
-        let busInfo: any = null;
+        let bestBus: any = null;
+        for (const bus of activeBuses) {
+          if (routeIdsForLeg.has(bus.route_id)) {
+            bestBus = bus;
+            break;
+          }
+          if (bus.route_id === 1) {
+            let near = false;
+            for (let i = 0; i < Math.min(leg.stops.length, 3); i++) {
+              const stop = leg.stops[i];
+              if (stop) {
+                const dist = haversineKm(
+                  parseFloat(bus.latitude), parseFloat(bus.longitude),
+                  stop.latitude, stop.longitude
+                );
+                if (dist <= 5) { near = true; break; }
+              }
+            }
+            if (near) { bestBus = bus; break; }
+          }
+        }
+
         let actualRouteCode = leg.routeCode;
         let actualRouteName = leg.routeName;
 
-        if (Array.isArray(liveData)) {
-          busInfo = liveData.find(b => {
-             const routeStr = (b.route_description || b.routename || '').toUpperCase();
-             const directMatch = routeStr.includes(leg.fromStopName.toUpperCase()) && routeStr.includes(leg.toStopName.toUpperCase());
-             if (directMatch) return true;
-
-             if (leg.allRoutes && leg.allRoutes.length > 0) {
-               return leg.allRoutes.some(r => {
-                 return doesBusRouteMatch(routeStr, r.routeName, r.source, r.destination);
-               });
-             }
-
-             if (routeSource && routeDest) {
-               return doesBusRouteMatch(routeStr, leg.routeName, routeSource, routeDest);
-             }
-             return false;
-          });
-
-          if (busInfo && leg.allRoutes && leg.allRoutes.length > 0) {
-             let bestScore = -1;
-             let bestRoute = leg.allRoutes[0];
-             const routeStr = (busInfo.route_description || busInfo.routename || '').toUpperCase();
-             for (const r of leg.allRoutes) {
-               let score = 0;
-               if (routeStr.includes(r.source.toUpperCase()) && routeStr.includes(r.destination.toUpperCase())) {
-                 score += 5;
-               }
-               const keywords = r.routeName.toUpperCase().replace(/[^A-Z0-9\s]/g, ' ').split(/\s+/).filter((w: string) => w.length > 3 && w !== 'DEPOT' && w !== 'BUS' && w !== 'STAND' && w !== 'EXPRESS' && w !== 'RETURN');
-               for (const word of keywords) {
-                 if (routeStr.includes(word)) {
-                   score += 10;
-                 }
-               }
-               if (score > bestScore) {
-                 bestScore = score;
-                 bestRoute = r;
-               }
-             }
-             actualRouteCode = bestRoute.routeCode;
-             actualRouteName = bestRoute.routeName;
-          }
+        if (bestBus && bestBus.route_id !== 1 && bestBus.route_code) {
+           actualRouteCode = bestBus.route_code;
+           actualRouteName = bestBus.route_name;
         }
 
         const durationMins = Math.round((leg.distanceKm / 40) * 60);
@@ -379,16 +384,16 @@ app.get('/api/v1/journey', async (req, res) => {
           routeName: actualRouteName,
           routeCode: actualRouteCode,
           busType: 'UPSRTC',
-          registrationNo: busInfo ? busInfo.RegNo : 'Scheduled',
-          busInfo: busInfo ? {
-            trip_id: Math.floor(Math.random() * 100000),
-            registration_no: busInfo.RegNo,
+          registrationNo: bestBus ? bestBus.registration_no : 'Scheduled',
+          busInfo: bestBus ? {
+            trip_id: bestBus.trip_id,
+            registration_no: bestBus.registration_no,
             bus_type: 'UPSRTC',
-            depot_name: 'Margdarshi Live',
-            bus_latitude: parseFloat(busInfo.lat) || null,
-            bus_longitude: parseFloat(busInfo.long) || null,
-            current_speed_kmph: parseFloat(busInfo.speed) || 0,
-            heading: parseFloat(busInfo.heading) || 0
+            depot_name: 'Live (UPBus AI)',
+            bus_latitude: parseFloat(bestBus.latitude),
+            bus_longitude: parseFloat(bestBus.longitude),
+            current_speed_kmph: parseFloat(bestBus.speed) || 0,
+            heading: parseFloat(bestBus.heading) || 0
           } : null,
           stops: leg.stops.map(s => ({
             stopId: s.stopId,
