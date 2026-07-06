@@ -105,11 +105,10 @@ const getDistinguishingStop = (journey: Journey, allJourneys: Journey[]) => {
   return currentStops[1]?.name.replace(/\s+(Bus Stand|Depot|Terminal|Peer|Village)$/i, '').trim() || 'Direct';
 };
 
-let API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
-let WS_BASE = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:5000';
-if (typeof window !== 'undefined' && !process.env.NEXT_PUBLIC_API_URL) {
-  API_BASE = `http://${window.location.hostname}:5000/api/v1`;
-  WS_BASE = `ws://${window.location.hostname}:5000`;
+let API_BASE = '/api/v1';
+let WS_BASE = 'ws://51.20.190.81:5000';
+if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+  WS_BASE = 'ws://localhost:5000';
 }
 
 // ─── Journey Timeline Component ───────────────────────────────────────────────
