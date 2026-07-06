@@ -37,6 +37,7 @@ interface ActiveBusState {
   routeCode?: string;
   routeName?: string;
   currentStop?: string;
+  zoneName?: string;
   status: string;
   isNewlyDetected?: boolean;
 }
@@ -87,7 +88,8 @@ export default function AdminMonitor() {
     return (
       (bus.regNo || '').toLowerCase().includes(q) ||
       (bus.routeName || '').toLowerCase().includes(q) ||
-      (bus.currentStop || '').toLowerCase().includes(q)
+      (bus.currentStop || '').toLowerCase().includes(q) ||
+      (bus.zoneName || '').toLowerCase().includes(q)
     );
   });
 
@@ -1035,7 +1037,12 @@ export default function AdminMonitor() {
                           </div>
                         </td>
                         <td style={{ fontFamily: 'monospace', fontSize: '12px' }}>
-                          {bus.latitude.toFixed(4)}, {bus.longitude.toFixed(4)}
+                          <div>{bus.latitude.toFixed(4)}, {bus.longitude.toFixed(4)}</div>
+                          {bus.zoneName && (
+                            <div style={{ fontSize: '9px', color: '#8b5cf6', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '180px' }} title={bus.zoneName}>
+                              <MapPin size={8} style={{ display: 'inline', marginRight: '2px' }}/>{bus.zoneName}
+                            </div>
+                          )}
                         </td>
                         <td>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>

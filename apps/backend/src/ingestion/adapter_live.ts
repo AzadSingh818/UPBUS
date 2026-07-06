@@ -22,6 +22,7 @@ export interface CanonicalVehicleLocation {
   nextStop?: string;
   destination?: string;
   depotName?: string;
+  zoneName?: string;
 }
 
 const MARGDARSHI_URL = 'https://margdarshi.upsrtcvlt.com/php/getGpsLiveData.php';
@@ -65,6 +66,7 @@ function parseMargdarshiBus(raw: any): CanonicalVehicleLocation | null {
     nextStop: raw.next_stop || undefined,
     destination: raw.destination || undefined,
     depotName: raw.depot_name || raw.home_depot || undefined,
+    zoneName: raw.zone_name || undefined,
   };
 }
 
@@ -200,6 +202,7 @@ export async function ingestLocation(location: CanonicalVehicleLocation): Promis
         ? `Next: ${location.nextStop}`
         : location.destination || 'En-route',
       status: location.speed > 0 ? 'MOVING' : 'HALTED',
+      zoneName: location.zoneName,
     });
 
     // 5. Route learning (non-blocking)
