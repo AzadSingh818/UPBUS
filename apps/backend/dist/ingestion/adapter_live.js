@@ -193,7 +193,7 @@ async function ingestLocation(location) {
             zoneName: location.zoneName,
         });
         // 5. Route learning (non-blocking)
-        (0, routeLearning_1.recordLiveLocation)(tripId, location.latitude, location.longitude, location.speed).catch(() => { });
+        (0, routeLearning_1.recordLiveLocation)(tripId, busId, location.latitude, location.longitude, location.speed).catch(() => { });
         // 6. Route progress (non-blocking, only for moving buses)
         if (location.speed > 0) {
             RouteProgressEngine_1.RouteProgressEngine.process({

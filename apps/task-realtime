@@ -1,0 +1,6 @@
+# Phase 2: Real-time AI Route Prediction
+
+- `[x]` Update `routeLearning.ts` to expose a function `predictRouteForTrip` that matches `visitedStopsMap` against known routes.
+- `[x]` Update `RouteProgressEngine.process` to call `predictRouteForTrip` when a bus hits a stop.
+- `[x]` Update `predictRouteForTrip` to automatically change the `route_id` in the `trips` table if a strong match is found.
+- `[x]` Update `adminMonitor.ts` to broadcast the new predicted route name to the frontend.

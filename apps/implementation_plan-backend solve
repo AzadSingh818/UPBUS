@@ -1,0 +1,44 @@
+# Smart Search & Predictive Route Engine (Phase 2 & Phase 3)
+
+This plan outlines the next major steps for the UPBUS project: Real-Time Route Prediction (Phase 2) and the User-Facing Smart Journey Search App (Phase 3).
+
+## Goal Description
+
+Since the live API does not provide route names, we need the backend AI to dynamically predict the route a bus is on while it is moving, rather than waiting 12 hours for the trip to complete. Once routes are predicted in real-time, the User App (`web-app`) will allow passengers to search for journeys (e.g. Saharanpur to Gangoh via Khera Afgan). The system will use Graph Search to find the physical path, and match it against live buses.
+
+## Proposed Changes
+
+### Phase 2: Real-time AI Route Prediction
+
+We will update the `routeLearning.ts` and `RouteProgressEngine` to continuously match a bus's GPS trail against known routes.
+
+#### [MODIFY] [routeLearning.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/engine/routeLearning.ts)
+- Update `recordLiveLocation` to compare the `visitedStopsMap` against all known `routes` in the database.
+- If a bus visits 3 consecutive stops that uniquely identify a specific route (e.g., Saharanpur -> Khera Afgan -> Gangoh), the AI will immediately update the `trips` table to change `route_id = 1` to the predicted `route_id`.
+
+#### [MODIFY] [adminMonitor.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/services/adminMonitor.ts)
+- When the `RouteProgressEngine` detects a route prediction, broadcast the updated `routeName` to the Admin Panel immediately, replacing "Dynamic Route" with the actual route.
+
+---
+
+### Phase 3: Smart Journey Search (User App)
+
+We will refine the `web-app` so users can search for complex routes with intermediate stops.
+
+#### [MODIFY] [graph.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/engine/graph.ts)
+- Expose a search endpoint that returns physical coordinates for every stop in the returned graph path.
+
+#### [MODIFY] [page.tsx (web-app)](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/web-app/src/app/page.tsx)
+- Build out the journey search input for Source & Destination.
+- Query the `graphEngine` to get the path.
+- Overlay live bus coordinates on the path on the map.
+
+## User Review Required
+
+> [!IMPORTANT]
+> The AI Route Prediction (Phase 2) is a complex feature that requires running a similarity algorithm every time a bus hits a stop. I will start by implementing Phase 2 (Backend AI Prediction) first, and then move to Phase 3 (Frontend User App). 
+
+## Open Questions
+
+> [!TIP]
+> Do you want me to prioritize Phase 2 (Backend AI Prediction) or Phase 3 (Frontend User App UI) first? I recommend doing Phase 2 first so the data is ready for the app.

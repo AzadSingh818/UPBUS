@@ -72,7 +72,7 @@ async function ingestLocation(location) {
           heading = EXCLUDED.heading,
           last_seen_at = EXCLUDED.last_seen_at`, [busId, tripId, location.latitude, location.longitude, location.speed, location.heading, location.timestamp]);
         // Record the location ping in the route learning engine
-        (0, routeLearning_1.recordLiveLocation)(tripId, location.latitude, location.longitude, location.speed).catch(err => {
+        (0, routeLearning_1.recordLiveLocation)(tripId, busId, location.latitude, location.longitude, location.speed).catch(err => {
             console.error('[Route Learning] Error recording location ping:', err);
         });
         // Process Route Progress Pipeline

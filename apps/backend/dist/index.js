@@ -636,7 +636,7 @@ wss.on('connection', (ws) => {
                 heading = EXCLUDED.heading,
                 last_seen_at = NOW()`, [busId, tripId, latitude, longitude, speed || 0, heading || 0]);
                     // Record location in the route learning engine
-                    (0, routeLearning_1.recordLiveLocation)(tripId, latitude, longitude, speed || 0).catch(err => {
+                    (0, routeLearning_1.recordLiveLocation)(tripId, busId, latitude, longitude, speed || 0).catch(err => {
                         console.error('[Route Learning] Error recording crowd-sourced location:', err);
                     });
                     // Mark this trip as having active crowd-sourced updates to prevent simulator overrides

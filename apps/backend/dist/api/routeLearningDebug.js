@@ -12,7 +12,9 @@ exports.router.post('/ping', async (req, res) => {
         return res.status(400).json({ error: 'tripId, latitude, and longitude are required' });
     }
     try {
-        await (0, routeLearning_1.recordLiveLocation)(parseInt(tripId, 10), parseFloat(latitude), parseFloat(longitude), parseFloat(speed || 0));
+        const tripRes = await (0, db_1.query)('SELECT bus_id FROM trips WHERE id = $1', [parseInt(tripId, 10)]);
+        const busId = tripRes.rowCount ? tripRes.rows[0].bus_id : 0;
+        await (0, routeLearning_1.recordLiveLocation)(parseInt(tripId, 10), busId, parseFloat(latitude), parseFloat(longitude), parseFloat(speed || 0));
         const currentVisited = routeLearning_1.visitedStopsMap.get(parseInt(tripId, 10)) || [];
         res.json({ success: true, currentVisited });
     }
