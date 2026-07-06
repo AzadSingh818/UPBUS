@@ -102,7 +102,6 @@ const getDistinguishingStop = (journey: Journey, allJourneys: Journey[]) => {
         .trim();
     }
   }
-
   return currentStops[1]?.name.replace(/\s+(Bus Stand|Depot|Terminal|Peer|Village)$/i, '').trim() || 'Direct';
 };
 
