@@ -79,6 +79,7 @@ function parseMargdarshiBus(raw) {
         nextStop: raw.next_stop || undefined,
         destination: raw.destination || undefined,
         depotName: raw.depot_name || raw.home_depot || undefined,
+        zoneName: raw.zone_name || undefined,
     };
 }
 /**
@@ -189,6 +190,7 @@ async function ingestLocation(location) {
                 ? `Next: ${location.nextStop}`
                 : location.destination || 'En-route',
             status: location.speed > 0 ? 'MOVING' : 'HALTED',
+            zoneName: location.zoneName,
         });
         // 5. Route learning (non-blocking)
         (0, routeLearning_1.recordLiveLocation)(tripId, location.latitude, location.longitude, location.speed).catch(() => { });

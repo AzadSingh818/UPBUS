@@ -1,0 +1,55 @@
+# Smart Search & Location Enrichment Engine
+
+This document outlines the plan for fixing the "0 buses found" search issue and building a robust search mechanism that relies on physical location and real-time graph routing, bypassing the limitations of the Margdarshi API's missing route metadata.
+
+## Goal Description
+
+Currently, searching for a specific city or region (like "Saharanpur") yields no active buses because the external API rarely provides route names or next stops. To resolve this, we will pass the real-time physical location (`zone_name`) to the frontend search engine. In the future phases, we will build predictive AI route assignments and a Smart Journey Search using our graph engine.
+
+## Proposed Changes
+
+### Phase 1: Immediate Search Fix (Zone Name Integration)
+
+We will inject `zone_name` from the Margdarshi Live Tracking API down to the frontend UI, allowing users to search buses based on their physical location strings (e.g. "Meerut", "Saharanpur").
+
+---
+
+#### [MODIFY] [adapter_live.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/ingestion/adapter_live.ts)
+- Pass `raw.zone_name` down to `adminMonitor.updateBus`.
+
+#### [MODIFY] [adminMonitor.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/services/adminMonitor.ts)
+- Add `zoneName?: string` to `ActiveBusState` interface.
+- Map the incoming `zoneName` to the `activeBuses` memory store.
+
+#### [MODIFY] [page.tsx](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/admin/src/app/page.tsx)
+- Add `zoneName?: string` to the `ActiveBusState` interface.
+- Update the `filteredBuses` search logic to include: `(bus.zoneName || '').toLowerCase().includes(q)`.
+- Update the frontend table layout to render the `zoneName` below the coordinates, so the admin sees the physical location alongside the lat/lng.
+
+---
+
+### Phase 2: Real-time AI Predictive Route Name (Future)
+
+Instead of waiting for a trip to complete (12 hours) to name a route, the `RouteProgressEngine` will identify if a bus's live GPS traversal has an 80% match with a previously learned route in our database. If so, it will dynamically overwrite the "Dynamic Route" name with the predicted route name on the fly.
+*(To be detailed and implemented in a follow-up iteration)*
+
+### Phase 3: Smart Journey Search Graph Engine (Future - User App)
+
+When building the User App, instead of string matching:
+1. The user selects Source (A) and Destination (B).
+2. `graphEngine.ts` computes the path sequence (A -> C -> B).
+3. The backend scans the live GPS coordinates of all 9699 active buses.
+4. Buses physically located within a 5km radius of the route path, with a directional `heading` towards B, are shown to the user in real-time.
+*(To be detailed and implemented during the User App development phase)*
+
+---
+
+## User Review Required
+
+> [!IMPORTANT]
+> I will only implement **Phase 1** right now to immediately fix the "0 matched buses" issue on your admin panel. Phases 2 and 3 require significant backend architectural changes and are better suited when we start building the User Side App.
+
+## Open Questions
+
+> [!TIP]
+> Are you okay with proceeding with Phase 1 now? I will modify the backend and the admin panel frontend to enable location-based text search.

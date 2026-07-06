@@ -115,6 +115,7 @@ class AdminMonitorService {
             routeCode: data.routeCode ?? existing?.routeCode,
             routeName: data.routeName ?? existing?.routeName,
             currentStop: data.currentStop ?? existing?.currentStop,
+            zoneName: data.zoneName ?? existing?.zoneName,
             status: data.status ?? existing?.status ?? 'active'
         };
         this.activeBuses.set(busId, updated);
