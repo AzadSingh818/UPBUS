@@ -133,99 +133,87 @@ app.get('/api/v1/search/routes', async (req, res) => {
         // Fetch all paths with 0 transfers (direct routes)
         const directPaths = findPathsDFS(from, to, 0);
         const result = [];
-        const liveData = await (0, margdarshiClient_1.fetchMargdarshiLiveData)();
+        // Fetch active buses from our DB (Phase 2 populates route_id)
+        const activeBusesRes = await (0, db_1.query)(`
+      SELECT 
+        b.registration_no, 
+        bls.latitude, 
+        bls.longitude, 
+        bls.speed, 
+        bls.heading, 
+        bls.last_seen_at, 
+        t.id as trip_id,
+        t.route_id, 
+        r.route_name, 
+        r.route_code 
+      FROM bus_live_state bls
+      JOIN trips t ON bls.trip_id = t.id
+      JOIN buses b ON bls.bus_id = b.id
+      LEFT JOIN routes r ON t.route_id = r.id
+      WHERE bls.last_seen_at >= NOW() - INTERVAL '3 hours'
+    `);
+        const activeBuses = activeBusesRes.rows;
+        // Helper for physical proximity
+        const R = 6371;
+        const haversineKm = (lat1, lon1, lat2, lon2) => {
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        };
         for (const path of directPaths) {
             const leg = path.legs[0]; // 0 transfers means exactly 1 leg
             const missedTrips = [];
             const nextTrips = [];
-            let routeSource = '';
-            let routeDest = '';
-            try {
-                const routeRes = await (0, db_1.query)(`SELECT source, destination FROM routes WHERE route_code = $1 LIMIT 1`, [leg.routeCode]);
-                if (routeRes.rowCount && routeRes.rowCount > 0) {
-                    routeSource = routeRes.rows[0].source;
-                    routeDest = routeRes.rows[0].destination;
+            const routeIdsForLeg = new Set();
+            routeIdsForLeg.add(leg.routeId);
+            if (leg.allRoutes) {
+                for (const r of leg.allRoutes) {
+                    routeIdsForLeg.add(r.routeId);
                 }
             }
-            catch (dbErr) {
-                console.error('Error fetching route details for search matching:', dbErr);
-            }
-            if (Array.isArray(liveData)) {
-                // Filter buses for this specific route or the long route containing this leg
-                const matchedBuses = liveData.filter(b => {
-                    const routeStr = (b.route_description || b.routename || '').toUpperCase();
-                    const fromStr = from.toUpperCase();
-                    const toStr = to.toUpperCase();
-                    const directMatch = routeStr.includes(fromStr) && routeStr.includes(toStr);
-                    if (directMatch)
-                        return true;
-                    if (leg.allRoutes && leg.allRoutes.length > 0) {
-                        return leg.allRoutes.some(r => {
-                            return doesBusRouteMatch(routeStr, r.routeName, r.source, r.destination);
-                        });
-                    }
-                    if (routeSource && routeDest) {
-                        return doesBusRouteMatch(routeStr, leg.routeName, routeSource, routeDest);
-                    }
-                    return false;
-                });
-                for (const bus of matchedBuses) {
-                    let etaMinutes = 0;
-                    if (bus.next_stop_eta) {
-                        etaMinutes = Math.max(0, Math.round((new Date(bus.next_stop_eta).getTime() - Date.now()) / 60000));
-                    }
-                    else if (bus.delay) {
-                        etaMinutes = Math.round(parseFloat(bus.delay));
-                    }
-                    if (isNaN(etaMinutes) || etaMinutes < 0)
-                        etaMinutes = 0;
-                    let actualRouteCode = leg.routeCode;
-                    let actualRouteName = leg.routeName;
-                    if (leg.allRoutes && leg.allRoutes.length > 0) {
-                        let bestScore = -1;
-                        let bestRoute = leg.allRoutes[0];
-                        const routeStr = (bus.route_description || bus.routename || '').toUpperCase();
-                        for (const r of leg.allRoutes) {
-                            let score = 0;
-                            if (routeStr.includes(r.source.toUpperCase()) && routeStr.includes(r.destination.toUpperCase())) {
-                                score += 5;
-                            }
-                            const keywords = r.routeName.toUpperCase().replace(/[^A-Z0-9\s]/g, ' ').split(/\s+/).filter((w) => w.length > 3 && w !== 'DEPOT' && w !== 'BUS' && w !== 'STAND' && w !== 'EXPRESS' && w !== 'RETURN');
-                            for (const word of keywords) {
-                                if (routeStr.includes(word)) {
-                                    score += 10;
-                                }
-                            }
-                            if (score > bestScore) {
-                                bestScore = score;
-                                bestRoute = r;
-                            }
+            // Filter active buses for this leg
+            const matchedBuses = activeBuses.filter(bus => {
+                // Strict Match: The bus is explicitly assigned to this route (via Admin UI or Phase 2 AI Prediction)
+                if (routeIdsForLeg.has(bus.route_id))
+                    return true;
+                // Physical Proximity Match: The bus is unassigned (Dynamic Route) but physically near the starting stops.
+                if (bus.route_id === 1) {
+                    // Check against first few stops of the leg
+                    for (let i = 0; i < Math.min(leg.stops.length, 3); i++) {
+                        const stop = leg.stops[i];
+                        if (stop) {
+                            const dist = haversineKm(parseFloat(bus.latitude), parseFloat(bus.longitude), stop.latitude, stop.longitude);
+                            if (dist <= 5)
+                                return true;
                         }
-                        actualRouteCode = bestRoute.routeCode;
-                        actualRouteName = bestRoute.routeName;
                     }
-                    nextTrips.push({
-                        tripId: Math.floor(Math.random() * 100000), // Random Trip ID for tracking
-                        busRegNo: bus.RegNo,
-                        busType: 'UPSRTC',
-                        routeCode: actualRouteCode,
-                        routeName: bus.route_description || actualRouteName,
-                        busLatitude: parseFloat(bus.lat),
-                        busLongitude: parseFloat(bus.long),
-                        currentSpeedKmph: parseFloat(bus.speed) || 0,
-                        heading: parseFloat(bus.heading) || 0,
-                        lastSeen: bus.LogrecTime ? new Date(bus.LogrecTime).toISOString() : new Date().toISOString(),
-                        status: 'running',
-                        // Instead of hardcoding 2 stops, we provide the full sequence of stops from our Graph Path!
-                        stops: leg.stops.map(s => ({
-                            stopId: s.stopId,
-                            name: s.name,
-                            etaMinutes: etaMinutes, // Basic mock, ETA engine handles actual
-                            status: 'upcoming'
-                        })),
-                        etaToBoardingMinutes: etaMinutes
-                    });
                 }
+                return false;
+            });
+            for (const bus of matchedBuses) {
+                // Use realistic dummy ETAs since we don't have ETA module fully active here yet
+                let etaMinutes = 15;
+                nextTrips.push({
+                    tripId: bus.trip_id,
+                    busRegNo: bus.registration_no,
+                    busType: 'UPSRTC',
+                    routeCode: bus.route_code || leg.routeCode,
+                    routeName: bus.route_name || leg.routeName,
+                    busLatitude: parseFloat(bus.latitude),
+                    busLongitude: parseFloat(bus.longitude),
+                    currentSpeedKmph: parseFloat(bus.speed) || 0,
+                    heading: parseFloat(bus.heading) || 0,
+                    lastSeen: bus.last_seen_at ? new Date(bus.last_seen_at).toISOString() : new Date().toISOString(),
+                    status: parseFloat(bus.speed) > 0 ? 'running' : 'halted',
+                    stops: leg.stops.map(s => ({
+                        stopId: s.stopId,
+                        name: s.name,
+                        etaMinutes: etaMinutes,
+                        status: 'upcoming'
+                    })),
+                    etaToBoardingMinutes: etaMinutes
+                });
             }
             result.push({
                 id: leg.routeId,
