@@ -144,21 +144,15 @@ export async function completeTripAndLearnRoute(tripId: number) {
     let isExistingRouteMatched = false;
     let matchedRouteCode = '';
 
-    // Helper to check if array 'sub' is a contiguous subsequence of array 'full'
+    // Helper to check if array 'sub' is an ordered subset of array 'full'
     const isSubsequence = (sub: number[], full: number[]) => {
-      if (sub.length === 0) return true;
-      if (sub.length > full.length) return false;
-      for (let i = 0; i <= full.length - sub.length; i++) {
-        let match = true;
-        for (let j = 0; j < sub.length; j++) {
-          if (full[i + j] !== sub[j]) {
-            match = false;
-            break;
-          }
+      let subIdx = 0;
+      for (let i = 0; i < full.length && subIdx < sub.length; i++) {
+        if (full[i] === sub[subIdx]) {
+          subIdx++;
         }
-        if (match) return true;
       }
-      return false;
+      return subIdx === sub.length;
     };
 
     for (const route of existingRoutesRes.rows) {
