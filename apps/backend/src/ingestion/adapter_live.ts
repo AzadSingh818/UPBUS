@@ -203,6 +203,7 @@ export async function ingestLocation(location: CanonicalVehicleLocation): Promis
         : location.destination || 'En-route',
       status: location.speed > 0 ? 'MOVING' : 'HALTED',
       zoneName: location.zoneName,
+      originalRouteStr: location.routeName,
     });
 
     // 5. Route learning (non-blocking)

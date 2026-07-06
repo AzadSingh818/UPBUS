@@ -23,6 +23,7 @@ export interface ActiveBusState {
   routeName?: string;
   currentStop?: string;
   zoneName?: string;
+  originalRouteStr?: string;
   status: string;
   /** True only for the fetch cycles immediately after a brand-new bus is first seen */
   isNewlyDetected?: boolean;

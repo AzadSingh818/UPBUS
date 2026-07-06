@@ -88,6 +88,7 @@ export default function AdminMonitor() {
     return (
       (bus.regNo || '').toLowerCase().includes(q) ||
       (bus.routeName || '').toLowerCase().includes(q) ||
+      (bus.originalRouteStr || '').toLowerCase().includes(q) ||
       (bus.currentStop || '').toLowerCase().includes(q) ||
       (bus.zoneName || '').toLowerCase().includes(q)
     );
@@ -1150,6 +1151,46 @@ export default function AdminMonitor() {
                 <div className="legend-item">
                   <div className="legend-dot" style={{ background: '#2563eb' }}></div>
                   <span>Remaining</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="coverage-container" style={{ width: '100%', maxWidth: '800px', marginTop: '24px' }}>
+            <div className="coverage-left">
+              <div className="coverage-header">
+                <div className="coverage-title">
+                  <Navigation size={16} color="#a855f7" />
+                  <span>AI Learned Route Variations</span>
+                </div>
+                <div className="coverage-stats">
+                  <strong>{stats?.learnedRoutesCount || 0}</strong> Discovered
+                </div>
+              </div>
+              <div className="progress-track" style={{ background: 'rgba(168, 85, 247, 0.1)' }}>
+                {/* 100% width since these are purely additive, no upper bound */}
+                <div className="progress-fill" style={{ width: '100%', background: 'linear-gradient(90deg, #a855f7 0%, #c084fc 100%)' }}></div>
+              </div>
+            </div>
+            
+            <div className="coverage-right">
+              <div className="donut-container">
+                <svg width="140" height="140" viewBox="0 0 140 140" style={{ transform: 'rotate(-90deg)' }}>
+                  <circle 
+                    cx="70" cy="70" r={donutRadius} 
+                    fill="transparent" 
+                    stroke="#a855f7" 
+                    strokeWidth="24" 
+                  />
+                </svg>
+                <div className="donut-hole-text" style={{ fontSize: '18px' }}>
+                  {stats?.learnedRoutesCount || 0}
+                </div>
+              </div>
+              <div className="donut-legend">
+                <div className="legend-item">
+                  <div className="legend-dot" style={{ background: '#a855f7' }}></div>
+                  <span>New Variations</span>
                 </div>
               </div>
             </div>
