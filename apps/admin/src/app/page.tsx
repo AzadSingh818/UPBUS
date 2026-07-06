@@ -27,6 +27,7 @@ interface AdminLogItem {
 }
 
 interface ActiveBusState {
+  originalRouteStr: string;
   busId?: number;
   regNo: string;
   latitude: number;
