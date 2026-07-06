@@ -137,13 +137,29 @@ export async function ingestLocation(location: CanonicalVehicleLocation): Promis
 
     // 2. Find or create active running trip
     let tripRes = await query(
-      "SELECT id, route_id FROM trips WHERE bus_id = $1 AND status = 'running' ORDER BY created_at DESC LIMIT 1",
+      "SELECT id, route_id, created_at FROM trips WHERE bus_id = $1 AND status = 'running' ORDER BY created_at DESC LIMIT 1",
       [busId]
     );
     let tripId: number;
+    let createNewTrip = false;
 
     if (tripRes.rows.length === 0) {
-      let routeId = 1;
+      createNewTrip = true;
+    } else {
+      const trip = tripRes.rows[0];
+      const tripAgeMs = Date.now() - new Date(trip.created_at).getTime();
+      
+      // If trip is older than 12 hours, forcefully complete it (stale trip)
+      if (tripAgeMs > 12 * 60 * 60 * 1000) {
+        await query("UPDATE trips SET status = 'completed' WHERE id = $1", [trip.id]);
+        createNewTrip = true;
+      } else {
+        tripId = trip.id;
+      }
+    }
+
+    if (createNewTrip) {
+      let routeId = 1; // Default unknown route
       if (location.routeName) {
         const routeMatch = await query(
           'SELECT id FROM routes WHERE route_name ILIKE $1 LIMIT 1',
@@ -157,8 +173,6 @@ export async function ingestLocation(location: CanonicalVehicleLocation): Promis
         [busId, routeId]
       );
       tripId = insertTrip.rows[0].id;
-    } else {
-      tripId = tripRes.rows[0].id;
     }
 
     // 3. Update live location
