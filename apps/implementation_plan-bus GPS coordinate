@@ -1,0 +1,32 @@
+# Implementation Plan - Fix Stale Bus Routes & GPS Mismatch
+
+Bhai, aapne ekdum brilliant bug pakda hai! Maine abhi Margdarshi ka raw API aur database check kiya toh mujhe is problem ki jadd mil gayi hai.
+
+## Problem (Route kyu galat dikha raha hai?)
+1. Jab ek bus apni aakhiri destination ke bilkul exact 200m radius ke andar nahi pahunchti (jaise bus stand ke thoda bahar park kar di ya GPS band kar diya), toh humaara backend uski "Trip" ko `running` state mein hi chhod deta tha.
+2. Is wajah se, **5035 buses (out of 5073)** pichle 24 ghante se `running` state me atki hui hain!
+3. Isiliye `UP78JN1353` bus jab agli subah Delhi-Meerut Expressway par chali, toh backend ko laga ki "Ye toh abhi tak kal wali Gangoh ki trip par hi chal rahi hai!" aur usne Gangoh ka route chipka diya jabki GPS Meerut ka tha.
+
+## Proposed Changes
+
+---
+
+### 1. Trip Expiration Logic in Backend
+#### [MODIFY] [adapter_live.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/ingestion/adapter_live.ts)
+- Backend mein ek "Trip Expiry" logic lagayenge. 
+- Agar koi trip `running` state me hai, lekin usey shuru hue **12 ghante** se zyada ho gaye hain, toh backend samajh jayega ki ye purani (stale) trip hai.
+- Wo purani trip ko turant `completed` mark karke us bus ke liye ek **Fresh Nayi Trip** start karega. Isse buses hamesha sahi aur naye raste par track hongi.
+
+### 2. Database Cleanup (Clear Stale Trips)
+- Ek script run karke, aapke AWS Database (`data.json`) mein jo 5000+ purani trips "running" me atki hui hain, un sabko force-close karke `completed` mark karenge taaki sabhi buses free ho jayein.
+
+### 3. Sync to AWS
+- Ye fix GitHub par push karke wapas AWS server se sync kiya jayega.
+- Iske baad admin panel ekdum accurate Live Routes dikhayega!
+
+---
+
+> [!IMPORTANT]
+> **User Review Required**
+> Kya ye 12-hour expiration wala plan theek hai? Aapke hisaab se UP mein koi ek single bus trip lagatar 12 ghante bina destination pahunche chalti hai kya? (Maximum 12-14 hours ek trip ke liye standard limit hoti hai).
+> Agar plan theek hai toh kripya "Proceed" par click karein.
