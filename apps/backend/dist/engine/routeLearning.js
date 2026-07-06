@@ -119,14 +119,26 @@ async function completeTripAndLearnRoute(tripId) {
         const startStop = traversedStops[0];
         const endStop = traversedStops[traversedStops.length - 1];
         console.log(`[Route Learning] Trip ${tripId} traversed sequence: ${traversedStops.map(s => s.name).join(' -> ')}`);
-        // Fetch all routes between these same source/destination endpoints
-        const existingRoutesRes = await (0, db_1.query)('SELECT id, route_code, route_name FROM routes WHERE source = $1 AND destination = $2', [startStop.name, endStop.name]);
+        // Check against ALL existing routes to prevent duplicates (Bidirectional & Subset checking)
+        const existingRoutesRes = await (0, db_1.query)('SELECT id, route_code, route_name FROM routes');
         let isExistingRouteMatched = false;
         let matchedRouteCode = '';
+        // Helper to check if array 'sub' is an ordered subset of array 'full'
+        const isSubsequence = (sub, full) => {
+            let subIdx = 0;
+            for (let i = 0; i < full.length && subIdx < sub.length; i++) {
+                if (full[i] === sub[subIdx]) {
+                    subIdx++;
+                }
+            }
+            return subIdx === sub.length;
+        };
         for (const route of existingRoutesRes.rows) {
             const rsRes = await (0, db_1.query)('SELECT stop_id FROM route_stops WHERE route_id = $1 ORDER BY sequence_no ASC', [route.id]);
             const existingSequence = rsRes.rows.map(r => r.stop_id);
-            if (existingSequence.length === visited.length && existingSequence.every((val, index) => val === visited[index])) {
+            const forwardMatch = isSubsequence(visited, existingSequence);
+            const reverseMatch = isSubsequence(visited, [...existingSequence].reverse());
+            if (forwardMatch || reverseMatch) {
                 isExistingRouteMatched = true;
                 matchedRouteCode = route.route_code;
                 break;
