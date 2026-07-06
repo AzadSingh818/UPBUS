@@ -191,6 +191,7 @@ async function ingestLocation(location) {
                 : location.destination || 'En-route',
             status: location.speed > 0 ? 'MOVING' : 'HALTED',
             zoneName: location.zoneName,
+            originalRouteStr: location.routeName,
         });
         // 5. Route learning (non-blocking)
         (0, routeLearning_1.recordLiveLocation)(tripId, busId, location.latitude, location.longitude, location.speed).catch(() => { });
