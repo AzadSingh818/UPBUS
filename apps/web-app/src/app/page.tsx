@@ -106,9 +106,9 @@ const getDistinguishingStop = (journey: Journey, allJourneys: Journey[]) => {
   return currentStops[1]?.name.replace(/\s+(Bus Stand|Depot|Terminal|Peer|Village)$/i, '').trim() || 'Direct';
 };
 
-let API_BASE = 'http://localhost:5000/api/v1';
-let WS_BASE = 'ws://localhost:5000';
-if (typeof window !== 'undefined') {
+let API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+let WS_BASE = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:5000';
+if (typeof window !== 'undefined' && !process.env.NEXT_PUBLIC_API_URL) {
   API_BASE = `http://${window.location.hostname}:5000/api/v1`;
   WS_BASE = `ws://${window.location.hostname}:5000`;
 }
