@@ -140,7 +140,7 @@ export async function ingestLocation(location: CanonicalVehicleLocation): Promis
       "SELECT id, route_id, created_at FROM trips WHERE bus_id = $1 AND status = 'running' ORDER BY created_at DESC LIMIT 1",
       [busId]
     );
-    let tripId: number;
+    let tripId: number = 0;
     let createNewTrip = false;
 
     if (tripRes.rows.length === 0) {
