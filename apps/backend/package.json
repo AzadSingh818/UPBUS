@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "ts-node-dev --ignore-watch src/db/data.json --respawn --transpile-only src/index.ts",
-    "build": "tsc",
+    "build": "tsc && node -e \"require('fs').copyFileSync('src/db/data.json', 'dist/db/data.json')\"",
     "start": "node dist/index.js"
   },
   "dependencies": {
