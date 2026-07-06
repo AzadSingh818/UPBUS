@@ -59,7 +59,9 @@ CREATE TABLE IF NOT EXISTS bus_live_state (
 
 -- Index for spatial and query performance
 CREATE INDEX IF NOT EXISTS idx_routes_search ON routes(source, destination);
-CREATE INDEX IF NOT EXISTS idx_bus_live_state ON bus_live_state(last_seen_at);
+CREATE INDEX IF NOT EXISTS idx_bus_live_state_trip ON bus_live_state(trip_id);
+CREATE INDEX IF NOT EXISTS idx_bus_live_state_time ON bus_live_state(last_seen_at);
+CREATE INDEX IF NOT EXISTS idx_stops_name ON stops(name);
 
 -- ==========================================
 -- SEED DATA FOR PILOT ROUTES

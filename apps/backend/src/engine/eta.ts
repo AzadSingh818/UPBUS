@@ -46,6 +46,21 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
   return R * c;
 }
 
+// Smart ETA: Time-of-day traffic modifier
+function getTrafficSpeedModifier(): number {
+  const hour = new Date().getHours();
+  // Morning Peak (8 AM - 11 AM) or Evening Peak (5 PM - 8 PM) -> 25% slower
+  if ((hour >= 8 && hour < 11) || (hour >= 17 && hour < 20)) {
+    return 0.75;
+  }
+  // Night / Early Morning (10 PM - 5 AM) -> 15% faster
+  if (hour >= 22 || hour < 5) {
+    return 1.15;
+  }
+  // Normal hours -> 1.0
+  return 1.0;
+}
+
 export async function getTripETAs(tripId: number, regNo?: string, routeCode?: string): Promise<TripETAResponse | null> {
   try {
     // 1. Fetch trip and bus details
@@ -313,9 +328,9 @@ export async function getTripETAs(tripId: number, regNo?: string, routeCode?: st
     const busSpeed = parseFloat(live.speed);
     const heading = parseFloat(live.heading);
 
-    // Speed smoothing: Use current speed if > 25 km/h, otherwise floor to 40 km/h (average highway speed)
+    // Speed smoothing: Use current speed if > 25 km/h, otherwise floor to 45 km/h (average highway speed)
     // to prevent division by zero or inflated ETAs when stationary at a traffic light or depot
-    const speedFloorKmph = busSpeed > 25 ? busSpeed : 45;
+    const speedFloorKmph = (busSpeed > 25 ? busSpeed : 45) * getTrafficSpeedModifier();
 
     // Fetch bus ID from buses table and load progress cache if available
     const busIdRes = await query(`SELECT id FROM buses WHERE registration_no = $1`, [trip.registration_no]);
