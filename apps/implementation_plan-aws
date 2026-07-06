@@ -1,0 +1,37 @@
+# Implementation Plan - Route Duplication Fix
+
+Bhai, aapne ekdum sahi bug pakda hai! Route count isliye badh raha hai kyunki backend code har trip ko ek naya route maan raha hai agar wo thoda sa bhi alag ho. 
+
+## Problem (Kyu badh raha hai count?)
+1. **Reverse Routes:** Agar route A -> B hai, aur bus B -> A wapas aati hai, toh system use naya route (duplicate) bana deta hai, jabki rules ke mutabik reverse route alag nahi hona chahiye.
+2. **Short Trips (Subsets):** Agar koi route Stop 1 se Stop 10 tak ka hai, aur ek bus Stop 2 se Stop 8 tak chalti hai, toh system usko bhi ek naya "Route Variant" bana raha tha. 
+3. Is wajah se har chhoti-badi trip par ek naya route ban raha hai aur 2006 se ginti 6443 tak pahunch gayi!
+
+## Proposed Changes
+
+---
+
+### Backend Logic Update
+
+#### [MODIFY] [routeLearning.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/engine/routeLearning.ts)
+- `INSERT INTO routes` wale logic se pehle hum ek **Bidirectional aur Subset Checking Algorithm** lagayenge.
+- Ab backend check karega ki:
+  - Kya ye trip kisi existing route ka hissa hai? (Forward Check)
+  - Kya ye trip kisi existing route ka **ulta (Reverse)** hissa hai? (Reverse Check)
+- Agar dono mein se kuch bhi match hua, toh naya route CREATE NAHI hoga. Isse duplicates banne hamesha ke liye band ho jayenge.
+
+---
+
+### Database Cleanup (Deduplication)
+
+#### [NEW] [clean_duplicates.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/scripts/clean_duplicates.ts)
+- Ek script banayi jayegi jo AWS server par chal kar un 4000+ kachra/duplicate routes ko delete karegi jo pichle kuch dino mein galat ban gaye hain.
+- Ye wapas original aur uniquely discovered routes ko hi rakhega.
+
+---
+
+> [!IMPORTANT]
+> **User Review Required & Open Questions**
+> 1. Aapka Vercel admin panel chal raha hai iska matlab AWS ka server chal raha hai, lekin mere paas uska NAYA Public IP address nahi hai jisse main SSH karke ye fix apply kar saku. 
+> **Kripya AWS EC2 se naya Public IP address yahan bhejein.**
+> 2. Kya ye plan theek hai? Agar haan, toh "Proceed" par click kijiye ya haan bol dijiye.

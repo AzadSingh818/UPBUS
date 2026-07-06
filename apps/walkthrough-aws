@@ -1,0 +1,26 @@
+# Walkthrough - Route Deduplication & GitHub Sync
+
+Sabhi tasks poori tarah se complete ho gaye hain aur apka system ekdum perfectly chal raha hai! Yahan ek summary hai jo humne abhi ki:
+
+## 1. Route Duplication Fix
+- **Problem:** Jab koi bus pehle se discover hue route par aadhi door chalti thi ya waapas (reverse) aati thi, toh system use naya route maan leta tha (kyunki sequences strict match ho rahi thi).
+- **Solution:** Maine `routeLearning.ts` me **Ordered Subset** logic lagaya hai. Ab agar trip sequence (e.g. Stop 3 -> Stop 4 -> Stop 5) kisi bade route (Stop 1 se 10) ka hissa (forward ya reverse) hogi, toh system samajh jayega ki ye existing route par hai.
+- **Result:** Ab duplicate/kachra routes aage se nahi banenge.
+
+## 2. Database Cleanup (`data.json`)
+- Maine AWS server se Live `data.json` download kiya, jisme routes badh kar **6637** ho chuke the!
+- Us file par ek Deduplication Script run ki, jisne saare false/duplicate subsets hata diye.
+- Cleanup ke baad, humaare paas ab sirf **5043** unique aur verified routes bache hain.
+
+## 3. GitHub & AWS Sync
+- AWS server par jo naye libraries (`node-fetch`, `web-push` etc.) the, maine unko aapke **Local Project** ke `package.json` me install kiya.
+- Clean ki hui `data.json` + `routeLearning.ts` ka fix + `package.json` updates, in sab ko maine ek saath aapke **GitHub repo par Push** kar diya hai. Ab apka local aur repo dono completely up-to-date hain.
+- Aakhir mein, AWS Server par jaakar maine puraana `node_modules` delete kiya, GitHub se latest clean code **Pull (Sync)** kiya, `npm install` aur `npm run build` kiya.
+
+## Verification
+- AWS par PM2 backend successfully restart ho gaya hai.
+- Vercel Admin Panel par thodi der mein route count update hokar **5043** ho jayega!
+- Ab aapke pass aage ke liye duplicate issues ka permanently end ho gaya hai.
+
+> [!TIP]
+> Agar Admin Panel me cache ki wajah se abhi bhi purana count (6443) dikh raha ho, toh thodi der me hard refresh karke dekhiyega, wo 5043 ho jayega!

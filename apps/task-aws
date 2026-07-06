@@ -1,0 +1,9 @@
+# Route Duplication Fix & Data Sync
+
+- `[/]` Fix code in `routeLearning.ts` locally (Bidirectional & Subset logic)
+- `[ ]` Push fixed code to GitHub
+- `[ ]` Await AWS Public IP Address from User
+- `[ ]` Connect to AWS and STOP PM2
+- `[ ]` Run Deduplication script on AWS `data.json`
+- `[ ]` Pull latest code on AWS and START PM2
+- `[ ]` Download cleaned `data.json` to local machine
