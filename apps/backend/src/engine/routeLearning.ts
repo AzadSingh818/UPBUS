@@ -42,7 +42,7 @@ export const visitedStopsMap = new Map<number, number[]>();
 /**
  * Record a live bus GPS update and detect if a stop is visited.
  */
-export async function recordLiveLocation(tripId: number, latitude: number, longitude: number, speed: number) {
+export async function recordLiveLocation(tripId: number, busId: number, latitude: number, longitude: number, speed: number) {
   if (isNaN(latitude) || isNaN(longitude)) return;
 
   const stops = await getStops();
@@ -70,6 +70,11 @@ export async function recordLiveLocation(tripId: number, latitude: number, longi
     if (visited.length === 0 || visited[visited.length - 1] !== closestStop.id) {
       visited.push(closestStop.id);
       console.log(`[Route Learning] Trip ${tripId} visited stop: ${closestStop.name} (Stop ID: ${closestStop.id})`);
+      
+      // Run AI Route Prediction asynchronously
+      predictRouteForTrip(tripId, busId, visited).catch(err => {
+        console.error('[Route Prediction] Error predicting route:', err);
+      });
     }
 
     // Auto-detect trip completion when the destination stop is reached
@@ -235,8 +240,86 @@ export async function completeTripAndLearnRoute(tripId: number) {
     await query("UPDATE trips SET status = $1 WHERE id = $2", ['completed', tripId]);
 
   } catch (err) {
-    console.error(`[Route Learning] Error completing trip ${tripId}:`, err);
+    console.error(`[Route Learning] Error processing route data for trip ${tripId}:`, err);
   } finally {
     visitedStopsMap.delete(tripId);
+  }
+}
+
+// ─── AI ROUTE PREDICTION ────────────────────────────────────────────────────────
+
+let cachedPredictiveRoutes: { id: number; route_name: string; route_code: string; stops: number[] }[] = [];
+let lastPredictiveRoutesFetch = 0;
+
+async function getPredictiveRoutes() {
+  const now = Date.now();
+  if (cachedPredictiveRoutes.length === 0 || now - lastPredictiveRoutesFetch > 300000) { // 5 minutes cache
+    try {
+      const routesRes = await query('SELECT id, route_name, route_code FROM routes WHERE id != 1');
+      const stopsRes = await query('SELECT route_id, stop_id FROM route_stops ORDER BY route_id, sequence_no ASC');
+      
+      const routesMap = new Map();
+      for (const r of routesRes.rows) {
+        routesMap.set(r.id, { ...r, stops: [] });
+      }
+      for (const s of stopsRes.rows) {
+        if (routesMap.has(s.route_id)) {
+          routesMap.get(s.route_id).stops.push(s.stop_id);
+        }
+      }
+      cachedPredictiveRoutes = Array.from(routesMap.values());
+      lastPredictiveRoutesFetch = now;
+    } catch (err) {
+      console.error('[Route Prediction] Error loading routes cache:', err);
+    }
+  }
+  return cachedPredictiveRoutes;
+}
+
+async function predictRouteForTrip(tripId: number, busId: number, visitedStopIds: number[]) {
+  if (visitedStopIds.length < 3) return; // Need at least 3 stops to confidently predict a route
+
+  // Check if trip is still unassigned (route_id = 1)
+  const tripRes = await query('SELECT route_id, registration_no FROM trips t JOIN buses b ON t.bus_id = b.id WHERE t.id = $1', [tripId]);
+  if (tripRes.rowCount === 0 || tripRes.rows[0].route_id !== 1) return; 
+
+  const regNo = tripRes.rows[0].registration_no;
+  const routes = await getPredictiveRoutes();
+  
+  const matchedRoutes = routes.filter(r => {
+    let vIdx = 0;
+    for (const stopId of r.stops) {
+      if (stopId === visitedStopIds[vIdx]) {
+        vIdx++;
+        if (vIdx === visitedStopIds.length) return true;
+      }
+    }
+    return false;
+  });
+
+  if (matchedRoutes.length > 0) {
+    // If multiple matches, pick the one with the fewest total stops (closest to the sequence)
+    matchedRoutes.sort((a, b) => a.stops.length - b.stops.length);
+    const bestMatch = matchedRoutes[0];
+
+    console.log(`[Route Prediction] Trip ${tripId} predicted to be on route: ${bestMatch.route_name}`);
+
+    // Update the trip with the new predicted route
+    await query('UPDATE trips SET route_id = $1 WHERE id = $2', [bestMatch.id, tripId]);
+    
+    // Broadcast to Admin Monitor dynamically to avoid circular dependencies
+    import('../services/adminMonitor').then(({ adminMonitor }) => {
+      adminMonitor.updateBus(busId, regNo, {
+        routeName: bestMatch.route_name,
+        routeCode: bestMatch.route_code
+      });
+      adminMonitor.addLog({
+        type: 'LEARNING',
+        busId: busId,
+        regNo: regNo,
+        status: 'success',
+        message: `AI predicted route: ${bestMatch.route_name} based on ${visitedStopIds.length} stops visited.`
+      });
+    });
   }
 }

@@ -12,7 +12,9 @@ router.post('/ping', async (req, res) => {
   }
 
   try {
-    await recordLiveLocation(parseInt(tripId, 10), parseFloat(latitude), parseFloat(longitude), parseFloat(speed || 0));
+    const tripRes = await query('SELECT bus_id FROM trips WHERE id = $1', [parseInt(tripId, 10)]);
+    const busId = tripRes.rowCount ? tripRes.rows[0].bus_id : 0;
+    await recordLiveLocation(parseInt(tripId, 10), busId, parseFloat(latitude), parseFloat(longitude), parseFloat(speed || 0));
     const currentVisited = visitedStopsMap.get(parseInt(tripId, 10)) || [];
     res.json({ success: true, currentVisited });
   } catch (err: any) {

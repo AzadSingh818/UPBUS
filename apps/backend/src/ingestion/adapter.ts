@@ -53,7 +53,7 @@ export async function ingestLocation(location: CanonicalVehicleLocation) {
     );
 
     // Record the location ping in the route learning engine
-    recordLiveLocation(tripId, location.latitude, location.longitude, location.speed).catch(err => {
+    recordLiveLocation(tripId, busId, location.latitude, location.longitude, location.speed).catch(err => {
       console.error('[Route Learning] Error recording location ping:', err);
     });
 

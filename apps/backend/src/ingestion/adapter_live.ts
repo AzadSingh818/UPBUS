@@ -206,7 +206,7 @@ export async function ingestLocation(location: CanonicalVehicleLocation): Promis
     });
 
     // 5. Route learning (non-blocking)
-    recordLiveLocation(tripId, location.latitude, location.longitude, location.speed).catch(() => {});
+    recordLiveLocation(tripId, busId, location.latitude, location.longitude, location.speed).catch(() => {});
 
     // 6. Route progress (non-blocking, only for moving buses)
     if (location.speed > 0) {

@@ -687,7 +687,7 @@ wss.on('connection', (ws: WebSocket) => {
           );
 
           // Record location in the route learning engine
-          recordLiveLocation(tripId, latitude, longitude, speed || 0).catch(err => {
+          recordLiveLocation(tripId, busId, latitude, longitude, speed || 0).catch(err => {
             console.error('[Route Learning] Error recording crowd-sourced location:', err);
           });
 
