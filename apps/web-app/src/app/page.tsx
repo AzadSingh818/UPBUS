@@ -348,6 +348,51 @@ export default function Home() {
 
   const [selectedTrip, setSelectedTrip] = useState<ActiveTrip | null>(null);
   const [liveDetails, setLiveDetails] = useState<TripLiveDetails | null>(null);
+
+  // Push Notification States
+  const [notified5Min, setNotified5Min] = useState(false);
+  const [notified10Min, setNotified10Min] = useState(false);
+
+  // Request Notification permission
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+      Notification.requestPermission();
+    }
+  }, []);
+
+  // Monitor ETA for Push Notifications
+  useEffect(() => {
+    if (!liveDetails || !liveDetails.stops || liveDetails.stops.length === 0) return;
+    
+    const upcomingStop = liveDetails.stops.find(s => s.status === 'upcoming' || s.status === 'arriving_soon' || s.status === 'arriving_now');
+    if (!upcomingStop || upcomingStop.etaMinutes === undefined) return;
+
+    const eta = upcomingStop.etaMinutes;
+
+    if (eta <= 10 && eta > 5 && !notified10Min) {
+      if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+        new Notification('UPBus Alert 🚍', {
+          body: `Your bus ${liveDetails.busRegNo} is arriving at ${upcomingStop.name} in ~${eta} mins!`,
+          icon: '/favicon.ico'
+        });
+      }
+      setNotified10Min(true);
+    } else if (eta <= 5 && !notified5Min) {
+      if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+        new Notification('UPBus Alert 🚍', {
+          body: `Get ready! Bus ${liveDetails.busRegNo} is arriving at ${upcomingStop.name} in ~${eta} mins!`,
+          icon: '/favicon.ico'
+        });
+      }
+      setNotified5Min(true);
+    }
+    
+    // Reset if a new trip is tracked or ETA increases significantly
+    if (eta > 12) {
+      setNotified10Min(false);
+      setNotified5Min(false);
+    }
+  }, [liveDetails, notified5Min, notified10Min]);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [trackingLoading, setTrackingLoading] = useState(false);
   const [isWebSocket, setIsWebSocket] = useState(false);
@@ -656,6 +701,33 @@ export default function Home() {
     setSelectedTrip(null); setLiveDetails(null); setIsWebSocket(false);
     setIsPassenger(false);
   };
+
+  // Auto-track bus when selecting a route in Bus Mode
+  useEffect(() => {
+    if (viewMode === 'bus' && hasDirectRoutes && routes[selectedRouteIdx]) {
+      const r = routes[selectedRouteIdx];
+      
+      const trip = r.nextTrips?.[0] || r.missedTrips?.[0];
+      if (trip && !isPassenger) {
+        handleTrackBus(trip.tripId, trip.busRegNo, trip.routeCode);
+      } else {
+        stopTracking();
+      }
+    }
+  }, [selectedRouteIdx, routes, viewMode, isPassenger]);
+
+  // Auto-track bus when selecting a journey option
+  useEffect(() => {
+    if (viewMode === 'journey' && journeys.length > 0 && journeys[selectedJourneyIdx]) {
+      const journey = journeys[selectedJourneyIdx];
+      const firstLeg = journey.legs[0];
+      if (firstLeg && firstLeg.busInfo && !isPassenger) {
+        handleTrackBus(firstLeg.busInfo.trip_id, firstLeg.busInfo.registration_no, firstLeg.routeCode);
+      } else {
+        stopTracking();
+      }
+    }
+  }, [selectedJourneyIdx, journeys, viewMode, isPassenger]);
 
   // ── Crowd-sourced location reporting effect ──────────────────────────────
   useEffect(() => {
@@ -1005,10 +1077,6 @@ export default function Home() {
                       );
                     })}
                   </div>
-                  
-                  {journey && (
-                    <JourneyTimeline journey={journey} onTrackBus={handleTrackBus} />
-                  )}
                 </div>
               )}
 
@@ -1293,8 +1361,8 @@ export default function Home() {
                   <>
                     <div className="map-wrapper">
                       <LiveMap
-                        latitude={liveDetails.busLatitude}
-                        longitude={liveDetails.busLongitude}
+                        latitude={liveDetails.busLatitude || (filteredStops.length > 0 ? filteredStops[0].latitude : 26.8467)}
+                        longitude={liveDetails.busLongitude || (filteredStops.length > 0 ? filteredStops[0].longitude : 80.9462)}
                         stops={filteredStops}
                         busRegNo={liveDetails.busRegNo}
                         heading={liveDetails.heading}
@@ -1376,7 +1444,7 @@ export default function Home() {
                                 ) : (stop.status === 'arriving_now' || stop.status === 'arriving_soon') ? (
                                   <span className="stop-badge arriving-badge">Arriving Now</span>
                                 ) : (
-                                  <span className="stop-badge upcoming-badge">~{stop.etaMinutes}m</span>
+                                  <span className="stop-badge upcoming-badge" style={{ background: 'var(--accent)', color: '#000', fontWeight: 'bold' }}>✨ AI ~{stop.etaMinutes}m</span>
                                 )}
                                 {stop.distanceRemainingKm > 0 && (
                                   <span className="stop-dist">{stop.distanceRemainingKm.toFixed(1)} km</span>
@@ -1413,50 +1481,58 @@ export default function Home() {
               </div>
             </div>
           ) : viewMode === 'journey' && journeys.length > 0 ? (
-            <div className="map-wrapper">
-              <LiveMap
-                latitude={mapBusLat}
-                longitude={mapBusLng}
-                stops={[]}
-                busRegNo={mapBusRegNo}
-                heading={mapBusHeading}
-                villages={villages}
-                reports={passengerReports}
-                currentSpeedKmph={mapBusSpeed}
-                routeName={mapBusRouteName}
-                multipleRoutes={journeys.map((j, i) => {
-                  // Flatten all leg stops then clip to the passenger's from→to segment
-                  const allStops = j.legs.flatMap(leg => leg.stops || []).map(s => ({
-                    stopId: s.stopId,
-                    name: s.name,
-                    sequenceNo: s.sequenceNo,
-                    latitude: s.latitude,
-                    longitude: s.longitude,
-                    status: 'upcoming' as const
-                  }));
-                  const clipped = clipStopsToSegment(allStops, from, to);
-                  return {
-                    stops: clipped,
-                    color: i === selectedJourneyIdx ? '#4f46e5' : '#6b7280',
-                    weight: i === selectedJourneyIdx ? 6 : 3,
-                    opacity: i === selectedJourneyIdx ? 0.9 : 0.4
-                  };
-                })}
-                onSelectRoute={async (idx) => {
-                  setSelectedJourneyIdx(idx);
-                  // Fetch villages — routeId from leg or routeCode fallback
-                  const leg = journeys[idx]?.legs?.[0];
-                  const rid = leg?.routeId
-                    || routes.find(r => r.route_code === leg?.routeCode)?.id;
-                  if (rid) {
-                    try {
-                      const vRes = await fetch(`${API_BASE}/routes/${rid}/villages`);
-                      const vData = await vRes.json();
-                      setVillages(vData.villages || []);
-                    } catch { setVillages([]); }
-                  }
-                }}
-              />
+            <div className="tracking-panel">
+              <div className="map-wrapper" style={{ margin: 0, height: '350px', flexShrink: 0 }}>
+                <LiveMap
+                  latitude={mapBusLat}
+                  longitude={mapBusLng}
+                  stops={[]}
+                  busRegNo={mapBusRegNo}
+                  heading={mapBusHeading}
+                  villages={villages}
+                  reports={passengerReports}
+                  currentSpeedKmph={mapBusSpeed}
+                  routeName={mapBusRouteName}
+                  multipleRoutes={journeys.map((j, i) => {
+                    // Flatten all leg stops then clip to the passenger's from→to segment
+                    const allStops = j.legs.flatMap(leg => leg.stops || []).map(s => ({
+                      stopId: s.stopId,
+                      name: s.name,
+                      sequenceNo: s.sequenceNo,
+                      latitude: s.latitude,
+                      longitude: s.longitude,
+                      status: 'upcoming' as const
+                    }));
+                    const clipped = clipStopsToSegment(allStops, from, to);
+                    return {
+                      stops: clipped,
+                      color: i === selectedJourneyIdx ? '#4f46e5' : '#6b7280',
+                      weight: i === selectedJourneyIdx ? 6 : 3,
+                      opacity: i === selectedJourneyIdx ? 0.9 : 0.4
+                    };
+                  })}
+                  onSelectRoute={async (idx) => {
+                    setSelectedJourneyIdx(idx);
+                    // Fetch villages — routeId from leg or routeCode fallback
+                    const leg = journeys[idx]?.legs?.[0];
+                    const rid = leg?.routeId
+                      || routes.find(r => r.route_code === leg?.routeCode)?.id;
+                    if (rid) {
+                      try {
+                        const vRes = await fetch(`${API_BASE}/routes/${rid}/villages`);
+                        const vData = await vRes.json();
+                        setVillages(vData.villages || []);
+                      } catch { setVillages([]); }
+                    }
+                  }}
+                />
+              </div>
+              <div className="stops-timeline" style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
+                <div className="stops-title" style={{ marginBottom: '16px' }}>🗺 Journey Plan Details</div>
+                {journey && (
+                  <JourneyTimeline journey={journey} onTrackBus={handleTrackBus} />
+                )}
+              </div>
             </div>
           ) : viewMode === 'direct' && routes.length > 0 ? (
             <div className="map-wrapper">

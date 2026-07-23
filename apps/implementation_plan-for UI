@@ -1,0 +1,29 @@
+# Implementation Plan: Smooth Maps & Smart ETA
+
+We will implement the remaining pending functionalities: Ola/Uber-like smooth map animations and Traffic-based accurate ETAs.
+
+## Proposed Changes
+
+### `apps/web-app` (Frontend)
+- **Smooth Marker Animation**: 
+  - Add a CSS rule in `globals.css` targeting `.leaflet-marker-icon`. 
+  - We will apply a `transition: transform 1.5s linear` so that whenever the backend sends new coordinates, the Leaflet marker will smoothly glide to the new position instead of instantly jumping.
+
+#### [MODIFY] [globals.css](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/web-app/src/app/globals.css)
+
+---
+
+### `apps/backend` (Backend)
+- **Smart ETA Calculation**:
+  - In `eta.ts`, the ETA is calculated as `distanceRemainingKm / speedFloorKmph`. 
+  - We already have a `getTrafficSpeedModifier()` function defined but it's not being used. 
+  - We will integrate it so that `speedFloorKmph = speedFloorKmph * getTrafficSpeedModifier()`. This will correctly slow down the ETA predictions during morning/evening peak hours, and speed them up during nighttime.
+
+#### [MODIFY] [eta.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/engine/eta.ts)
+
+## Verification Plan
+
+### Manual Verification
+1. Open the Live Tracking panel in the web app and select a bus.
+2. Verify that when the bus location updates, the marker glides smoothly on the map.
+3. Verify that ETAs are populated and correctly adjusted for time-of-day traffic logic.

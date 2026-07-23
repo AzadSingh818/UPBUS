@@ -1,0 +1,58 @@
+# Implementation Plan - Dynamic Live Route Mapping, Redis Cache, Map Snapping & Log Routing
+
+This plan outlines the changes to resolve:
+1. Live route name mismatch using Redis Cache lookup (`Bus Number -> Active Trip -> Live Route`).
+2. Log forwarding to the Admin UI `⚙️ Engine` tab without console lag.
+3. Map snapping using Turf.js to align raw GPS points to highway routes.
+4. Keeping Scraper logs quiet in the console terminal but running in the background.
+
+---
+
+## User Review Required
+
+> [!IMPORTANT]
+> - **Redis Connection Fail-Safe**: We will implement a wrapper that connects to your local Redis client (`redis://localhost:6379`). If Redis is not running or fails to connect, the system will seamlessly fall back to a high-performance in-memory Map cache. This prevents any crashes if Redis isn't started yet.
+> - **Turf.js Snapping**: RAW coordinates from the Margdarshi feed will be snapped to the sequence of stops for the active route, ensuring buses stick exactly to the road on the map.
+
+---
+
+## Proposed Changes
+
+### [Component: Shared / DB / Redis]
+
+#### [NEW] [redis.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/utils/redis.ts) & [redis.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/engine/src/utils/redis.ts)
+- Create a safe Redis connection wrapper.
+- Expose `redisGet` and `redisSet` helpers with automatic in-memory Map fallback.
+
+### [Component: Ingestion Engine]
+
+#### [MODIFY] [adapter_live.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/engine/src/ingestion/adapter_live.ts)
+- Parse `vehicle_journey_id` as `activeTripId` and `route_description` as `routeName` from Margdarshi JSON payload.
+- In `runLiveIngestionCycle`, save the live duty mapping to Redis (`bus:${registrationNo} -> { route_name, trip_id }`).
+- Add error logging to `adminMonitor` on API timeouts/failures.
+- Update `flushToBackend` to use `node-fetch` instead of hardcoded `127.0.0.1` IPv4 options to resolve Node localhost IP connection issues.
+
+#### [NEW] [snapping.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/engine/src/utils/snapping.ts)
+- Add Turf.js-powered coordinate snapping logic.
+- Retrieve the sequence of stops for the route, construct a GeoJSON line, and snap raw coordinates to the route path.
+
+#### [MODIFY] [RouteProgressEngine.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/engine/src/modules/route-progress/service/RouteProgressEngine.ts)
+- Integrate snapping helper to process snapped coordinates for route progress, improving accuracy.
+
+### [Component: Backend API / Admin Monitor]
+
+#### [MODIFY] [admin.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/api/admin.ts)
+- In `/monitor/buses`, perform a Redis lookup for each bus to fetch its live route name dynamically, falling back to the DB/default name if not cached.
+
+---
+
+## Verification Plan
+
+### Automated Tests
+- Run `npx tsc --noEmit` across backend and engine to verify type safety.
+- Run a single-cycle ingestion check in the engine to verify live processing.
+
+### Manual Verification
+- Start backend and engine. Verify `⚙️ Engine` tab shows ingestion logs.
+- Verify `🛡️ Admin` tab shows scheduler logs.
+- Verify `TOTAL ONLINE` count is updated dynamically on `http://localhost:3003`.

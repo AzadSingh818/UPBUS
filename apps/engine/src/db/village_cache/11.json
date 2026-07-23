@@ -1,0 +1,230 @@
+{
+  "fetchedAt": "2026-06-29T09:03:35.921Z",
+  "villages": [
+    {
+      "name": "Sakhan Khurd",
+      "latitude": 29.7350918,
+      "longitude": 77.6620101
+    },
+    {
+      "name": "Khudana",
+      "latitude": 29.7294323,
+      "longitude": 77.4405856
+    },
+    {
+      "name": "Meghrajpur",
+      "latitude": 29.7199944,
+      "longitude": 77.6642626
+    },
+    {
+      "name": "Thehri Buzurg",
+      "latitude": 29.7668218,
+      "longitude": 77.649481
+    },
+    {
+      "name": "Sakhan Kalan",
+      "latitude": 29.7402341,
+      "longitude": 77.649393
+    },
+    {
+      "name": "Kasimpura",
+      "latitude": 29.7106841,
+      "longitude": 77.6642228
+    },
+    {
+      "name": "Chakwali",
+      "latitude": 29.7789053,
+      "longitude": 77.5088023
+    },
+    {
+      "name": "Shahpur",
+      "latitude": 29.7577461,
+      "longitude": 77.6593494
+    },
+    {
+      "name": "Aamwala",
+      "latitude": 29.7705032,
+      "longitude": 77.5286846
+    },
+    {
+      "name": "Sarsina",
+      "latitude": 29.7835985,
+      "longitude": 77.6466035
+    },
+    {
+      "name": "Sona Arjanpur",
+      "latitude": 29.7531262,
+      "longitude": 77.4574327
+    },
+    {
+      "name": "Baseda",
+      "latitude": 29.8108646,
+      "longitude": 77.6373452
+    },
+    {
+      "name": "Ambehta Chand",
+      "latitude": 29.7739884,
+      "longitude": 77.5436496
+    },
+    {
+      "name": "Shamaspur",
+      "latitude": 29.8601853,
+      "longitude": 77.4930095
+    },
+    {
+      "name": "Pahanshu",
+      "latitude": 29.8439942,
+      "longitude": 77.523651
+    },
+    {
+      "name": "Talheri Buzurg",
+      "latitude": 29.769332,
+      "longitude": 77.6629972
+    },
+    {
+      "name": "Mirzapur",
+      "latitude": 29.7670597,
+      "longitude": 77.5387572
+    },
+    {
+      "name": "Hashimpura",
+      "latitude": 29.6998991,
+      "longitude": 77.7027419
+    },
+    {
+      "name": "Gudamb",
+      "latitude": 29.7295019,
+      "longitude": 77.4848556
+    },
+    {
+      "name": "Raichanda",
+      "latitude": 29.7340483,
+      "longitude": 77.4929666
+    },
+    {
+      "name": "Pandokheri",
+      "latitude": 29.6958952,
+      "longitude": 77.4342211
+    },
+    {
+      "name": "Kheri Aasa",
+      "latitude": 29.7198504,
+      "longitude": 77.6420919
+    },
+    {
+      "name": "Nanhera Aasa",
+      "latitude": 29.7284957,
+      "longitude": 77.6366901
+    },
+    {
+      "name": "Khajoori",
+      "latitude": 29.7088541,
+      "longitude": 77.6456164
+    },
+    {
+      "name": "Alauddinpur",
+      "latitude": 29.787833,
+      "longitude": 77.4924672
+    },
+    {
+      "name": "Kallarpur Rajput",
+      "latitude": 29.7120826,
+      "longitude": 77.4668994
+    },
+    {
+      "name": "Sherpur",
+      "latitude": 29.8174238,
+      "longitude": 77.4228813
+    },
+    {
+      "name": "Tapri",
+      "latitude": 29.7662509,
+      "longitude": 77.5524311
+    },
+    {
+      "name": "Labakri",
+      "latitude": 29.6964199,
+      "longitude": 77.6497455
+    },
+    {
+      "name": "Bhagwanpur",
+      "latitude": 29.7693693,
+      "longitude": 77.5589275
+    },
+    {
+      "name": "Kutaba",
+      "latitude": 29.7610443,
+      "longitude": 77.5518947
+    },
+    {
+      "name": "Abdyalpur",
+      "latitude": 29.7238791,
+      "longitude": 77.4960566
+    },
+    {
+      "name": "Hardeki",
+      "latitude": 29.790671,
+      "longitude": 77.4821017
+    },
+    {
+      "name": "Isharpur",
+      "latitude": 29.6680158,
+      "longitude": 77.6602578
+    },
+    {
+      "name": "Thaska",
+      "latitude": 29.6992599,
+      "longitude": 77.4687769
+    },
+    {
+      "name": "Jatiya Kheri",
+      "latitude": 29.8389787,
+      "longitude": 77.426276
+    },
+    {
+      "name": "Bhanera Khemchand",
+      "latitude": 29.6814536,
+      "longitude": 77.4449014
+    },
+    {
+      "name": "Manki",
+      "latitude": 29.6989013,
+      "longitude": 77.724967
+    },
+    {
+      "name": "Katla",
+      "latitude": 29.7161174,
+      "longitude": 77.5001506
+    },
+    {
+      "name": "Devpura",
+      "latitude": 29.6729524,
+      "longitude": 77.4307394
+    },
+    {
+      "name": "Dalheri",
+      "latitude": 29.7199239,
+      "longitude": 77.5157976
+    },
+    {
+      "name": "Kurdi",
+      "latitude": 29.7226446,
+      "longitude": 77.6121425
+    },
+    {
+      "name": "Jhabiran",
+      "latitude": 29.7106383,
+      "longitude": 77.5024251
+    },
+    {
+      "name": "Chandena Koli",
+      "latitude": 29.7518594,
+      "longitude": 77.5950622
+    },
+    {
+      "name": "Bhojpur",
+      "latitude": 29.6861887,
+      "longitude": 77.4658012
+    }
+  ]
+}

@@ -18,10 +18,16 @@ let isProcessing = false;
 
 async function fetchWithTimeout(url: string, options: any = {}, timeoutMs = 3000): Promise<any> {
   const fetch = (await import('node-fetch')).default;
-  return Promise.race([
-    fetch(url, options),
-    new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), timeoutMs))
-  ]);
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal as any });
+    clearTimeout(id);
+    return response;
+  } catch (error) {
+    clearTimeout(id);
+    throw error;
+  }
 }
 
 function cleanStopName(name: string): string {

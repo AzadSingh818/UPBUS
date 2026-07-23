@@ -1,0 +1,289 @@
+import { query } from '../db';
+import { mockDb } from '../db';
+
+export interface AdminLogItem {
+  timestamp: string;
+  terminalId?: 'engine' | 'admin' | 'webapp' | 'gateway';
+  service?: string;
+  level?: 'INFO' | 'DEBUG' | 'WARN' | 'ERROR' | 'CRIT';
+  entityId?: string;
+  /** NEW_BUS = first-time detection event from Zero-Touch Onboarding engine */
+  type: 'VALIDATION' | 'SEEDER' | 'LEARNING' | 'ERROR' | 'SYSTEM' | 'NEW_BUS';
+  busId?: string | number;
+  regNo?: string;
+  status?: 'duplicate' | 'accepted' | 'rejected' | 'success' | 'failed';
+  message: string;
+  latencyMs?: number;
+}
+
+export interface ActiveBusState {
+  busId: number;
+  regNo: string;
+  latitude: number;
+  longitude: number;
+  speed: number;
+  heading: number;
+  lastSeen: string;
+  routeCode?: string;
+  routeName?: string;
+  tripId?: number;
+  currentStop?: string;
+  zoneName?: string;
+  originalRouteStr?: string;
+  status: string;
+  /** True only for the fetch cycles immediately after a brand-new bus is first seen */
+  isNewlyDetected?: boolean;
+}
+
+// A bus is considered stale if it hasn't sent a ping in this many milliseconds
+const STALE_BUS_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+
+class AdminMonitorService {
+  private logs: AdminLogItem[] = [];
+  private activeBuses: Map<number, ActiveBusState> = new Map();
+  private maxLogs = 300;
+  private cleanupInterval: NodeJS.Timeout | null = null;
+
+  // ── Batched push buffer ───────────────────────────────────────────────────
+  // Instead of one HTTP request per GPS event (thousands/sec → port exhaustion),
+  // we batch all pending logs & bus updates and flush every 2 seconds.
+  private pendingLogs: AdminLogItem[] = [];
+  private pendingBusUpdates: Map<number, ActiveBusState> = new Map();
+  private flushInterval: NodeJS.Timeout | null = null;
+
+  constructor() {
+    this.addLog({
+      terminalId: 'engine',
+      service: 'GEO-MATCH',
+      level: 'INFO',
+      type: 'SYSTEM',
+      message: 'Admin Real-Time Monitoring Service started successfully.'
+    });
+    this.initializeActiveBuses();
+    this.startStaleCleanup();
+    this.startBatchFlush();
+  }
+
+  /**
+   * Active buses are dynamically populated from real-time Margdarshi API pings.
+   */
+  private initializeActiveBuses() {
+    // No-op: live pings populate this map dynamically
+  }
+
+  /**
+   * Periodically remove buses that haven't sent a GPS ping recently.
+   * This ensures the count naturally drops when a bus stops transmitting.
+   */
+  private startStaleCleanup() {
+    this.cleanupInterval = setInterval(() => {
+      const now = Date.now();
+      let removedCount = 0;
+
+      for (const [busId, bus] of this.activeBuses.entries()) {
+        const lastSeenMs = new Date(bus.lastSeen).getTime();
+        if (now - lastSeenMs > STALE_BUS_TIMEOUT_MS) {
+          this.activeBuses.delete(busId);
+          removedCount++;
+          console.log(`[Admin Monitor] Removed stale bus ${busId} (${bus.regNo}) - last seen ${Math.round((now - lastSeenMs) / 60000)} min ago`);
+        }
+      }
+
+      if (removedCount > 0) {
+        this.addLog({
+          terminalId: 'engine',
+          service: 'STALE-TRACKER',
+          level: 'WARN',
+          type: 'SYSTEM',
+          message: `Removed ${removedCount} stale bus(es) from active tracking (no ping for ${STALE_BUS_TIMEOUT_MS / 60000} min).`
+        });
+      }
+    }, 60 * 1000); // Run cleanup every 1 minute
+  }
+
+  /**
+   * Add a log entry to the in-memory circular buffer.
+   * VALIDATION logs are console-only (too frequent to push to backend).
+   * Other important logs (SEEDER, LEARNING, NEW_BUS, ERROR) are batched & pushed.
+   */
+  addLog(item: Omit<AdminLogItem, 'timestamp'>) {
+    const termId = item.terminalId || 'engine';
+    const logItem: AdminLogItem = {
+      ...item,
+      terminalId: termId,
+      service: item.service || (item.type === 'SEEDER' ? 'GEOCODER-SEEDER' : item.type === 'NEW_BUS' ? 'NEW-BUS-DISCOVERY' : 'GEO-MATCH'),
+      level: item.level || (item.type === 'ERROR' ? 'ERROR' : item.status === 'rejected' ? 'WARN' : 'INFO'),
+      timestamp: new Date().toISOString()
+    };
+    this.logs.push(logItem);
+    
+    // Maintain maximum logs threshold
+    if (this.logs.length > this.maxLogs) {
+      this.logs.shift();
+    }
+
+    // Cap pendingLogs to prevent memory buildup between flushes
+    if (this.pendingLogs.length < 200) {
+      this.pendingLogs.push(logItem);
+    }
+  }
+
+  /**
+   * Update the live tracking state of a bus.
+   * If the bus is NEW (never seen before), it is automatically registered.
+   * This means any bus that sends a GPS ping — even a brand new one —
+   * will immediately appear in the active list and increment the count.
+   */
+  updateBus(busId: number, regNo: string, data: Partial<ActiveBusState>) {
+    if (!busId) return;
+    const existing = this.activeBuses.get(busId);
+    const isNewBus = !existing;
+    
+    const updated: ActiveBusState = {
+      busId: busId,
+      regNo: regNo || existing?.regNo || 'UP-UNKNOWN',
+      latitude: data.latitude ?? existing?.latitude ?? 0,
+      longitude: data.longitude ?? existing?.longitude ?? 0,
+      speed: data.speed ?? existing?.speed ?? 0,
+      heading: data.heading ?? existing?.heading ?? 0,
+      lastSeen: new Date().toISOString(),
+      routeCode: data.routeCode ?? existing?.routeCode,
+      routeName: data.routeName ?? existing?.routeName,
+      tripId: data.tripId ?? existing?.tripId,
+      currentStop: data.currentStop ?? existing?.currentStop,
+      zoneName: data.zoneName ?? existing?.zoneName,
+      status: data.status ?? existing?.status ?? 'active'
+    };
+    
+    this.activeBuses.set(busId, updated);
+
+    // Log when a genuinely new bus first appears
+    if (isNewBus) {
+      console.log(`[Admin Monitor] NEW bus registered: busId=${busId}, regNo=${regNo}. Total active: ${this.activeBuses.size}`);
+      // Mark as newly detected — NewBusDiscovery will update this once route is confirmed
+      updated.isNewlyDetected = true;
+    }
+
+    // Queue for next batch flush — NOT an immediate HTTP call
+    this.pendingBusUpdates.set(busId, updated);
+  }
+
+  /**
+   * Mark a bus as COMPLETED and remove it from the active list.
+   * Call this when a trip finishes so the count decreases immediately.
+   */
+  removeBus(busId: number) {
+    const bus = this.activeBuses.get(busId);
+    if (bus) {
+      this.activeBuses.delete(busId);
+      console.log(`[Admin Monitor] Bus ${busId} (${bus.regNo}) removed from active tracking (trip completed).`);
+      this.addLog({
+        type: 'SYSTEM',
+        busId,
+        regNo: bus.regNo,
+        message: `Bus ${bus.regNo} (ID: ${busId}) trip completed. Removed from active tracking. Total active: ${this.activeBuses.size}`
+      });
+    }
+  }
+
+  /**
+   * Batch flush: collect all pending logs & bus updates, send ONE HTTP request
+   * to backend every 1000ms. Prevents port exhaustion on Windows.
+   */
+  private startBatchFlush() {
+    this.flushInterval = setInterval(async () => {
+      const logs = this.pendingLogs.splice(0); // drain & clear
+      const busUpdates = Array.from(this.pendingBusUpdates.values());
+      this.pendingBusUpdates.clear();
+
+      if (logs.length === 0 && busUpdates.length === 0) return; // nothing to send
+
+      await this.flushToBackend({ logs, busUpdates });
+    }, 1000); // Flush every 1000ms — smooth real-time stream without port exhaustion
+  }
+
+  /**
+   * Single fire-and-forget HTTP push to backend bridge.
+   * Called only by startBatchFlush — never directly per-event.
+   */
+  private async flushToBackend(payload: { logs: AdminLogItem[], busUpdates: ActiveBusState[] }) {
+    const backendUrl = process.env.BACKEND_INTERNAL_URL || 'http://127.0.0.1:5000';
+    try {
+      const fetch = (await import('node-fetch')).default;
+      const response = await fetch(`${backendUrl}/api/v1/admin/monitor/push`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) {
+        console.error(`[Admin Monitor Bridge] Failed to push to backend: HTTP ${response.status}`);
+      }
+    } catch (err: any) {
+      if (err.code === 'ECONNREFUSED') {
+        console.warn('[Admin Monitor Bridge] Warning: Backend server on port 5000 is not running yet (waiting for backend to start).');
+      } else {
+        console.warn('[Admin Monitor Bridge] Backend connection pending:', err.message);
+      }
+    }
+  }
+
+  /**
+   * Get all validation & seeder logs
+   */
+  getLogs(): AdminLogItem[] {
+    return [...this.logs];
+  }
+
+  /**
+   * Get all currently active (non-stale) buses.
+   * Count will naturally grow as new buses come online and
+   * shrink as buses finish their trips or go silent.
+   */
+  getActiveBuses(limit = 10000): ActiveBusState[] {
+    return Array.from(this.activeBuses.values())
+      .sort((a, b) => new Date(b.lastSeen).getTime() - new Date(a.lastSeen).getTime())
+      .slice(0, limit);
+  }
+
+  /**
+   * Retrieve total database stats dynamically
+   */
+  async getStats() {
+    try {
+      const stopsCount = mockDb.stops.length;
+      const routesCount = mockDb.routes.length;
+      const routeStopsCount = mockDb.route_stops.length;
+      const busesCount = mockDb.buses.length;
+      const tripsCount = mockDb.trips.length;
+      
+      const learnedRoutes = mockDb.routes.filter((r: any) => 
+        (r.route_code || '').includes('VAR') || 
+        (r.route_code || '').includes('LEARNED') || 
+        r.id > 300
+      ).length;
+
+      return {
+        stopsCount,
+        routesCount,
+        routeStopsCount,
+        busesCount,
+        tripsCount,
+        learnedRoutesCount: learnedRoutes,
+        activeBusesCount: this.activeBuses.size
+      };
+    } catch (e: any) {
+      return {
+        error: e.message || e,
+        stopsCount: 0,
+        routesCount: 0,
+        routeStopsCount: 0,
+        busesCount: 0,
+        tripsCount: 0,
+        learnedRoutesCount: 0,
+        activeBusesCount: 0
+      };
+    }
+  }
+}
+
+export const adminMonitor = new AdminMonitorService();

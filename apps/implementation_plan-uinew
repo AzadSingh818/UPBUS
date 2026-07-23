@@ -1,0 +1,42 @@
+# UI & UX Refinement Plan 🎨
+
+Aapne bilkul sahi point out kiya: Backend algorithms (OATS, AI ETA, MVCC) perfect chal rahe hain, par jab tak unka data frontend par properly render nahi hota, user experience kharab ho jata hai. 
+
+Main aapki CSS styling (Glassmorphism, gradients, hover effects) ko bilkul disturb kiye bina, backend data mapping ko theek karunga taaki "multiple duplicate routes" aur "empty tracking" wale issues fix ho jayein.
+
+## User Review Required
+> [!IMPORTANT]
+> **Tracking Missing Issue**: `getTripETAs` (jo live tracking data bhejta hai) ab naye **MDP** format mein data return kar raha hai. Puraane UI component mein `status` aur `busLatitude` keys expect ki ja rahi thi. Main `page.tsx` mein component data mapping ko naye format ke mutabiq update karunga.
+
+## Open Questions
+- Kya aap chahte hain ki main **Admin Panel** par naye `historical_gps_logs` (AI Scraper dataset) ke live row counts ka ek chota sa badge ya stat card add karu, taaki aap dekh sakein ki aapka ML data kitni tezi se grow ho raha hai?
+
+---
+
+## Proposed Changes
+
+### [Web App UI Fixes (app/page.tsx)]
+#### [MODIFY] [page.tsx](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/web-app/src/app/page.tsx)
+- **Fix Multiple Duplicates (Direct Routes):** UI ab multiple segment permutations nahi dikhayegi. Backend se jo `findPathsDFS` data aa raha hai, usko unique `routeCode` ke basis par frontend par render kiya jayega. (Siddha aur saaf Search Results).
+- **Fix Live Tracking & AI-ETA Display:** Tracking popup mein ETA values ko "AI-Predicted" ke roop mein highlight kiya jayega, aur agar live tracking band hai (bus halt hai), toh UI gracefully "Scheduled / Halted" dikhayegi na ki pura map blank (empty) ho jaye.
+- **OATS Integration:** Jaha hum route distance dikhate hain, waha OATS (Graph Theory) ka "Traffic Cost" bhi render hoga agar milta hai.
+
+### [Backend API Logic Fixes]
+#### [MODIFY] [index.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/index.ts)
+- `/api/v1/search/routes` mein duplicates hataunga (`route_code` par GroupBy karunga) taaki frontend map aur list ko clear JSON payload mile.
+
+### [Admin Dashboard UI]
+#### [MODIFY] [page.tsx (Admin)](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/admin/src/app/page.tsx)
+#### [MODIFY] [adminMonitor.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/services/adminMonitor.ts)
+- **MVCC Versioning Indicators:** Admin monitor logs mein agar database lock ya version conflict hota hai, toh usko as an "ERROR" badge clear error text ("Optimistic Lock Error") ke sath dikhaya jayega. 
+- **AI Data Stat:** System Stats array mein "Scraped AI Records" ka counter add karunga jisse aap live data size dekh sakein.
+
+---
+
+## Verification Plan
+
+### Automated Tests
+- Terminal mein dono applications (web-app aur admin) ke build errors check karna (e.g. TypeScript interfaces mismatch).
+
+### Manual Verification
+- Main confirm karunga ki API se single deduplicated routes aate hain aur Web App UI design bina toote ekdum smooth flow ho raha hai.

@@ -1457,8 +1457,19 @@ function executeMockQuery(text: string, params: any[] = []): { rows: any[]; rowC
     return { rows: [], rowCount: 1 };
   }
 
+  // 13. Historical GPS logs count query
+  if (queryStr.includes('historical_gps_logs')) {
+    const count = mockDb.historical_gps_logs ? mockDb.historical_gps_logs.length : 0;
+    return { rows: [{ count }], rowCount: 1 };
+  }
+
+  // 14. Registration numbers from buses
+  if (queryStr.includes('SELECT registration_no FROM buses')) {
+    const rows = (mockDb.buses || []).map((b: any) => ({ registration_no: b.registration_no }));
+    return { rows, rowCount: rows.length };
+  }
+
   // Default fallback
-  console.log(`Mock DB received unhandled query: ${queryStr}`);
   return { rows: [], rowCount: 0 };
 }
 

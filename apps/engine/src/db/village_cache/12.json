@@ -1,0 +1,35 @@
+{
+  "fetchedAt": "2026-06-29T06:22:41.014Z",
+  "villages": [
+    {
+      "name": "Shermau",
+      "latitude": 29.8531326,
+      "longitude": 77.2726108
+    },
+    {
+      "name": "Sabdalpur",
+      "latitude": 29.9178235,
+      "longitude": 77.4777808
+    },
+    {
+      "name": "Bahadur Nagar",
+      "latitude": 29.7655803,
+      "longitude": 77.2223028
+    },
+    {
+      "name": "Jukheri",
+      "latitude": 29.8031215,
+      "longitude": 77.3060984
+    },
+    {
+      "name": "Narayanpur",
+      "latitude": 29.9557975,
+      "longitude": 77.2934054
+    },
+    {
+      "name": "Kapuri",
+      "latitude": 29.8625406,
+      "longitude": 77.3937554
+    }
+  ]
+}

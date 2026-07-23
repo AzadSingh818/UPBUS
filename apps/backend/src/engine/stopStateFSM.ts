@@ -71,17 +71,42 @@ interface PerStopRecord {
 /** Key = `${busRegNo}:${stopId}` */
 const stateMap = new Map<string, PerStopRecord>();
 
-// ── Haversine helper (private copy to avoid circular imports) ─────────────────
+// ── Geofencing & Ray-Casting Helpers ──────────────────────────────────────────
 
-function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371;
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+/**
+ * Dynamically generates a virtual polygon (Geofence) around a central coordinate.
+ * Creates a bounding box polygon (square) with the given radius.
+ */
+function getStopGeofencePolygon(stopLat: number, stopLng: number, radiusKm: number): Array<[number, number]> {
+  // Rough conversion: 1 deg lat = 111 km
+  const dLat = radiusKm / 111;
+  const dLng = radiusKm / (111 * Math.cos(stopLat * Math.PI / 180));
+  
+  return [
+    [stopLat + dLat, stopLng - dLng], // Top-Left
+    [stopLat + dLat, stopLng + dLng], // Top-Right
+    [stopLat - dLat, stopLng + dLng], // Bottom-Right
+    [stopLat - dLat, stopLng - dLng]  // Bottom-Left
+  ];
+}
+
+/**
+ * Ray-Casting Algorithm
+ * Draws a ray from the bus's coordinate to infinity. Counts intersections with
+ * the polygon boundaries. Odd number of intersections means the point is inside.
+ */
+function isPointInPolygon(pointLat: number, pointLng: number, polygon: Array<[number, number]>): boolean {
+  let isInside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i][0], yi = polygon[i][1];
+    const xj = polygon[j][0], yj = polygon[j][1];
+    
+    // Check if the ray intersects the edge
+    const intersect = ((yi > pointLng) !== (yj > pointLng))
+        && (pointLat < (xj - xi) * (pointLng - yi) / (yj - yi) + xi);
+    if (intersect) isInside = !isInside;
+  }
+  return isInside;
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -109,8 +134,17 @@ export function updateBusFSM(
 ): void {
   for (const stop of stops) {
     const key = `${busRegNo}:${stop.stopId}`;
-    const dist = haversineKm(busLat, busLng, stop.latitude, stop.longitude);
     const isSlow = speedKmph < SPEED_THRESHOLD_KMPH;
+
+    // Generate dynamic geofences for this specific stop
+    const arrivingPolygon = getStopGeofencePolygon(stop.latitude, stop.longitude, ARRIVING_RADIUS_KM);
+    const onStopPolygon = getStopGeofencePolygon(stop.latitude, stop.longitude, ON_STOP_RADIUS_KM);
+    const exitPolygon = getStopGeofencePolygon(stop.latitude, stop.longitude, ON_STOP_EXIT_RADIUS_KM);
+
+    // Apply Ray-Casting
+    const isInsideArriving = isPointInPolygon(busLat, busLng, arrivingPolygon);
+    const isInsideOnStop = isPointInPolygon(busLat, busLng, onStopPolygon);
+    const isOutsideExit = !isPointInPolygon(busLat, busLng, exitPolygon);
 
     // Fetch (or initialise) the per-stop record
     let rec = stateMap.get(key);
@@ -132,7 +166,7 @@ export function updateBusFSM(
 
     switch (rec.state) {
       case 'upcoming':
-        if (dist <= ARRIVING_RADIUS_KM) {
+        if (isInsideArriving) {
           rec.state = 'arriving_now';
           rec.dwellCount = 0;
           
@@ -147,7 +181,7 @@ export function updateBusFSM(
         break;
 
       case 'arriving_now':
-        if (dist <= ON_STOP_RADIUS_KM && isSlow) {
+        if (isInsideOnStop && isSlow) {
           rec.dwellCount += 1;
           if (rec.dwellCount >= DWELL_PINGS) {
             rec.state = 'on_stop';
@@ -169,15 +203,15 @@ export function updateBusFSM(
           // Reset dwell counter if conditions break
           rec.dwellCount = 0;
           // If bus moved far away from the stop again without entering, go back
-          if (dist > ARRIVING_RADIUS_KM) {
+          if (!isInsideArriving) {
             rec.state = 'upcoming';
           }
         }
         break;
 
       case 'on_stop':
-        // Use hysteresis exit radius to avoid flicker
-        if (dist > ON_STOP_EXIT_RADIUS_KM) {
+        // Use hysteresis exit polygon to avoid flicker
+        if (isOutsideExit) {
           rec.state = 'departed';
           rec.dwellCount = 0;
         }

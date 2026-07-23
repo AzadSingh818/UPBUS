@@ -1,0 +1,505 @@
+{
+  "fetchedAt": "2026-06-29T07:31:51.007Z",
+  "villages": [
+    {
+      "name": "Mawala Mohammadjamalpur",
+      "latitude": 28.9060791,
+      "longitude": 78.6549425
+    },
+    {
+      "name": "Chand Kheri",
+      "latitude": 28.961478,
+      "longitude": 78.555808
+    },
+    {
+      "name": "Kazikhera",
+      "latitude": 28.9751683,
+      "longitude": 78.5313597
+    },
+    {
+      "name": "Sonakpur",
+      "latitude": 28.8600008,
+      "longitude": 78.734211
+    },
+    {
+      "name": "Bhalaswa Gaj",
+      "latitude": 29.8745135,
+      "longitude": 77.7458694
+    },
+    {
+      "name": "Changeri",
+      "latitude": 28.9143439,
+      "longitude": 78.6368751
+    },
+    {
+      "name": "Felra Patti",
+      "latitude": 28.9482976,
+      "longitude": 78.5859775
+    },
+    {
+      "name": "Molna",
+      "latitude": 29.8638698,
+      "longitude": 77.7661657
+    },
+    {
+      "name": "Jebri",
+      "latitude": 28.8921589,
+      "longitude": 78.6733746
+    },
+    {
+      "name": "Jebra",
+      "latitude": 28.8862785,
+      "longitude": 78.6830091
+    },
+    {
+      "name": "Pheona",
+      "latitude": 29.0733645,
+      "longitude": 78.3498416
+    },
+    {
+      "name": "Bhanakwa",
+      "latitude": 28.9709023,
+      "longitude": 78.548727
+    },
+    {
+      "name": "Simli",
+      "latitude": 29.7516977,
+      "longitude": 78.0185069
+    },
+    {
+      "name": "Karampur Ki Madaiya",
+      "latitude": 28.9294723,
+      "longitude": 78.6236465
+    },
+    {
+      "name": "Adhampur",
+      "latitude": 28.9531419,
+      "longitude": 78.5611724
+    },
+    {
+      "name": "Fattehpur Bishnoi",
+      "latitude": 28.8967617,
+      "longitude": 78.6615085
+    },
+    {
+      "name": "Salempur Bangar",
+      "latitude": 28.8777108,
+      "longitude": 78.6945962
+    },
+    {
+      "name": "Behedeki Saidabad",
+      "latitude": 29.8650607,
+      "longitude": 77.7861213
+    },
+    {
+      "name": "Mandawali",
+      "latitude": 29.6452401,
+      "longitude": 78.2552594
+    },
+    {
+      "name": "Dulhepur",
+      "latitude": 28.9133671,
+      "longitude": 78.656187
+    },
+    {
+      "name": "Bichpuri",
+      "latitude": 28.9671478,
+      "longitude": 78.5610007
+    },
+    {
+      "name": "Jalalabad",
+      "latitude": 29.5967449,
+      "longitude": 78.3158684
+    },
+    {
+      "name": "Madhwa Khalsa",
+      "latitude": 28.961478,
+      "longitude": 78.5784244
+    },
+    {
+      "name": "Laksar",
+      "latitude": 29.7589256,
+      "longitude": 78.0407334
+    },
+    {
+      "name": "Rasulpur Sunbati",
+      "latitude": 28.8578673,
+      "longitude": 78.7181139
+    },
+    {
+      "name": "Alipura",
+      "latitude": 28.9571599,
+      "longitude": 78.5414313
+    },
+    {
+      "name": "Khatai",
+      "latitude": 29.5208345,
+      "longitude": 78.2474828
+    },
+    {
+      "name": "Malakpur Nizampur",
+      "latitude": 28.8957472,
+      "longitude": 78.699274
+    },
+    {
+      "name": "Sunehti Alampur",
+      "latitude": 29.8812938,
+      "longitude": 77.7660689
+    },
+    {
+      "name": "Shahpur Abadulwari",
+      "latitude": 28.9487483,
+      "longitude": 78.553276
+    },
+    {
+      "name": "Aniyari",
+      "latitude": 28.924749,
+      "longitude": 78.6490631
+    },
+    {
+      "name": "Madhi",
+      "latitude": 28.9598634,
+      "longitude": 78.5876512
+    },
+    {
+      "name": "Delna",
+      "latitude": 29.8418351,
+      "longitude": 77.789812
+    },
+    {
+      "name": "Har Kishanpur",
+      "latitude": 28.9404111,
+      "longitude": 78.6238718
+    },
+    {
+      "name": "Dhakera East & West",
+      "latitude": 28.9169358,
+      "longitude": 78.6667871
+    },
+    {
+      "name": "Adalpur Jagu Sihali",
+      "latitude": 28.9554701,
+      "longitude": 78.5990238
+    },
+    {
+      "name": "Chak Chhavi",
+      "latitude": 28.9879815,
+      "longitude": 78.5416163
+    },
+    {
+      "name": "Sundarpur Chaupur",
+      "latitude": 28.98652,
+      "longitude": 78.5446928
+    },
+    {
+      "name": "Nagal",
+      "latitude": 29.6631215,
+      "longitude": 78.1911603
+    },
+    {
+      "name": "Tejupur",
+      "latitude": 29.8965581,
+      "longitude": 77.7406845
+    },
+    {
+      "name": "Khushalpur",
+      "latitude": 28.9460069,
+      "longitude": 78.6203527
+    },
+    {
+      "name": "Nighi",
+      "latitude": 28.9775476,
+      "longitude": 78.5645628
+    },
+    {
+      "name": "Milak Khadana",
+      "latitude": 28.8598682,
+      "longitude": 78.7013962
+    },
+    {
+      "name": "Binarsi",
+      "latitude": 29.8939165,
+      "longitude": 77.7508934
+    },
+    {
+      "name": "Paoti",
+      "latitude": 29.8527042,
+      "longitude": 77.7547073
+    },
+    {
+      "name": "Dainatpur",
+      "latitude": 28.9147947,
+      "longitude": 78.6778163
+    },
+    {
+      "name": "Malpur",
+      "latitude": 28.8954841,
+      "longitude": 78.6349869
+    },
+    {
+      "name": "Didora",
+      "latitude": 28.850782,
+      "longitude": 78.7140691
+    },
+    {
+      "name": "Sanjarpur",
+      "latitude": 28.9523533,
+      "longitude": 78.6134004
+    },
+    {
+      "name": "Nemtulla Nagar (hakimpur)",
+      "latitude": 28.8813089,
+      "longitude": 78.6592984
+    },
+    {
+      "name": "Gyanpur",
+      "latitude": 28.8706551,
+      "longitude": 78.6781061
+    },
+    {
+      "name": "Bindu Kharak",
+      "latitude": 29.8609306,
+      "longitude": 77.7317102
+    },
+    {
+      "name": "Sikandarpur",
+      "latitude": 28.8633171,
+      "longitude": 78.6900901
+    },
+    {
+      "name": "Kunja Bahadurpur",
+      "latitude": 29.887507,
+      "longitude": 77.7747042
+    },
+    {
+      "name": "Didora Ki Milak",
+      "latitude": 28.8505565,
+      "longitude": 78.7081146
+    },
+    {
+      "name": "Naksjandabad",
+      "latitude": 28.9350405,
+      "longitude": 78.6518526
+    },
+    {
+      "name": "Khadana",
+      "latitude": 28.8542589,
+      "longitude": 78.6984157
+    },
+    {
+      "name": "Bairampur",
+      "latitude": 28.9428899,
+      "longitude": 78.6403941
+    },
+    {
+      "name": "Kalheri",
+      "latitude": 29.6068943,
+      "longitude": 78.2977366
+    },
+    {
+      "name": "Gopalpura Natha Nagla",
+      "latitude": 28.9133672,
+      "longitude": 78.6930083
+    },
+    {
+      "name": "Chak Hamidipur",
+      "latitude": 28.9239226,
+      "longitude": 78.6749839
+    },
+    {
+      "name": "Mudhala",
+      "latitude": 29.4607422,
+      "longitude": 78.1770425
+    },
+    {
+      "name": "Didauri",
+      "latitude": 28.8461021,
+      "longitude": 78.7081575
+    },
+    {
+      "name": "Manakpur",
+      "latitude": 29.8415932,
+      "longitude": 77.7582586
+    },
+    {
+      "name": "Kota",
+      "latitude": 29.8923125,
+      "longitude": 77.6403496
+    },
+    {
+      "name": "Kurameerpur",
+      "latitude": 28.93966,
+      "longitude": 78.6549853
+    },
+    {
+      "name": "Mora Mustkam",
+      "latitude": 28.8953205,
+      "longitude": 78.7341518
+    },
+    {
+      "name": "Simla",
+      "latitude": 28.9721413,
+      "longitude": 78.5987663
+    },
+    {
+      "name": "Majra Mulgadda",
+      "latitude": 28.845651,
+      "longitude": 78.7019026
+    },
+    {
+      "name": "Muda Kheri",
+      "latitude": 28.9796264,
+      "longitude": 78.5870558
+    },
+    {
+      "name": "Nagala Jograj",
+      "latitude": 28.9663217,
+      "longitude": 78.6114263
+    },
+    {
+      "name": "Shivpur",
+      "latitude": 29.8462276,
+      "longitude": 77.7361679
+    },
+    {
+      "name": "Basantpur Ramrai",
+      "latitude": 28.825698,
+      "longitude": 78.808397
+    },
+    {
+      "name": "Chaudarpur",
+      "latitude": 28.8514774,
+      "longitude": 78.6874294
+    },
+    {
+      "name": "Shekhupura",
+      "latitude": 28.9930891,
+      "longitude": 78.5661506
+    },
+    {
+      "name": "Madhpuri",
+      "latitude": 28.9288197,
+      "longitude": 78.6819336
+    },
+    {
+      "name": "Jamalpur",
+      "latitude": 28.9383268,
+      "longitude": 78.6651778
+    },
+    {
+      "name": "Dehri Jumman",
+      "latitude": 29.000296,
+      "longitude": 78.5549926
+    },
+    {
+      "name": "Tajpur Mafi",
+      "latitude": 28.8410145,
+      "longitude": 78.8136501
+    },
+    {
+      "name": "Uttampur Bahlolpur",
+      "latitude": 28.8577546,
+      "longitude": 78.6719562
+    },
+    {
+      "name": "Kori Rawana",
+      "latitude": 28.9572351,
+      "longitude": 78.6346434
+    },
+    {
+      "name": "Khanpur Kasba Mustahkam",
+      "latitude": 28.8548228,
+      "longitude": 78.8119697
+    },
+    {
+      "name": "Ismailpur",
+      "latitude": 28.9752763,
+      "longitude": 78.6084544
+    },
+    {
+      "name": "Chudiyala Mohanpur",
+      "latitude": 29.9077014,
+      "longitude": 77.7673459
+    },
+    {
+      "name": "Mustafabad Mustkam",
+      "latitude": 28.8332436,
+      "longitude": 78.8178165
+    },
+    {
+      "name": "Madhiya",
+      "latitude": 28.9490299,
+      "longitude": 78.6570668
+    },
+    {
+      "name": "Shahalmpur",
+      "latitude": 28.8529058,
+      "longitude": 78.671894
+    },
+    {
+      "name": "Seruadharampur",
+      "latitude": 28.9248993,
+      "longitude": 78.7041235
+    },
+    {
+      "name": "Bhensia",
+      "latitude": 28.8400876,
+      "longitude": 78.8205527
+    },
+    {
+      "name": "Kishanpur",
+      "latitude": 28.9563337,
+      "longitude": 78.6489772
+    },
+    {
+      "name": "Chhaya Nagla",
+      "latitude": 28.9959683,
+      "longitude": 78.5790561
+    },
+    {
+      "name": "Saidpur Khaddar",
+      "latitude": 28.9004863,
+      "longitude": 78.7509445
+    },
+    {
+      "name": "Ladawai",
+      "latitude": 28.9374067,
+      "longitude": 78.6856268
+    },
+    {
+      "name": "Telepura",
+      "latitude": 28.9848683,
+      "longitude": 78.6020277
+    },
+    {
+      "name": "Shukla",
+      "latitude": 28.952879,
+      "longitude": 78.660264
+    },
+    {
+      "name": "Rafatpur",
+      "latitude": 28.8259518,
+      "longitude": 78.8219261
+    },
+    {
+      "name": "Akbarpur Sihali",
+      "latitude": 28.9995474,
+      "longitude": 78.57897
+    },
+    {
+      "name": "Dhaki",
+      "latitude": 28.9920757,
+      "longitude": 78.5941313
+    },
+    {
+      "name": "Bilaspur",
+      "latitude": 29.8412768,
+      "longitude": 77.7132511
+    },
+    {
+      "name": "Sidki",
+      "latitude": 29.8765972,
+      "longitude": 77.631626
+    }
+  ]
+}

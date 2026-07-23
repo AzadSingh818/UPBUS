@@ -1,0 +1,38 @@
+# UPBUS Phase 4: Live Map Tracking, Smart ETA & UP State Scale-up
+
+This document outlines the technical plan for implementing the next phase of the UPBUS project.
+
+## 1. Live Map Tracking (Smooth WebSockets Animation)
+Currently, the User App receives live GPS updates via WebSockets every 5-6 seconds. However, the bus marker "jumps" abruptly to the new location (teleportation). 
+**Goal:** Make the bus move smoothly along the polyline (route path) like Uber/Ola.
+**Implementation:**
+- Update `apps/web-app/src/app/components/LiveMap.tsx`.
+- Introduce a custom `react-leaflet` hook or a `requestAnimationFrame` loop that interpolates the bus marker's `[lat, lng]` from the old position to the new position over the 5-second interval.
+- Update the heading/rotation of the bus marker to point in the direction of the smooth movement.
+
+## 2. Smart ETA (Time Prediction)
+Currently, ETA is calculated in a very basic way (distance / constant speed).
+**Goal:** Make the ETA highly accurate based on real-time vehicle speed and route geometry.
+**Implementation:**
+- Update `apps/backend/src/engine/eta.ts`.
+- Calculate remaining route distance dynamically using the accurate Polyline segments.
+- Incorporate the bus's *current live speed* (if valid) and a fallback average speed (e.g., 35 kmph for state highways).
+- Update the ETA in real-time as the bus accelerates/decelerates or gets stuck in traffic.
+
+## 3. Scale Up (Pure UP State Expansion)
+You mentioned expanding from Saharanpur to the whole of UP. 
+**Great news!** The `routeSeeder.ts` engine we built in Phase 2 is *already* scanning the entire Margdarshi API (which covers all UP buses). Whenever it sees a bus from Gorakhpur, Lucknow, or Agra, it automatically learns that route and adds it to our database.
+**Goal:** Ensure the system scales without performance bottlenecks.
+**Implementation:**
+- Review and optimize `adapter_live.ts` and `routeSeeder.ts` to ensure Postgres can handle inserting hundreds of new routes/stops daily from across UP.
+- Add an index on `bus_live_state` and `stops` table to speed up the massive state-wide search queries in Phase 3.
+
+## User Review Required
+
+> [!IMPORTANT]
+> For the Smooth Animation on the frontend map, I will modify `LiveMap.tsx` to animate the marker. This might require adding a library like `leaflet.marker.slideto` or writing custom interpolation math. Do you approve proceeding with this plan?
+
+> [!NOTE]
+> The database is already capturing data for all of UP automatically. Once we optimize the Smart ETA, it will apply universally to all UP routes!
+
+Please click **Proceed** if you want me to start writing the code for these features!

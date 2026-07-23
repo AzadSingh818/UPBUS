@@ -1,0 +1,76 @@
+# Implementation Plan - Production Fixes: Real-Time Telemetry Sync, Persistent Route Seeding, Scraper & Admin Terminal Stream
+
+This plan outlines the root cause investigation and technical fixes for the four issues reported:
+1. **Missing Bus Telemetry on Admin Dashboard (0 Total Online, Empty Grid)**
+2. **Loss of Dynamically Seeded Routes/Stops on Server Reboot in Mock DB Mode**
+3. **Continuous Background Data Scraping**
+4. **Continuous Live Engine Terminal Log Stream in Admin Console UI**
+
+---
+
+## Technical Breakdown & Root Causes
+
+### 1. Missing Bus Telemetry on Admin Panel (0 Total Online)
+- **Root Cause**: Engine's `adminMonitor` batch flush split 9,500+ buses into 20 HTTP chunks (500 per chunk) and fired 20 concurrent POST requests every 500ms (`40 HTTP POST requests/sec`) to Backend `POST /api/v1/admin/monitor/push`. This caused socket pool exhaustion/drops on Windows Node.js, so Backend's `adminMonitor` never received the bus state updates and stayed at 0 active buses.
+- **Solution**: Consolidate the Engine-to-Backend push payload into a single clean batch payload per interval (since Express is configured for `50mb` payloads) and use structured retry handling.
+
+### 2. Loss of Seeded Routes & Stops on Server Reboot
+- **Root Cause A**: `INSERT INTO stops` had **no mock query handler** in `executeMockQuery` in both Engine and Backend `db/index.ts`. Geocoded stops failed to insert, returning empty rows, so new stops were never saved into `mockDb.stops`.
+- **Root Cause B**: Engine and Backend maintain isolated `data.json` files (`apps/engine/src/db/data.json` and `apps/backend/src/db/data.json`). When Engine inserted a new route into `mockDb.routes` and called `persistMockDb()`, it only saved to Engine's local `data.json`. Backend's `data.json` remained at 5,053 routes.
+- **Solution**:
+  1. Add full mock DB query handlers for `INSERT INTO stops` (with `ON CONFLICT (stop_code)` update/insert support) in both Engine and Backend `db/index.ts`.
+  2. In `persistMockDb()`, write to **both** Engine's `data.json` and Backend's `data.json` simultaneously.
+  3. Support route code/name search matching and route stop sequence insertion in mock DB mode.
+
+### 3. Background Data Scraping Interruption
+- **Root Cause**: Backend's `historicalDataScraper` fetches active buses from Backend's `adminMonitor`. Because Backend received 0 active buses due to the push bridge issue (Problem 1), the scraper logged `Scraper waiting for active buses from engine...` every 30 seconds.
+- **Solution**: Resolving Problem 1 will allow Backend's `adminMonitor` to hold all 9,500+ live buses. Additionally, update `historicalDataScraper` to handle mock DB inserts cleanly without throwing query errors.
+
+### 4. Admin Engine Console Log Stream Frozen
+- **Root Cause A**: `adapter_live.ts` only logged `Live fetch: ...` if `buses.length !== lastFetchCount`. Because the API consistently returns 9,576 buses every cycle, `lastFetchCount` matched, suppressing log output.
+- **Root Cause B**: Raw telemetry batch ingestion cycles did not emit structured periodic summary log lines to `adminMonitor`.
+- **Solution**:
+  1. Emit cycle summary logs on every live fetch cycle (e.g. `[GEO-MATCH] Tracked 9,576 active buses in 500ms batch cycle`).
+  2. Stream telemetry cycle stats, new bus discoveries, and seeder events smoothly through the Engine → Backend → Admin UI pipeline.
+
+---
+
+## Proposed Code Changes
+
+### Component 1: Mock DB Query Engine & Dual-Persist Sync
+#### [MODIFY] [db/index.ts (Engine)](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/engine/src/db/index.ts)
+- Add mock query handler for `INSERT INTO stops` (allocates new ID, updates `mockDb.stops`, updates `stopsCache` map).
+- Update `persistMockDb()` to save to both `apps/engine/src/db/data.json` and `apps/backend/src/db/data.json` (if exists).
+
+#### [MODIFY] [db/index.ts (Backend)](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/db/index.ts)
+- Mirror `INSERT INTO stops` and `INSERT INTO routes` handlers in Backend mock DB so read queries return consistent data.
+
+---
+
+### Component 2: Telemetry Bridge & Admin Stream
+#### [MODIFY] [adminMonitor.ts (Engine)](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/engine/src/services/adminMonitor.ts)
+- Optimize `startBatchFlush()`: Send a single consolidated payload containing all pending logs & active bus updates in ONE HTTP POST request every 1000ms instead of 20 rapid sub-chunk requests per 500ms.
+- Increase pending logs buffer and ensure all telemetry & seeder logs flow cleanly to the bridge.
+
+#### [MODIFY] [adapter_live.ts (Engine)](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/engine/src/ingestion/adapter_live.ts)
+- Remove `if (buses.length !== lastFetchCount)` guard so every 30-second fetch cycle logs telemetry stats to `adminMonitor`.
+- Log periodic batch processing milestones for live terminal visibility in Admin UI.
+
+---
+
+### Component 3: Historical Scraper & Data Pipeline
+#### [MODIFY] [historicalDataScraper.ts (Backend)](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/scripts/historicalDataScraper.ts)
+- Ensure mock DB insert logic for `historical_gps_logs` handles batch pushes gracefully and updates the historical logs counter without errors.
+
+---
+
+## Verification Plan
+
+### Automated / Diagnostic Checks
+1. **Engine Ingestion Check**: Run `cd apps/engine && npm run dev` and confirm 9,500+ buses are fetched and logged every 30s.
+2. **Backend Telemetry Sync Check**: Run `cd apps/backend && npm run dev` and check `http://localhost:5000/api/v1/admin/monitor/stats` to verify `activeBusesCount` matches Engine (e.g. 9,500+).
+3. **Route Seeding Persistence Verification**: Seed a new route, restart the Engine and Backend servers, and verify that `routesCount` and `stopsCount` in `data.json` remain updated instead of resetting to 5053.
+4. **Admin UI Verification**: Open `http://localhost:3003` and verify:
+   - **TOTAL ONLINE** shows active bus count (>9,000)
+   - **Active Buses Tracked** grid displays real live buses with coordinates & status
+   - **Production Log Stream (Engine tab)** continuously scrolls live ingestion & seeder logs like VS Code terminal.

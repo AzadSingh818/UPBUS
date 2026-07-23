@@ -1,0 +1,75 @@
+{"level":"info","message":"API Server running on port 5000","module":"API-GATEWAY","timestamp":"2026-07-18T13:24:38.179Z"}
+{"level":"warn","message":"waypoints.json not found — run scripts/fetch_osm_villages.ts to generate it. Village waypoints will be empty.","module":"API-GATEWAY","timestamp":"2026-07-18T13:24:38.496Z"}
+{"level":"info","message":"Historical GPS Log Scraper cron job started.","module":"API-GATEWAY","timestamp":"2026-07-18T13:24:40.972Z"}
+{"level":"info","message":"API Server running on port 5000","module":"API-GATEWAY","timestamp":"2026-07-18T13:57:12.409Z"}
+{"level":"warn","message":"waypoints.json not found — run scripts/fetch_osm_villages.ts to generate it. Village waypoints will be empty.","module":"API-GATEWAY","timestamp":"2026-07-18T13:57:12.694Z"}
+{"level":"info","message":"Historical GPS Log Scraper cron job started.","module":"API-GATEWAY","timestamp":"2026-07-18T13:57:14.911Z"}
+{"level":"info","message":"API Server running on port 5000","module":"API-GATEWAY","timestamp":"2026-07-18T17:05:42.193Z"}
+{"level":"warn","message":"waypoints.json not found — run scripts/fetch_osm_villages.ts to generate it. Village waypoints will be empty.","module":"API-GATEWAY","timestamp":"2026-07-18T17:05:42.415Z"}
+{"level":"info","message":"Historical GPS Log Scraper cron job started.","module":"API-GATEWAY","timestamp":"2026-07-18T17:05:43.430Z"}
+{"level":"info","message":"HTTP GET /api/v1/stops 304 - 92ms","module":"API-GATEWAY","timestamp":"2026-07-18T18:30:25.323Z"}
+{"level":"info","message":"HTTP GET /api/v1/reports/active 304 - 38ms","module":"API-GATEWAY","timestamp":"2026-07-18T18:30:25.374Z"}
+{"level":"info","message":"HTTP GET /api/v1/reports/active 304 - 4ms","module":"API-GATEWAY","timestamp":"2026-07-18T18:30:34.973Z"}
+{"level":"info","message":"API Server running on port 5000","module":"API-GATEWAY","timestamp":"2026-07-18T20:12:31.012Z"}
+{"level":"warn","message":"waypoints.json not found — run scripts/fetch_osm_villages.ts to generate it. Village waypoints will be empty.","module":"API-GATEWAY","timestamp":"2026-07-18T20:12:31.858Z"}
+{"level":"info","message":"Historical GPS Log Scraper cron job started.","module":"API-GATEWAY","timestamp":"2026-07-18T20:12:38.567Z"}
+{"level":"info","message":"API Server running on port 5000","module":"API-GATEWAY","timestamp":"2026-07-18T20:37:33.688Z"}
+{"level":"warn","message":"waypoints.json not found — run scripts/fetch_osm_villages.ts to generate it. Village waypoints will be empty.","module":"API-GATEWAY","timestamp":"2026-07-18T20:37:33.956Z"}
+{"level":"info","message":"Historical GPS Log Scraper cron job started.","module":"API-GATEWAY","timestamp":"2026-07-18T20:37:35.710Z"}
+{"level":"info","message":"API Server running on port 5000","module":"API-GATEWAY","timestamp":"2026-07-18T20:39:25.694Z"}
+{"level":"warn","message":"waypoints.json not found — run scripts/fetch_osm_villages.ts to generate it. Village waypoints will be empty.","module":"API-GATEWAY","timestamp":"2026-07-18T20:39:26.036Z"}
+{"level":"info","message":"Historical GPS Log Scraper cron job started.","module":"API-GATEWAY","timestamp":"2026-07-18T20:39:32.889Z"}
+{"level":"info","message":"API Server running on port 5000","module":"API-GATEWAY","timestamp":"2026-07-18T21:03:02.927Z"}
+{"level":"warn","message":"waypoints.json not found — run scripts/fetch_osm_villages.ts to generate it. Village waypoints will be empty.","module":"API-GATEWAY","timestamp":"2026-07-18T21:03:03.570Z"}
+{"level":"info","message":"Historical GPS Log Scraper cron job started.","module":"API-GATEWAY","timestamp":"2026-07-18T21:03:07.848Z"}
+{"level":"info","message":"API Server running on port 5000","module":"API-GATEWAY","timestamp":"2026-07-20T06:59:57.151Z"}
+{"level":"warn","message":"waypoints.json not found — run scripts/fetch_osm_villages.ts to generate it. Village waypoints will be empty.","module":"API-GATEWAY","timestamp":"2026-07-20T06:59:57.720Z"}
+{"level":"info","message":"Historical GPS Log Scraper cron job started.","module":"API-GATEWAY","timestamp":"2026-07-20T07:00:12.722Z"}
+{"level":"info","message":"API Server running on port 5000","module":"API-GATEWAY","timestamp":"2026-07-20T07:46:54.489Z"}
+{"level":"warn","message":"waypoints.json not found — run scripts/fetch_osm_villages.ts to generate it. Village waypoints will be empty.","module":"API-GATEWAY","timestamp":"2026-07-20T07:46:54.813Z"}
+{"level":"info","message":"Historical GPS Log Scraper cron job started.","module":"API-GATEWAY","timestamp":"2026-07-20T07:46:57.176Z"}
+{"level":"info","message":"API Server running on port 5000","module":"API-GATEWAY","timestamp":"2026-07-20T07:50:57.520Z"}
+{"level":"warn","message":"waypoints.json not found — run scripts/fetch_osm_villages.ts to generate it. Village waypoints will be empty.","module":"API-GATEWAY","timestamp":"2026-07-20T07:50:58.024Z"}
+{"level":"info","message":"Historical GPS Log Scraper cron job started.","module":"API-GATEWAY","timestamp":"2026-07-20T07:51:01.171Z"}
+{"level":"info","message":"API Server running on port 5000","module":"API-GATEWAY","timestamp":"2026-07-20T07:56:53.072Z"}
+{"level":"warn","message":"waypoints.json not found — run scripts/fetch_osm_villages.ts to generate it. Village waypoints will be empty.","module":"API-GATEWAY","timestamp":"2026-07-20T07:56:53.400Z"}
+{"level":"info","message":"Historical GPS Log Scraper cron job started.","module":"API-GATEWAY","timestamp":"2026-07-20T07:56:54.828Z"}
+{"level":"info","message":"API Server running on port 5000","module":"API-GATEWAY","timestamp":"2026-07-20T08:04:13.402Z"}
+{"level":"warn","message":"waypoints.json not found — run scripts/fetch_osm_villages.ts to generate it. Village waypoints will be empty.","module":"API-GATEWAY","timestamp":"2026-07-20T08:04:13.939Z"}
+{"level":"info","message":"Historical GPS Log Scraper cron job started.","module":"API-GATEWAY","timestamp":"2026-07-20T08:04:16.307Z"}
+{"level":"info","message":"API Server running on port 5000","module":"API-GATEWAY","timestamp":"2026-07-20T10:01:24.202Z"}
+{"level":"warn","message":"waypoints.json not found — run scripts/fetch_osm_villages.ts to generate it. Village waypoints will be empty.","module":"API-GATEWAY","timestamp":"2026-07-20T10:01:24.612Z"}
+{"level":"info","message":"Historical GPS Log Scraper cron job started.","module":"API-GATEWAY","timestamp":"2026-07-20T10:01:27.009Z"}
+{"level":"info","message":"API Server running on port 5000","module":"API-GATEWAY","timestamp":"2026-07-20T10:16:07.823Z"}
+{"level":"warn","message":"waypoints.json not found — run scripts/fetch_osm_villages.ts to generate it. Village waypoints will be empty.","module":"API-GATEWAY","timestamp":"2026-07-20T10:16:08.258Z"}
+{"level":"info","message":"Historical GPS Log Scraper cron job started.","module":"API-GATEWAY","timestamp":"2026-07-20T10:16:10.556Z"}
+{"level":"info","message":"API Server running on port 5000","module":"API-GATEWAY","timestamp":"2026-07-20T11:11:50.177Z"}
+{"level":"warn","message":"waypoints.json not found — run scripts/fetch_osm_villages.ts to generate it. Village waypoints will be empty.","module":"API-GATEWAY","timestamp":"2026-07-20T11:11:50.556Z"}
+{"level":"info","message":"Historical GPS Log Scraper cron job started.","module":"API-GATEWAY","timestamp":"2026-07-20T11:11:53.697Z"}
+{"level":"info","message":"API Server running on port 5000","module":"API-GATEWAY","timestamp":"2026-07-20T11:12:15.096Z"}
+{"level":"warn","message":"waypoints.json not found — run scripts/fetch_osm_villages.ts to generate it. Village waypoints will be empty.","module":"API-GATEWAY","timestamp":"2026-07-20T11:12:15.267Z"}
+{"level":"info","message":"Historical GPS Log Scraper cron job started.","module":"API-GATEWAY","timestamp":"2026-07-20T11:12:17.069Z"}
+{"level":"info","message":"API Server running on port 5000","module":"API-GATEWAY","timestamp":"2026-07-20T11:12:26.888Z"}
+{"level":"warn","message":"waypoints.json not found — run scripts/fetch_osm_villages.ts to generate it. Village waypoints will be empty.","module":"API-GATEWAY","timestamp":"2026-07-20T11:12:27.059Z"}
+{"level":"info","message":"Historical GPS Log Scraper cron job started.","module":"API-GATEWAY","timestamp":"2026-07-20T11:12:28.180Z"}
+{"level":"info","message":"API Server running on port 5000","module":"API-GATEWAY","timestamp":"2026-07-20T11:13:41.609Z"}
+{"level":"warn","message":"waypoints.json not found — run scripts/fetch_osm_villages.ts to generate it. Village waypoints will be empty.","module":"API-GATEWAY","timestamp":"2026-07-20T11:13:41.879Z"}
+{"level":"info","message":"Historical GPS Log Scraper cron job started.","module":"API-GATEWAY","timestamp":"2026-07-20T11:13:45.035Z"}
+{"level":"info","message":"API Server running on port 5000","module":"API-GATEWAY","timestamp":"2026-07-20T11:20:21.356Z"}
+{"level":"warn","message":"waypoints.json not found — run scripts/fetch_osm_villages.ts to generate it. Village waypoints will be empty.","module":"API-GATEWAY","timestamp":"2026-07-20T11:20:21.568Z"}
+{"level":"info","message":"Historical GPS Log Scraper cron job started.","module":"API-GATEWAY","timestamp":"2026-07-20T11:20:24.709Z"}
+{"level":"info","message":"API Server running on port 5000","module":"API-GATEWAY","timestamp":"2026-07-20T11:20:42.139Z"}
+{"level":"warn","message":"waypoints.json not found — run scripts/fetch_osm_villages.ts to generate it. Village waypoints will be empty.","module":"API-GATEWAY","timestamp":"2026-07-20T11:20:42.303Z"}
+{"level":"info","message":"Historical GPS Log Scraper cron job started.","module":"API-GATEWAY","timestamp":"2026-07-20T11:20:43.051Z"}
+{"level":"info","message":"API Server running on port 5000","module":"API-GATEWAY","timestamp":"2026-07-20T11:30:50.274Z"}
+{"level":"warn","message":"waypoints.json not found — run scripts/fetch_osm_villages.ts to generate it. Village waypoints will be empty.","module":"API-GATEWAY","timestamp":"2026-07-20T11:30:50.635Z"}
+{"level":"info","message":"Historical GPS Log Scraper cron job started.","module":"API-GATEWAY","timestamp":"2026-07-20T11:30:53.681Z"}
+{"level":"info","message":"API Server running on port 5000","module":"API-GATEWAY","timestamp":"2026-07-23T04:31:46.291Z"}
+{"level":"warn","message":"waypoints.json not found — run scripts/fetch_osm_villages.ts to generate it. Village waypoints will be empty.","module":"API-GATEWAY","timestamp":"2026-07-23T04:31:46.684Z"}
+{"level":"info","message":"Historical GPS Log Scraper cron job started.","module":"API-GATEWAY","timestamp":"2026-07-23T04:32:02.466Z"}
+{"level":"info","message":"API Server running on port 5000","module":"API-GATEWAY","timestamp":"2026-07-23T05:05:51.300Z"}
+{"level":"warn","message":"waypoints.json not found — run scripts/fetch_osm_villages.ts to generate it. Village waypoints will be empty.","module":"API-GATEWAY","timestamp":"2026-07-23T05:05:51.613Z"}
+{"level":"info","message":"Historical GPS Log Scraper cron job started.","module":"API-GATEWAY","timestamp":"2026-07-23T05:05:54.272Z"}
+{"level":"info","message":"API Server running on port 5000","module":"API-GATEWAY","timestamp":"2026-07-23T05:26:45.564Z"}
+{"level":"warn","message":"waypoints.json not found — run scripts/fetch_osm_villages.ts to generate it. Village waypoints will be empty.","module":"API-GATEWAY","timestamp":"2026-07-23T05:26:46.399Z"}
+{"level":"info","message":"Historical GPS Log Scraper cron job started.","module":"API-GATEWAY","timestamp":"2026-07-23T05:26:57.327Z"}

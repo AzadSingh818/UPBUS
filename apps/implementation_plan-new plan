@@ -1,0 +1,43 @@
+# Refine UPBus Algorithms to match GSRTC ITMS Architecture
+
+This plan outlines the specific changes required to upgrade our existing backend engines to match the enterprise-level architectural standards of GSRTC, while preserving our unique features (Margdarshi API dynamic ingestion and automated route/bus discovery).
+
+## User Review Required
+> [!IMPORTANT]
+> Please review the mathematical approaches below. GSRTC uses complex algorithms like HMM and Kalman Filters. Since our backend is stateless for GPS pings, we will store the required mathematical state (variance, previous estimates) in our existing in-memory caches to keep performance high without hitting the database on every ping.
+
+## Proposed Changes
+
+### 1. `apps/backend/src/engine/eta.ts` (ETA Engine - WMA)
+- **Current State:** Uses a simple Time-of-Day multiplier (0.75x or 1.15x).
+- **Proposed Change:** Implement the **Hybrid Historical + Real-Time Prediction Model (WMA)**.
+  - Formula: `Predicted Speed = (α * Current Speed) + ((1 - α) * Historical Speed)`
+  - `α (alpha)` will be set to `0.7` to give 70% weight to current traffic realities and 30% to historical averages.
+
+### 2. `apps/backend/src/modules/route-progress/algorithms/GPSValidator.ts` (Kalman Filter)
+- **Current State:** Rejects invalid, duplicate, or wildly inaccurate (> 50m) GPS points.
+- **Proposed Change:** Integrate a **Kalman Filter (Smoothening Algorithm)**.
+  - We will expand the `lastProcessedCache` to store the Kalman state (`error_covariance` and `estimate`).
+  - During the `Predict` and `Update` steps, the algorithm will mathematically smooth out sudden jumps in coordinates before they are passed to the Map Matcher, preventing the bus icon from teleporting on the user's map.
+
+### 3. `apps/backend/src/modules/route-progress/algorithms/MapMatcher.ts` (HMM Snap-to-Road)
+- **Current State:** Snaps the raw GPS point to the absolute closest mathematical point on the route polyline (pure geometric projection).
+- **Proposed Change:** Upgrade to a **Hidden Markov Model (HMM)** approach.
+  - **Emission Probability:** How far is the GPS point from the road segment?
+  - **Transition Probability:** Is it physically possible for the heavy bus to travel from the *previous* snapped location to the *new* projected location in the given time elapsed (checking for unrealistic speeds like 200 km/h)?
+  - The algorithm will score segments based on both probabilities to choose the correct road line, preventing the bus from snapping to a parallel highway.
+
+### 4. `apps/backend/src/modules/route-progress/algorithms/StopStateMachine.ts` (Ray-Casting Geofencing)
+- **Current State:** Uses a simple radial circle (Haversine distance `< 100m`) to determine if a bus is `AT_STOP`.
+- **Proposed Change:** Implement the **Ray-Casting Algorithm** for Geofencing.
+  - We will dynamically construct a virtual polygon (a Geofence bounding box) around the bus stop coordinates.
+  - The engine will draw an imaginary ray from the bus's coordinate to infinity. By counting the odd/even intersections with the polygon boundaries, it will accurately trigger the `AT_STOP` (Arrival) and `DEPARTING` (Departure) states.
+
+## Open Questions
+- **Geofence Size:** For the Ray-Casting algorithm, should we build a standard 100-meter x 100-meter square polygon around each official stop coordinate, or do you prefer a different size for the depot geofences?
+
+## Verification Plan
+### Automated Tests
+- Run `npm test route_progress.test.ts` to ensure the FSM, HMM Map Matcher, and Kalman Validator pass existing telemetry simulations without breaking the tracking logic.
+### Manual Verification
+- Track a live bus on the frontend to verify that ETA calculations feel realistic and the bus icon moves smoothly without teleporting.

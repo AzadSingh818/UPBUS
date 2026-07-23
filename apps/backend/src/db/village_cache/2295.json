@@ -1,0 +1,95 @@
+{
+  "fetchedAt": "2026-07-16T07:57:21.990Z",
+  "villages": [
+    {
+      "name": "Sakhan Khurd",
+      "latitude": 29.7350918,
+      "longitude": 77.6620101
+    },
+    {
+      "name": "Thehri Buzurg",
+      "latitude": 29.7668218,
+      "longitude": 77.649481
+    },
+    {
+      "name": "Meghrajpur",
+      "latitude": 29.7199944,
+      "longitude": 77.6642626
+    },
+    {
+      "name": "Shahpur",
+      "latitude": 29.7577461,
+      "longitude": 77.6593494
+    },
+    {
+      "name": "Sarsina",
+      "latitude": 29.7835985,
+      "longitude": 77.6466035
+    },
+    {
+      "name": "Sakhan Kalan",
+      "latitude": 29.7402341,
+      "longitude": 77.649393
+    },
+    {
+      "name": "Kasimpura",
+      "latitude": 29.7106841,
+      "longitude": 77.6642228
+    },
+    {
+      "name": "Baseda",
+      "latitude": 29.8108646,
+      "longitude": 77.6373452
+    },
+    {
+      "name": "Talheri Buzurg",
+      "latitude": 29.769332,
+      "longitude": 77.6629972
+    },
+    {
+      "name": "Hashimpura",
+      "latitude": 29.6998991,
+      "longitude": 77.7027419
+    },
+    {
+      "name": "Kheri Aasa",
+      "latitude": 29.7198504,
+      "longitude": 77.6420919
+    },
+    {
+      "name": "Nanhera Aasa",
+      "latitude": 29.7284957,
+      "longitude": 77.6366901
+    },
+    {
+      "name": "Khajoori",
+      "latitude": 29.7088541,
+      "longitude": 77.6456164
+    },
+    {
+      "name": "Labakri",
+      "latitude": 29.6964199,
+      "longitude": 77.6497455
+    },
+    {
+      "name": "Isharpur",
+      "latitude": 29.6680158,
+      "longitude": 77.6602578
+    },
+    {
+      "name": "Sidki",
+      "latitude": 29.8765972,
+      "longitude": 77.631626
+    },
+    {
+      "name": "Manki",
+      "latitude": 29.6989013,
+      "longitude": 77.724967
+    },
+    {
+      "name": "Gunarsa",
+      "latitude": 29.6513606,
+      "longitude": 77.6678466
+    }
+  ]
+}

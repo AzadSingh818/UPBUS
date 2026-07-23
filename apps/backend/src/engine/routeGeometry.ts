@@ -149,7 +149,7 @@ export function dumpGeometrySummary() {
  * Compute the bus's position along a route.
  * Returns the cumulative distance (km) of the nearest point on the polyline.
  */
-export function computeBusPositionOnRoute(routeId: number, lat: number, lng: number): { busDistKm: number; closestSeq: number } | null {
+export function computeBusPositionOnRoute(routeId: number, lat: number, lng: number): { busDistKm: number; closestSeq: number; snappedLat?: number; snappedLng?: number } | null {
   const geom = geometries.get(routeId);
   if (!geom) return null;
   const pts = geom.points;
@@ -158,6 +158,8 @@ export function computeBusPositionOnRoute(routeId: number, lat: number, lng: num
   let bestDist = Infinity;
   let bestCum = 0;
   let bestSeq = -1;
+  let bestLat = lat;
+  let bestLng = lng;
 
   for (let i = 0; i < pts.length - 1; i++) {
     const a = pts[i];
@@ -178,9 +180,11 @@ export function computeBusPositionOnRoute(routeId: number, lat: number, lng: num
       const segLen = haversine(a.latitude, a.longitude, b.latitude, b.longitude);
       bestCum = geom.prefixKm[i] + t * segLen;
       bestSeq = a.seq ?? -1;
+      bestLat = projLat;
+      bestLng = projLng;
     }
   }
-  return { busDistKm: bestCum, closestSeq: bestSeq };
+  return { busDistKm: bestCum, closestSeq: bestSeq, snappedLat: bestLat, snappedLng: bestLng };
 }
 
 /**

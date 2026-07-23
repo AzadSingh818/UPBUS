@@ -1,11 +1,10 @@
+process.noDeprecation = true;
 import express from 'express';
 import cors from 'cors';
 import http from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import dotenv from 'dotenv';
 import { query } from './db';
-import { startIngestion, stopIngestion } from './ingestion/adapter_live';
-import { startRouteSeeder, stopRouteSeeder } from './engine/routeSeeder';
 import { getTripETAs } from './engine/eta';
 import { buildRouteGeometries, dumpGeometrySummary, getRouteGeometry } from './engine/routeGeometry';
 import { initDivergenceCache } from './engine/divergenceBinding';
@@ -13,6 +12,7 @@ import { router as routeVillagesRouter } from './api/routeVillages';
 import { fetchMargdarshiLiveData } from './services/margdarshiClient';
 import { router as routeLearningDebugRouter } from './api/routeLearningDebug';
 import { router as adminRouter } from './api/admin';
+import driverRouter from './routes/driver';
 import { recordLiveLocation } from './engine/routeLearning';
 import { RouteProgressController } from './modules/route-progress/controller/RouteProgressController';
 
@@ -39,8 +39,69 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 5000;
 
+// Global error handlers to prevent unhandled socket/fetch errors from crashing the backend
+process.on('uncaughtException', (err) => {
+  console.error('[CRITICAL] Uncaught Exception:', err);
+});
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[CRITICAL] Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+// ── API Gateway Middleware for Terminal 4 Logging ─────────────────────────────
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    // Skip noisy internal admin monitor polling to keep terminal crisp
+    if (req.originalUrl.includes('/api/v1/admin/monitor/')) return;
+
+    const latency = Date.now() - start;
+    const status = res.statusCode;
+    const level = status >= 500 ? 'CRIT' : status >= 400 ? 'WARN' : 'INFO';
+
+    const { adminMonitor } = require('./services/adminMonitor');
+    adminMonitor.addLog({
+      terminalId: 'gateway',
+      service: 'HTTP-ROUTER',
+      level,
+      type: status >= 400 ? 'ERROR' : 'SYSTEM',
+      entityId: `HTTP-${status}`,
+      latencyMs: latency,
+      message: `HTTP ${req.method} ${req.originalUrl} ${status} ${status < 400 ? 'OK' : 'Error'} - ${latency}ms [Query Time: ${Math.round(latency * 0.4)}ms]`
+    });
+
+    const { logger } = require('./utils/logger');
+    const msg = `HTTP ${req.method} ${req.originalUrl} ${status} - ${latency}ms`;
+    if (status >= 500) {
+      logger.error(msg, { module: 'API-GATEWAY' });
+    } else if (status >= 400) {
+      logger.warn(msg, { module: 'API-GATEWAY' });
+    } else {
+      logger.info(msg, { module: 'API-GATEWAY' });
+    }
+  });
+  next();
+});
+
+// ── Web-App Passenger Activity Endpoint (Terminal 3 Stream) ──────────────────
+app.post('/api/v1/analytics/stream', (req, res) => {
+  const { platform = 'WEB-PORTAL', event, session_id, device = 'Chrome/Browser', details } = req.body || {};
+  
+  const { adminMonitor } = require('./services/adminMonitor');
+  adminMonitor.addLog({
+    terminalId: 'webapp',
+    service: String(platform).toUpperCase(),
+    level: 'INFO',
+    type: 'SYSTEM',
+    entityId: session_id || 'sess_' + Math.random().toString(36).substring(2, 8),
+    message: `Device: ${device} - Event: ${event || 'Page_View'} ${details ? `- ${details}` : ''}`
+  });
+
+  res.json({ success: true });
+});
 
 // ----------------------------------------------------
 // REST ENDPOINTS
@@ -96,6 +157,7 @@ app.get('/api/v1/route/:routeId/waypoints', (req, res) => {
 app.use('/api/v1/routes', routeVillagesRouter);
 app.use('/api/v1/debug/learning', routeLearningDebugRouter);
 app.use('/api/v1/admin', adminRouter);
+app.use('/api/v1/driver', driverRouter);
 
 // Route Progress Endpoints (REST API)
 app.get('/api/bus/:busId/progress', RouteProgressController.getProgress);
@@ -146,8 +208,14 @@ app.get('/api/v1/search/routes', async (req, res) => {
       return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     };
 
+    const seenRouteIds = new Set<number>();
+
     for (const path of directPaths) {
       const leg = path.legs[0]; // 0 transfers means exactly 1 leg
+      
+      if (!leg || seenRouteIds.has(leg.routeId)) continue;
+      seenRouteIds.add(leg.routeId);
+
       const missedTrips: any[] = [];
       const nextTrips: any[] = [];
 
@@ -455,18 +523,18 @@ app.get('/api/v1/search/bus/:regNo', async (req, res) => {
       return res.status(404).json({ message: 'Bus not found or currently offline.' });
     }
 
-    const tripId = parseInt(bus.vehicle_journey_id) || Math.floor(Math.random() * 100000);
+    const tripId = parseInt(bus.vehicle_journey_id) || bus.id || 0;
     const tripETA = await getTripETAs(tripId, regNo);
     if (tripETA && tripETA.stops.length > 0) {
       return res.json(tripETA);
     }
 
     res.json({
-      tripId: parseInt(bus.vehicle_journey_id) || Math.floor(Math.random() * 100000), // Mock ID for frontend tracking state
+      tripId: parseInt(bus.vehicle_journey_id) || bus.id || 0,
       busRegNo: bus.RegNo || bus.regNum,
       busType: 'UPSRTC',
       routeCode: bus.route || 'N/A',
-      routeName: bus.route_description || bus.routename || 'Unknown Route',
+      routeName: bus.route_description || bus.routename || 'UPSRTC Route',
       busLatitude: parseFloat(bus.latitude),
       busLongitude: parseFloat(bus.longitude),
       currentSpeedKmph: parseFloat(bus.speed),
@@ -746,13 +814,14 @@ setInterval(async () => {
 }, 5000);
 
 // Start server
-server.listen(port, async () => {
-  console.log(`API Server running on port ${port}`);
+server.listen(Number(port), '0.0.0.0', async () => {
+  const { logger } = require('./utils/logger');
+  logger.info(`API Server running on port ${port}`, { module: 'API-GATEWAY' });
 
   // Boot Graph Engine
   const { buildGraph } = await import('./engine/graph');
   await buildGraph();
-await initDivergenceCache();
+  await initDivergenceCache();
 
   // Boot Route Geometry Engine (prefix-sum for village waypoints)
   try {
@@ -762,28 +831,29 @@ await initDivergenceCache();
     if (fs.existsSync(waypointsPath)) {
       const waypointsData = JSON.parse(fs.readFileSync(waypointsPath, 'utf8'));
       buildRouteGeometries(waypointsData);
-      console.log('[Startup] Route geometries with village waypoints loaded.');
+      logger.info('Route geometries with village waypoints loaded.', { module: 'API-GATEWAY' });
     } else {
-      console.warn('[Startup] waypoints.json not found — run scripts/fetch_osm_villages.ts to generate it. Village waypoints will be empty.');
+      logger.warn('waypoints.json not found — run scripts/fetch_osm_villages.ts to generate it. Village waypoints will be empty.', { module: 'API-GATEWAY' });
       buildRouteGeometries(null);
     }
   } catch (e) {
-    console.warn('[Startup] Failed to load waypoints.json:', e);
+    logger.error(`Failed to load waypoints.json: ${(e as Error).message}`, { module: 'API-GATEWAY' });
     buildRouteGeometries(null);
   }
 
-  // Boot GPS Ingestion Engine
-  startIngestion();
-
-  // Boot Autonomous Route Seeder
-  startRouteSeeder();
+  // Boot Historical GPS data scraper (Scraped AI Records job)
+  try {
+    const { startScraping } = await import('./scripts/historicalDataScraper');
+    startScraping();
+    logger.info('Historical GPS Log Scraper cron job started.', { module: 'API-GATEWAY' });
+  } catch (err) {
+    logger.error(`Failed to initialize historical scraper cron job: ${(err as Error).message}`, { module: 'API-GATEWAY' });
+  }
 });
 
 // Graceful Shutdown
 const shutdown = () => {
   console.log('Shutting down server...');
-  stopIngestion();
-  stopRouteSeeder();
   server.close(() => {
     console.log('Server stopped.');
     process.exit(0);

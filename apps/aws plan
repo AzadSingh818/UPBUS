@@ -8,7 +8,6 @@ Bhai, aapne ekdum sahi step-by-step workflow samjhaya hai! Ye plan ab aapke bata
 
 ### 1. Stop Services on AWS Server
 Sabse pehle hum AWS server par login karke PM2 me chal rahe backend ko stop karenge taaki jab hum data clean kar rahe ho tab koi naya garbage data add na ho jaye.
-
 ### 2. Database Cleanup (Deduplication) on AWS
 Ek cleanup script chala kar AWS VM par maujood `data.json` me se 4000+ duplicate/kachra routes ko filter aur delete karenge, sirf original unique routes ko preserve karenge.
 

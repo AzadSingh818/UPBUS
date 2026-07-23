@@ -1,0 +1,315 @@
+{
+  "fetchedAt": "2026-07-17T08:07:31.953Z",
+  "villages": [
+    {
+      "name": "Maldahiya",
+      "latitude": 25.3251266,
+      "longitude": 82.9951071
+    },
+    {
+      "name": "Lazpat Nagar Colony",
+      "latitude": 25.3235134,
+      "longitude": 82.9918742
+    },
+    {
+      "name": "Kail Garh",
+      "latitude": 25.3227276,
+      "longitude": 82.9986468
+    },
+    {
+      "name": "Pishach Mochan",
+      "latitude": 25.3205632,
+      "longitude": 82.9955446
+    },
+    {
+      "name": "Gulab Bagh Colony",
+      "latitude": 25.3178594,
+      "longitude": 82.99151
+    },
+    {
+      "name": "Lahurabir",
+      "latitude": 25.3213556,
+      "longitude": 83.0017917
+    },
+    {
+      "name": "Old Loco Colony",
+      "latitude": 25.3197707,
+      "longitude": 82.982226
+    },
+    {
+      "name": "Chetganj",
+      "latitude": 25.3204867,
+      "longitude": 83.0015206
+    },
+    {
+      "name": "Shastri Nagar",
+      "latitude": 25.316065,
+      "longitude": 82.9912839
+    },
+    {
+      "name": "Mata kund",
+      "latitude": 25.3167265,
+      "longitude": 82.9973659
+    },
+    {
+      "name": "Sabji Mandi",
+      "latitude": 25.3184317,
+      "longitude": 83.0017566
+    },
+    {
+      "name": "Kasturba nagar",
+      "latitude": 25.3145803,
+      "longitude": 82.9923247
+    },
+    {
+      "name": "Shivpurva",
+      "latitude": 25.3163718,
+      "longitude": 82.9812643
+    },
+    {
+      "name": "Lalla pura",
+      "latitude": 25.3150213,
+      "longitude": 82.9970081
+    },
+    {
+      "name": "Hari Nagar Colony",
+      "latitude": 25.3183355,
+      "longitude": 82.977444
+    },
+    {
+      "name": "Bajrang Nagar",
+      "latitude": 25.3143117,
+      "longitude": 82.9823104
+    },
+    {
+      "name": "Gandhi nagar",
+      "latitude": 25.3124487,
+      "longitude": 82.9901619
+    },
+    {
+      "name": "Maulvi bagh park",
+      "latitude": 25.312888,
+      "longitude": 82.9948404
+    },
+    {
+      "name": "Chandpur",
+      "latitude": 25.3169121,
+      "longitude": 82.976669
+    },
+    {
+      "name": "New loco colony",
+      "latitude": 25.3149365,
+      "longitude": 82.9779953
+    },
+    {
+      "name": "Chhittupura",
+      "latitude": 25.3126062,
+      "longitude": 82.9816939
+    },
+    {
+      "name": "Sigra",
+      "latitude": 25.3112567,
+      "longitude": 82.9852117
+    },
+    {
+      "name": "Lahartara",
+      "latitude": 25.3165238,
+      "longitude": 82.9733253
+    },
+    {
+      "name": "Nai Sarak",
+      "latitude": 25.3130035,
+      "longitude": 83.0041685
+    },
+    {
+      "name": "Golghar",
+      "latitude": 25.3150378,
+      "longitude": 82.9732693
+    },
+    {
+      "name": "Sidhgiri Bagh",
+      "latitude": 25.310765,
+      "longitude": 83.0014754
+    },
+    {
+      "name": "Sampoornanand nagar colony",
+      "latitude": 25.3084053,
+      "longitude": 82.9866708
+    },
+    {
+      "name": "Govindpura",
+      "latitude": 25.3123487,
+      "longitude": 83.0075191
+    },
+    {
+      "name": "Bank Colony",
+      "latitude": 25.3087421,
+      "longitude": 82.9809286
+    },
+    {
+      "name": "Jai Prakash Nagar",
+      "latitude": 25.3102927,
+      "longitude": 82.9775283
+    },
+    {
+      "name": "Rampura luxa",
+      "latitude": 25.3078215,
+      "longitude": 83.00316
+    },
+    {
+      "name": "Nirala Nagar",
+      "latitude": 25.3076595,
+      "longitude": 82.9756721
+    },
+    {
+      "name": "Manik Nagar",
+      "latitude": 25.3191268,
+      "longitude": 82.9646204
+    },
+    {
+      "name": "Girinagar Colony",
+      "latitude": 25.3036224,
+      "longitude": 82.9848597
+    },
+    {
+      "name": "Gudauliya",
+      "latitude": 25.3105809,
+      "longitude": 82.9696758
+    },
+    {
+      "name": "Maheshpur",
+      "latitude": 25.314613,
+      "longitude": 82.9651114
+    },
+    {
+      "name": "Kamchchha",
+      "latitude": 25.3021874,
+      "longitude": 82.9868426
+    },
+    {
+      "name": "Mahavir Colony",
+      "latitude": 25.300306,
+      "longitude": 82.9919532
+    },
+    {
+      "name": "Vinayaka Kolhwa",
+      "latitude": 25.30037,
+      "longitude": 82.9856817
+    },
+    {
+      "name": "Maruadih Rly. Settelment",
+      "latitude": 25.3115359,
+      "longitude": 82.9641304
+    },
+    {
+      "name": "jalkal",
+      "latitude": 25.2992407,
+      "longitude": 82.9964878
+    },
+    {
+      "name": "Taradham Colony Tulsipur",
+      "latitude": 25.2993485,
+      "longitude": 82.9793062
+    },
+    {
+      "name": "Sudamapur",
+      "latitude": 25.2974774,
+      "longitude": 82.988414
+    },
+    {
+      "name": "Gangapuri Colony",
+      "latitude": 25.3130548,
+      "longitude": 82.9594197
+    },
+    {
+      "name": "Railway Colony",
+      "latitude": 25.2985017,
+      "longitude": 82.9738096
+    },
+    {
+      "name": "Daniyalpur",
+      "latitude": 25.3345461,
+      "longitude": 82.9523163
+    },
+    {
+      "name": "Lahartara Industrial Estate",
+      "latitude": 25.3058761,
+      "longitude": 82.9610732
+    },
+    {
+      "name": "Khojwan",
+      "latitude": 25.2937144,
+      "longitude": 82.9939776
+    },
+    {
+      "name": "Kirahiya",
+      "latitude": 25.2933176,
+      "longitude": 82.9910613
+    },
+    {
+      "name": "Shri Ram Nagar Colony",
+      "latitude": 25.2962509,
+      "longitude": 82.9742827
+    },
+    {
+      "name": "Bhitari",
+      "latitude": 25.3144059,
+      "longitude": 82.9541045
+    },
+    {
+      "name": "Gurudham Colony",
+      "latitude": 25.293356,
+      "longitude": 82.998168
+    },
+    {
+      "name": "Manduadih",
+      "latitude": 25.3001107,
+      "longitude": 82.9648751
+    },
+    {
+      "name": "Jawahar Nagar Colony",
+      "latitude": 25.2924515,
+      "longitude": 82.9978416
+    },
+    {
+      "name": "Sarai Nandan",
+      "latitude": 25.2903865,
+      "longitude": 82.9866351
+    },
+    {
+      "name": "Nawabganj",
+      "latitude": 25.2900665,
+      "longitude": 82.9978566
+    },
+    {
+      "name": "Tridev Nagar Colony",
+      "latitude": 25.2890191,
+      "longitude": 82.9878873
+    },
+    {
+      "name": "Tulsi Nagar",
+      "latitude": 25.2876618,
+      "longitude": 82.9917043
+    },
+    {
+      "name": "Chandpur",
+      "latitude": 25.3075653,
+      "longitude": 82.9507893
+    },
+    {
+      "name": "Sukulpura",
+      "latitude": 25.2861519,
+      "longitude": 82.9938879
+    },
+    {
+      "name": "Kewaldham Colony",
+      "latitude": 25.2854307,
+      "longitude": 82.9990428
+    },
+    {
+      "name": "Kerakatpur",
+      "latitude": 25.3082895,
+      "longitude": 82.9468456
+    }
+  ]
+}

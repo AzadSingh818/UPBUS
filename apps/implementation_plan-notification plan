@@ -1,0 +1,41 @@
+# Implementation Plan: Push Notifications & Driver App
+
+Here is the plan to implement the requested features:
+
+## 1. Push Notifications (ETA Alerts) 🔔
+Instead of setting up a complex backend VAPID/FCM infrastructure for the MVP, we will leverage the browser's native `Notification` API directly in the frontend during an active tracking session.
+
+### Proposed Changes
+- Request Notification permissions from the user when they start tracking a bus.
+- In `LiveMap.tsx` or the tracking state, monitor the `etaMinutes` of the user's target stop (or the upcoming stop).
+- When the ETA drops to exactly 10 minutes or 5 minutes, trigger a native OS Push Notification: *"Your bus UP32XX is arriving in X mins"*.
+- We will track which notifications have been sent (e.g., `notified5Min = true`) to prevent spamming.
+
+#### [MODIFY] [page.tsx](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/web-app/src/app/page.tsx)
+- Add permission request and notification logic when `selectedRoute` or ETA updates.
+
+---
+
+## 2. Private Buses Tracking (Driver App) 🚌
+We will create a dedicated interface for drivers to broadcast their location.
+
+### Proposed Changes
+- **Frontend**: Create a new page `/driver` in the web app. It will have a simple form taking `Registration Number` and `Route Code`.
+- When the driver clicks "Start Trip", we will use `navigator.geolocation.watchPosition()` to stream high-accuracy GPS data.
+- **Backend API**: Create a new REST endpoint `/api/v1/driver/location` that accepts `busRegNo`, `latitude`, `longitude`, `speed`, and `heading`.
+- **Database**: The backend will upsert this data into the `bus_live_state` table.
+- **Integration**: Because our Engine already processes `bus_live_state` for UPSRTC buses, the private bus will *automatically* appear on the live maps, get ETAs, and trigger the AI Route Seeder!
+
+#### [NEW] [apps/web-app/src/app/driver/page.tsx](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/web-app/src/app/driver/page.tsx)
+- Driver tracking UI.
+#### [NEW] [apps/backend/src/routes/driver.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/routes/driver.ts)
+- Express route to handle incoming driver GPS pings.
+#### [MODIFY] [apps/backend/src/index.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/index.ts)
+- Mount the new `/api/v1/driver` route.
+
+## Verification Plan
+1. **Push Notifications**: Start tracking a bus, mock the ETA dropping to 5 minutes, and verify the OS displays a push notification.
+2. **Driver App**: Open `localhost:3000/driver`, enter a dummy bus number, start the trip. Then open the main app in another tab and search for that route to see the dummy bus moving live!
+
+> [!IMPORTANT]
+> This Push Notification approach requires the app to be open in a tab (even if in the background). If you need notifications when the app is completely closed (killed), it requires a full Service Worker Web Push setup. Is the active-tab approach okay for now?

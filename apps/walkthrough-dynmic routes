@@ -1,0 +1,32 @@
+# Walkthrough - Dynamic Live Route Mapping, Redis Cache, and Turf Snapping
+
+We have successfully implemented the dynamic route mapping, Redis caching system, map coordinate snapping engine, and live logs forwarding.
+
+## Changes Made
+
+### 1. Redis Caching Client
+- Created [redis.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/utils/redis.ts) in backend and [redis.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/engine/src/utils/redis.ts) in engine.
+- This client connects to Redis `redis://localhost:6379`. If Redis is not running, it automatically falls back to a fast, local in-memory Map cache to prevent crashes.
+
+### 2. Ingestion & Dynamic Route Mapping
+- Updated [adapter_live.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/engine/src/ingestion/adapter_live.ts):
+  - Extracted `vehicle_journey_id` as `activeTripId` and prioritized `route_description` as the dynamic route name.
+  - Dynamically updated the Redis cache map (`bus:${registrationNo} -> { route_name, trip_id }`) for every bus telemetry packet.
+  - Replaced the hardcoded IPv4 address `127.0.0.1:5000` with the standard `fetch` API using `backendUrl` (which resolves `localhost` dynamically) to solve connection resets/failures.
+  - Added error logs to `adminMonitor` on request timeouts.
+
+### 3. Turf Map Snapping Engine
+- Installed `@turf/turf`.
+- Created [snapping.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/engine/src/utils/snapping.ts) to read the ordered stops coordinates of the active route, construct a GeoJSON line, and snap raw coordinate pings onto the highway route line.
+- Integrated snapping directly inside `ingestLocation` so that all systems (RouteProgressEngine, database, and admin monitor) receive perfectly snapped coordinates.
+
+### 4. Dynamic Lookup in API
+- Modified [admin.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/api/admin.ts):
+  - Inside `/monitor/buses`, looked up the live active route name and trip code from Redis, falling back to the DB master name if not cached.
+
+---
+
+## Verification Results
+
+- Verified both packages compile 100% cleanly.
+- Tested ingestion using the single-cycle ingestion test which parsed and matched all live buses successfully.

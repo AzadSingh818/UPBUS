@@ -1,0 +1,41 @@
+# Advanced Algorithmic Refinement (GSRTC/Zepto Deep Dive)
+
+Maine aapke diye gaye saare 11 reference links (Zepto MDP, OATS Traffic Flow, GSRTC/Margdarshi architecture, Descartes Route Planning, API Rate Limiting) ka deeply analysis kiya hai. Humare UPBus architecture ko in world-class enterprise standards par laane ke liye maine humare current backend engines ko evaluate kiya aur yeh 3 major missing/incorrect logic find kiye hain jinko hum refine karenge:
+
+## User Review Required
+> [!IMPORTANT]
+> **Refinement Scope**: Humare current engines basics mein bohot strong hain (HMM, Ray-Casting, MVCC lag chuka hai). Lekin Zepto ke 10-minute delivery model aur GSRTC ke OATS backend se compare karein toh humari ETA aur API hitting thodi rigid hai. Ye plan un engines ko "Dynamic" banayega.
+
+## Open Questions
+- Kya hum API Rate Limiting mein **Token Bucket** algorithm use karein (jo burst traffic allow karta hai) ya strict **Leaky Bucket** (jo constant flow maintain karta hai)? Margdarshi API ke liye Token Bucket best rehta hai.
+- Kya main in 3 backend engines ko pehle refine kar doon aur uske baad UI (Admin/User) ko in naye data structures ke sath connect karoon?
+
+---
+
+## Proposed Changes
+
+### 1. API Traffic Control (Throttling & Rate Limiting)
+**Reference**: *API Traffic Control: Choosing Between Rate Limiting and Throttling*
+- **Flaw**: Humara `margdarshiClient.ts` directly loop mein fetch marta hai. Agar Margdarshi/UPSRTC server delay hota hai, toh humara server multiple parallel requests bhej kar unka server DDoSed (ban) karwa sakta hai.
+- **Fix**: Main `margdarshiClient.ts` mein **Token Bucket Algorithm** implement karunga. Ye humari fetching ko throttle karega (e.g., max 5 requests per second), jisse humara IP Margdarshi server par block na ho aur safe streaming chalti rahe.
+
+### 2. Markov Decision Processes (MDP) & Reinforcement Learning for ETA
+**Reference**: *Zepto Delivery / Markov Decision Processes and Reinforcement Learning*
+- **Flaw**: Humara current ETA engine (`eta.ts`) WMA (Weighted Moving Average) par chalta hai jo sirif time-of-day (jaise 8 AM par 25% slower) dekhta hai. Yeh deterministic (fixed) hai. 
+- **Fix**: Main isko **MDP (Markov Decision Process)** mein upgrade karunga. Isme har stop ek "State" ban jayega aur next stop par jane ki "Transition Probability" dynamically compute hogi pichle buses ke historical data se. Isse Zepto ki tarah ETA minute-by-minute self-correct hoga.
+
+### 3. Graph Theory & OATS (Optimizing Traffic Flow)
+**Reference**: *Optimizing Traffic Flow (Scribd) & Descartes Route Planning*
+- **Flaw**: Humara Graph routing engine physical distance (kilometers) ke hisab se routes ko traverse karta hai. 
+- **Fix**: Main **Dynamic Edge Weighting** (Dijkstra/A* algorithm extension) implement karunga. Har route segment (Edge) ki weightage sirf distance nahi, balki live congestion (traffic speed) hogi. Agar ek segment par live bus ki speed 10km/h aa rahi hai, toh backend automatic uss edge ki "Cost" badha dega, aur aane wali buses ko real-time traffic delay dikhayega.
+
+---
+
+## Verification Plan
+
+### Automated Tests
+- Rate Limiter function ko 100 parallel requests bhej kar test karenge ki kya wo extra requests ko queue/discard karta hai ya nahi.
+- MDP probability matrix test karenge ki fixed math ki jagah dynamic ETA aa raha hai ya nahi.
+
+### Manual Verification
+- Backend logs mein check karenge ki `margdarshiClient` strictly delay ke sath request bhej raha hai ya nahi bina IP block huye.

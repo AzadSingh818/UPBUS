@@ -16,14 +16,20 @@ import {
 } from 'lucide-react';
 
 const LiveMap = dynamic(() => import('../components/LiveMap'), { ssr: false });
+const SingleBusMap = dynamic(() => import('../components/SingleBusMap'), { ssr: false });
 
 interface AdminLogItem {
   timestamp: string;
+  terminalId?: 'engine' | 'admin' | 'webapp' | 'gateway';
+  service?: string;
+  level?: 'INFO' | 'DEBUG' | 'WARN' | 'ERROR' | 'CRIT';
+  entityId?: string;
   type: 'VALIDATION' | 'SEEDER' | 'LEARNING' | 'ERROR' | 'SYSTEM' | 'NEW_BUS';
   busId?: string | number;
   regNo?: string;
   status?: 'duplicate' | 'accepted' | 'rejected' | 'success' | 'failed';
   message: string;
+  latencyMs?: number;
 }
 
 interface ActiveBusState {
@@ -51,6 +57,7 @@ interface DatabaseStats {
   tripsCount: number;
   learnedRoutesCount: number;
   activeBusesCount: number;
+  historicalLogsCount: number;
 }
 
 export default function AdminMonitor() {
@@ -62,6 +69,7 @@ export default function AdminMonitor() {
   const [isMounted, setIsMounted] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [selectedBusForMap, setSelectedBusForMap] = useState<ActiveBusState | null>(null);
   
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -69,8 +77,53 @@ export default function AdminMonitor() {
 
   const [viewMode, setViewMode] = useState<'console' | 'map' | 'coverage'>('coverage');
   const [speedFilter, setSpeedFilter] = useState<'all' | 'moving' | 'halted'>('all');
+  const [activeTerminal, setActiveTerminal] = useState<'engine' | 'admin' | 'webapp' | 'gateway'>('engine');
 
   const terminalEndRef = useRef<HTMLDivElement>(null);
+
+  const engineLogs = logs.filter((log) => {
+    return (
+      log.terminalId === 'engine' ||
+      ['LEARNING', 'NEW_BUS', 'SEEDER', 'VALIDATION'].includes(log.type) ||
+      (log.service && ['GEO-MATCH', 'MAP-MATCH', 'ETA-ENGINE', 'KALMAN-FLT', 'GEOFENCE', 'NEW-BUS-DISCOVERY', 'GEOCODER-SEEDER'].includes(log.service)) ||
+      (log.message &&
+        (log.message.includes('Processing ping') ||
+          log.message.includes('telemetry') ||
+          log.message.includes('visited stop') ||
+          log.message.includes('Route CONFIRMED') ||
+          log.message.includes('New bus detected') ||
+          log.message.includes('geocoded') ||
+          log.message.includes('seeded route') ||
+          log.message.includes('Found new route') ||
+          log.message.includes('NoiseFilter') ||
+          log.message.includes('GPSValidator')))
+    );
+  });
+
+  const adminLogs = logs.filter((log) => {
+    return (
+      log.terminalId === 'admin' ||
+      (log.type === 'SYSTEM' &&
+        (!log.service || log.service === 'ADMIN-OPS' || log.service === 'SCHEDULER' || log.service === 'AUTH' || log.message.includes('Admin Real-Time')))
+    );
+  });
+
+  const webappLogs = logs.filter((log) => {
+    return log.terminalId === 'webapp' || (log.service && log.service.includes('WEB'));
+  });
+
+  const gatewayLogs = logs.filter((log) => {
+    return log.terminalId === 'gateway' || log.service === 'HTTP-ROUTER' || (log.message && log.message.includes('HTTP '));
+  });
+
+  const currentDisplayLogs =
+    activeTerminal === 'engine'
+      ? engineLogs
+      : activeTerminal === 'admin'
+      ? adminLogs
+      : activeTerminal === 'webapp'
+      ? webappLogs
+      : gatewayLogs;
 
   // Reset page to 1 when search query or speed filter changes
   useEffect(() => {
@@ -121,18 +174,24 @@ export default function AdminMonitor() {
       const ts = Date.now();
       // 1. Logs
       const logsRes = await fetch(`${API_BASE}/monitor/logs?t=${ts}`, { cache: 'no-store' });
-      const logsData = await logsRes.json();
-      setLogs(logsData.logs || []);
+      if (logsRes.ok) {
+        const logsData = await logsRes.json();
+        setLogs(logsData.logs || []);
+      }
 
       // 2. Active Buses
       const busesRes = await fetch(`${API_BASE}/monitor/buses?t=${ts}`, { cache: 'no-store' });
-      const busesData = await busesRes.json();
-      setBuses(busesData.buses || []);
+      if (busesRes.ok) {
+        const busesData = await busesRes.json();
+        setBuses(busesData.buses || []);
+      }
 
       // 3. Stats
       const statsRes = await fetch(`${API_BASE}/monitor/stats?t=${ts}`, { cache: 'no-store' });
-      const statsData = await statsRes.json();
-      setStats(statsData.stats || null);
+      if (statsRes.ok) {
+        const statsData = await statsRes.json();
+        setStats(statsData.stats || null);
+      }
 
       setLastRefreshed(new Date());
       if (isManual) setRefreshTrigger(prev => prev + 1);
@@ -153,7 +212,7 @@ export default function AdminMonitor() {
 
     const interval = setInterval(() => {
       fetchData();
-    }, 2000); // 2-second update cycles
+    }, 1000); // 1-second update cycle for near real-time logs
 
     return () => clearInterval(interval);
   }, [isLive]);
@@ -454,6 +513,64 @@ export default function AdminMonitor() {
           justify-content: space-between;
           align-items: center;
         }
+
+        .log-tab-buttons {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+
+        .log-tab-btn {
+          background: rgba(255, 255, 255, 0.05);
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          color: #9ca3af;
+          font-size: 11px;
+          font-weight: 600;
+          padding: 3px 10px;
+          border-radius: 6px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .log-tab-btn:hover {
+          background: rgba(255, 255, 255, 0.12);
+          color: #f3f4f6;
+        }
+
+        .log-tab-btn.active {
+          background: rgba(245, 158, 11, 0.2);
+          border-color: #f59e0b;
+          color: #f59e0b;
+          font-weight: 700;
+        }
+
+        .log-service {
+          color: #38bdf8;
+          font-weight: 700;
+          font-size: 11px;
+          flex-shrink: 0;
+        }
+
+        .log-entity {
+          color: #a78bfa;
+          font-weight: 600;
+          font-size: 11px;
+          flex-shrink: 0;
+        }
+
+        .log-level-badge {
+          font-size: 9px;
+          font-weight: 800;
+          padding: 1px 5px;
+          border-radius: 4px;
+          text-transform: uppercase;
+          flex-shrink: 0;
+        }
+
+        .level-info { background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); }
+        .level-debug { background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); }
+        .level-warn { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
+        .level-error, .level-crit { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
 
         .console-window-dots {
           display: flex;
@@ -876,6 +993,16 @@ export default function AdminMonitor() {
           </div>
         </div>
 
+        <div className="stat-card">
+          <div className="stat-icon-box" style={{ background: 'rgba(139, 92, 246, 0.1)', color: '#8b5cf6' }}>
+            <Database size={20} />
+          </div>
+          <div className="stat-info">
+            <span className="stat-value">{stats?.historicalLogsCount ?? 0}</span>
+            <span className="stat-label">Scraped AI Records</span>
+          </div>
+        </div>
+
         <div 
           className="stat-card" 
           onClick={() => setSpeedFilter('all')}
@@ -953,28 +1080,65 @@ export default function AdminMonitor() {
                 <span className="win-dot green"></span>
               </div>
               <div className="console-title">
-                <TerminalIcon size={14} /> GPS Ingestion Logs (2s Poll)
+                <TerminalIcon size={14} /> Production Log Stream
               </div>
-              <div></div>
+              <div className="log-tab-buttons">
+                <button
+                  onClick={() => setActiveTerminal('engine')}
+                  className={`log-tab-btn ${activeTerminal === 'engine' ? 'active' : ''}`}
+                >
+                  ⚙️ Engine ({engineLogs.length})
+                </button>
+                <button
+                  onClick={() => setActiveTerminal('admin')}
+                  className={`log-tab-btn ${activeTerminal === 'admin' ? 'active' : ''}`}
+                >
+                  🛡️ Admin ({adminLogs.length})
+                </button>
+                <button
+                  onClick={() => setActiveTerminal('webapp')}
+                  className={`log-tab-btn ${activeTerminal === 'webapp' ? 'active' : ''}`}
+                >
+                  📱 Web-App ({webappLogs.length})
+                </button>
+                <button
+                  onClick={() => setActiveTerminal('gateway')}
+                  className={`log-tab-btn ${activeTerminal === 'gateway' ? 'active' : ''}`}
+                >
+                  🌐 Gateway ({gatewayLogs.length})
+                </button>
+              </div>
             </div>
             
             <div className="console-terminal">
-              {logs.length === 0 ? (
+              {currentDisplayLogs.length === 0 ? (
                 <div style={{ color: '#475569', fontStyle: 'italic', padding: '12px' }}>
-                  Waiting for incoming GPS pings or seeder events...
+                  {activeTerminal === 'engine'
+                    ? 'Waiting for incoming GPS pings & engine events...'
+                    : activeTerminal === 'admin'
+                    ? 'No admin audit events logged yet...'
+                    : activeTerminal === 'webapp'
+                    ? 'Waiting for passenger web/mobile app stream...'
+                    : 'Waiting for API Gateway HTTP traffic...'}
                 </div>
               ) : (
-                logs.map((log, idx) => (
-                  <div key={idx} className="log-line">
-                    <span className="log-time">[{formatTime(log.timestamp)}]</span>
-                    <span className={`log-badge ${getLogTypeBadgeClass(log.type)}`}>
-                      {log.type}
-                    </span>
-                    <span className={`log-msg ${getLogStatusClass(log.status)}`}>
-                      {log.message}
-                    </span>
-                  </div>
-                ))
+                currentDisplayLogs.map((log, idx) => {
+                  const levelStr = log.level || (log.type === 'ERROR' ? 'ERROR' : 'INFO');
+                  const serviceStr = log.service || (log.terminalId === 'engine' ? 'GEO-MATCH' : log.terminalId === 'gateway' ? 'HTTP-ROUTER' : 'ADMIN-OPS');
+                  return (
+                    <div key={idx} className="log-line">
+                      <span className="log-time">[{formatTime(log.timestamp)}]</span>
+                      <span className="log-service">[{serviceStr}]</span>
+                      <span className={`log-level-badge level-${levelStr.toLowerCase()}`}>
+                        {levelStr}
+                      </span>
+                      {log.entityId && <span className="log-entity">[{log.entityId}]</span>}
+                      <span className={`log-msg ${getLogStatusClass(log.status)}`}>
+                        {log.message}
+                      </span>
+                    </div>
+                  );
+                })
               )}
               <div ref={terminalEndRef} />
             </div>
@@ -1026,7 +1190,25 @@ export default function AdminMonitor() {
                       <tr key={`${bus.busId ?? ''}-${bus.regNo}`}>
                         <td>
                           <div style={{ display: 'flex', alignItems: 'center' }}>
-                            <span className="bus-badge-reg">{bus.regNo}</span>
+                            <span 
+                              className="bus-badge-reg"
+                              onClick={() => setSelectedBusForMap(bus)}
+                              style={{ 
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.borderColor = '#f59e0b';
+                                e.currentTarget.style.boxShadow = '0 0 8px rgba(245, 158, 11, 0.3)';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.borderColor = 'rgba(245, 158, 11, 0.25)';
+                                e.currentTarget.style.boxShadow = 'none';
+                              }}
+                              title="Click to track real-time map inside Admin UI"
+                            >
+                              {bus.regNo}
+                            </span>
                             {bus.isNewlyDetected && <span className="new-bus-tag">NEW</span>}
                           </div>
                         </td>
@@ -1039,10 +1221,25 @@ export default function AdminMonitor() {
                           </div>
                         </td>
                         <td style={{ fontFamily: 'monospace', fontSize: '12px' }}>
-                          <div>{bus.latitude.toFixed(4)}, {bus.longitude.toFixed(4)}</div>
+                          <a 
+                            href={`https://www.google.com/maps/search/?api=1&query=${bus.latitude},${bus.longitude}`} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            style={{ 
+                              color: '#38bdf8', 
+                              textDecoration: 'underline',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
+                            title="Open in Google Maps"
+                          >
+                            <MapPin size={10} />
+                            {bus.latitude.toFixed(4)}, {bus.longitude.toFixed(4)}
+                          </a>
                           {bus.zoneName && (
                             <div style={{ fontSize: '9px', color: '#8b5cf6', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '180px' }} title={bus.zoneName}>
-                              <MapPin size={8} style={{ display: 'inline', marginRight: '2px' }}/>{bus.zoneName}
+                              {bus.zoneName}
                             </div>
                           )}
                         </td>
@@ -1198,6 +1395,14 @@ export default function AdminMonitor() {
           </div>
           
         </div>
+      )}
+      
+      {selectedBusForMap && (
+        <SingleBusMap 
+          bus={selectedBusForMap} 
+          onClose={() => setSelectedBusForMap(null)} 
+          allBuses={buses}
+        />
       )}
     </div>
   );

@@ -1,0 +1,21 @@
+# UI & UX Refinement Walkthrough 🚌✨
+
+Saare UI bugs aur issues ko theek kar diya gaya hai, aur aapka purana design/CSS bilkul waisa hi maintain kiya gaya hai. 
+
+## What changed?
+
+### 1. "Multiple Routes" Issue Fixed
+Maine backend api (`/search/routes`) mein logic update kiya hai taaki `directPaths` ab `routeCode` ke basis par **deduplicate** ho jaye. Ab aapko web app mein duplicate buses nahi dikhengi aur search result ekdum saaf aur crisp aayega. 
+
+### 2. Live Tracking & AI ETA UI
+- **Graceful Fallbacks**: Agar kisi bus ka GPS temporarily off hai ya DB mein coordinates blank hain, toh tracking map ab blank screen hone ke bajaay intelligently nearest stop coordinates par fallback karega. (Isse wo purana bug theek ho jayega jisme tracking kuch nahi dikha rahi thi).
+- **AI ETA Highlight**: Timeline tracker ke neche ab ETA values **"✨ AI ~15m"** style mein highlight hokar dikhengi, jo dikhata hai ki yield values MDP (Markov Decision Process) backend engine se calculated hain.
+
+### 3. Admin Panel Updates
+- **Scraped AI Records**: Main dashboard mein ab ek naya KPI card "Scraped AI Records" add kiya gaya hai. Yeh direct `historical_gps_logs` (aapke naye ML database) ka count padhta hai. Isse aap monitor kar sakte hain ki background seeder kitna telemetry data scrape karke future neural network models ke liye collect kar raha hai.
+- Ye stat `DatabaseStats` interface aur `/monitor/stats` backend dono jagah integrate ho chuka hai.
+
+---
+
+> [!TIP]
+> Agar Web App ko start karte waqt `.next/dev/types` ka cache error aaye toh ek baar `npm run dev` dobara start kijiye (Next.js ka cache kabhi kabhi purane interface definitions ko retain kar leta hai).

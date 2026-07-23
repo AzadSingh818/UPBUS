@@ -1,0 +1,32 @@
+# Fix UI Layout and DFS Duplicate Routes
+
+The user reported two main issues:
+1. **Kitne sare multiple routes aa rahe hai (DFS generating too many identical paths)**: When searching for a journey like Meerut -> Delhi, the DFS algorithm returns 10 options that are nearly identical (e.g., all 3-transfer routes using the same core buses but transferring at slightly different villages).
+2. **Tracking / Journey Timeline UI is broken**: The Journey Timeline component is currently squished inside the 420px left sidebar underneath the options list. The map section on the right is missing layout flex styles, causing rendering issues. The user wants the timeline to be placed below the map on the right side, resembling the previous design.
+
+## Proposed Changes
+
+### 1. Engine Layer (DFS Deduplication)
+
+#### [MODIFY] `apps/backend/src/engine/graph.ts`
+- **Issue**: `filterUniquePaths` currently deduplicates paths by joining the IDs of *all stops* visited (`stopIds.join('-')`). This means transferring at Modinagar vs transferring at Kasba generates two distinct paths, blowing up the combinations.
+- **Fix**: Change the deduplication key to just use the sequence of `routeId`s. E.g., `p.legs.map(l => l.routeId).join('-')`. 
+- **Result**: If two paths use the same buses (Route A -> Route B) but transfer at different stops, we will only keep the path with the shortest total distance. This will cleanly reduce the 10 junk options into 1 or 2 distinct macro-journeys.
+
+### 2. Frontend Layer (UI Layout)
+
+#### [MODIFY] `apps/web-app/src/app/page.tsx`
+- **Issue**: `<JourneyTimeline>` is rendered inside the left `.search-panel`.
+- **Fix**: Move `<JourneyTimeline journey={journey} />` to the right `.map-section`, directly below `<LiveMap>` when `viewMode === 'journey'`. This allows the timeline to span the full right column width.
+- **Fix**: Add inline flex/layout styles to `.map-section` and `.tracking-panel` wrapper divs in `page.tsx` directly to ensure they take up the remaining width `flex: 1` and `height: calc(100vh - 100px)`.
+
+#### [MODIFY] `apps/web-app/src/app/globals.css`
+- **Fix**: Add `.map-section` and `.tracking-panel` CSS definitions if needed to ensure the right side correctly fills the screen and scrolls independently.
+
+## Open Questions
+- None. This is a direct CSS and algorithmic fix to meet the user's specific feedback.
+
+## Verification Plan
+- Run `npm run dev` on both apps.
+- Search Meerut to Delhi in Journey Plan mode. Verify that only a few distinct options appear (no spam of 10 identical options).
+- Click on an option and verify the `<JourneyTimeline>` renders properly on the right side underneath the map, instead of squished in the sidebar.

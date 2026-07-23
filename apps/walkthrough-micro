@@ -1,0 +1,46 @@
+# Microservices Split & UI Restoration Complete!
+
+Maine aapke instructions ke hisab se backend ko 2 parts mein split kar diya hai (Microservices Architecture), aur frontend mein journey search ki live tracking UI wapas restore kar di hai!
+
+## 1. Microservices Architecture (The Backend Split)
+
+![Engine Terminal](https://img.shields.io/badge/Microservices-Engine-blue)
+![API Terminal](https://img.shields.io/badge/Microservices-API-green)
+
+Humne ek naya standalone service banaya hai **`apps/engine`**.
+Ab kaam ka batwara (division of labor) kuch is tarah hoga:
+
+1. **`apps/engine` (Data Ingestion & Route Learning):**
+   - Yeh engine UPSRTC se live data scrape karega, PostgreSQL database me save karega, aur nayi routes seekhega (Autonomous Route Seeder).
+   - Yeh bina kisi HTTP port ke background mein chup-chap apna kaam karega, isliye yeh kabhi bhi API ko slow nahi karega!
+
+2. **`apps/backend` (User API & WebSockets):**
+   - Yeh siraf REST API requests aur WebSocket connections ko handle karega.
+   - Kyunki isme ab koi bhaari background task nahi chal raha, yeh user ki searches ko **makkhan ki tarah** instantly respond karega. Event loop kabhi block nahi hoga!
+
+### Aapko kya karna hai?
+Aapko abse apne terminal mein **teen (3)** commands chalani hongi:
+1. `npm run dev` (in `apps/web-app`)
+2. `npm run dev` (in `apps/backend`)
+3. **`npm run dev` (in `apps/engine`)** 👈 Yeh naya hai!
+
+---
+
+## 2. Frontend Map & Tracking UI Restoration
+
+> "phle usmai track krne ka bhi tha map bhi tha ek baar pichla code dekho ache se"
+
+Aapka matlab bilkul sahi tha! Pehle jab aap direct routes search karte the, toh us par click karte hi **Left side** par ek poora stops ka timeline ("Where is my train" jaisa) khul jata tha aur map par bus track hone lagti thi. Lekin naye Journey Planner mein yeh feature dab gaya tha.
+
+Maine ise fix kar diya hai:
+- **Auto-Tracking on Selection:** Ab jab bhi aap koi "Available Way" (Journey option) select karenge, system **automatically** uss option ki live bus ko dhoondhega aur Right Panel mein uska Map aur Stops Timeline khol dega!
+- Aapko ab manually "Track Bus" button dabane ki zarurat nahi hai, yeh pehle ki tarah seamless ho gaya hai.
+
+---
+
+### Verification (Aap ise test kaise karein?)
+
+1. Apne terminals restart kijiye aur teeno apps (`web-app`, `backend`, `engine`) ko `npm run dev` se start karein.
+2. Web App mein jakar **"Saharanpur to Gangoh"** search karein.
+3. Kisi bhi route (Available Way) par click karein.
+4. Note karein ki right side mein **Map aur Stops Timeline (Where is my train)** automatically track hona shuru ho jayega! Aur API bilkul lag-free chalegi.

@@ -1,0 +1,134 @@
+# 4-Terminal Enterprise Production Logging Architecture
+
+Implement a 4-terminal structured enterprise logging pipeline across UPBus microservices (`apps/engine`, `apps/backend`, `apps/web-app`, `apps/admin`), featuring 4 dedicated, color-coded live stream tabs in the Admin Console UI without altering any existing statistics or active bus tracking functionality.
+
+## Proposed 4-Terminal System Architecture
+
+```
+                                  ┌───────────────────────────┐
+                                  │   UPBus Admin Console     │
+                                  │   (4 Terminal Log Window) │
+                                  └─────────────┬─────────────┘
+                                                │ Polling / SSE
+                                                ▼
+                                  ┌───────────────────────────┐
+                                  │  Backend Admin Monitor    │
+                                  │   (Central Log Collector) │
+                                  └─────────────▲─────────────┘
+                                                │ HTTP Push Bridge
+             ┌──────────────────┬───────────────┴───────────────┬──────────────────┐
+             │                  │                               │                  │
+┌────────────┴──────────┐ ┌─────┴──────────────────┐ ┌──────────┴──────────┐ ┌─────┴────────────┐
+│ Terminal 1: Engine    │ │ Terminal 2: Admin      │ │ Terminal 3: Web-App │ │ Terminal 4:      │
+│ (GPS, Snapping, ETA)  │ │ (Audit, Overrides)     │ │ (User Activity)      │ │ API Gateway      │
+└───────────────────────┘ └────────────────────────┘ └──────────────────────┘ └──────────────────┘
+```
+
+## User Review Required
+
+> [!IMPORTANT]
+> - All existing statistics cards (Total Online 9,600+, Moving, Offline, Base Routes 5053, Geocoded Stops 1199, Learned Variations 4886) and Active Buses grid remain **100% untouched and preserved**.
+> - The single Log Console window on the left side of the Admin UI will be upgraded to feature **4 Dedicated Interactive Tabs** matching enterprise production systems (GSRTC/UPSRTC):
+>   1. `[ ⚙️ Engine Log ]` (GPS Ingestion, Map-Matching, Kalman Filter, ETA Predictions)
+>   2. `[ 🛡️ Admin Log ]` (Audit Trails, Security Logins, Route Overrides)
+>   3. `[ 📱 Web-App Stream ]` (User Bus Searches, Seat Layout Fetching, App Latency)
+>   4. `[ 🌐 API Gateway ]` (Express HTTP Requests, Latency ms, Database & Cache Queries)
+
+---
+
+## Standardized Production Log Item Schema
+
+```typescript
+export interface ProductionLogItem {
+  timestamp: string;
+  terminalId: 'engine' | 'admin' | 'webapp' | 'gateway';
+  service: string; // GEO-MATCH, KALMAN-FLT, MAP-MATCH, ETA-ENGINE, AUTH, SCHEDULER, API, FARE-ENGINE
+  level: 'INFO' | 'DEBUG' | 'WARN' | 'ERROR' | 'CRIT';
+  entityId?: string; // VEHICLE_ID, TRIP_ID, ADMIN_ID, SESSION_ID
+  message: string;
+  latencyMs?: number;
+  details?: string;
+}
+```
+
+---
+
+## Proposed Changes
+
+### Backend Service & API Bridge
+
+#### [MODIFY] [adminMonitor.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/services/adminMonitor.ts)
+- Update `AdminLogItem` schema to incorporate `terminalId`, `service`, `level`, `entityId`, and `latencyMs`.
+- Add categorized log buffers for `engine`, `admin`, `webapp`, and `gateway`.
+
+#### [MODIFY] [admin.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/api/admin.ts)
+- Update `/api/v1/admin/monitor/logs` to accept terminal query parameter (`?terminal=engine|admin|webapp|gateway`).
+- Update `/api/v1/admin/monitor/push` to handle 4-terminal structured logs.
+
+#### [MODIFY] [index.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/index.ts)
+- Add Express API Gateway request logging middleware to capture HTTP requests (`METHOD`, `PATH`, `STATUS`, `LATENCY_MS`) and direct them to `gateway` terminal logs.
+
+---
+
+### Ingestion Engine Services
+
+#### [MODIFY] [adminMonitor.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/engine/src/services/adminMonitor.ts)
+- Update log structure in Engine to format logs into `[GEO-MATCH]`, `[KALMAN-FLT]`, `[MAP-MATCH]`, `[ETA-ENGINE]`, and `[GEOFENCE]` services with proper log levels (`INFO`, `DEBUG`, `WARN`, `ERROR`).
+
+#### [MODIFY] [RouteProgressEngine.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/engine/src/modules/route-progress/service/RouteProgressEngine.ts)
+- Instrument `RouteProgressEngine` to generate `[GEO-MATCH]` and `[MAP-MATCH]` telemetry logs with vehicle IDs.
+
+#### [MODIFY] [newBusDiscovery.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/engine/src/services/newBusDiscovery.ts)
+- Format `newBusDiscovery` logs under `[NEW-BUS-DISCOVERY]` service.
+
+#### [MODIFY] [routeSeeder.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/engine/src/engine/routeSeeder.ts)
+- Format `routeSeeder` logs under `[GEOCODER-SEEDER]` service.
+
+---
+
+### Web App Stream Instrument
+
+#### [NEW] [userAnalyticsLogger.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/api/userAnalyticsLogger.ts)
+- Endpoint `/api/v1/analytics/stream` to receive user search events, seat layout requests, and device platform metadata (`ANDROID`, `WEB-PORTAL`, `IOS`) and route them to `webapp` terminal logs.
+
+---
+
+### Admin Console Frontend UI
+
+#### [MODIFY] [page.tsx](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/admin/src/app/page.tsx)
+- Upgrade Console Window Header to display 4 dedicated tab buttons:
+  - `[ ⚙️ Engine Log (Count) ]`
+  - `[ 🛡️ Admin Log (Count) ]`
+  - `[ 📱 Web-App Stream (Count) ]`
+  - `[ 🌐 API Gateway (Count) ]`
+- Add ANSI Level Badges:
+  - 🟢 `INFO` (Emerald Green)
+  - 🔵 `DEBUG` (Cyan/Blue)
+  - 🟡 `WARN` (Amber/Yellow)
+  - 🔴 `ERROR / CRIT` (Red)
+- Display `[SERVICE]`, `[ENTITY_ID]`, `latencyMs`, and formatted timestamp for each log line.
+
+---
+
+## Verification Plan
+
+### Automated Tests
+- Typecheck all projects:
+  ```powershell
+  cd "c:\Users\Azad Singh\Desktop\upbus\apps\admin"
+  npx tsc --noEmit
+  cd "c:\Users\Azad Singh\Desktop\upbus\apps\backend"
+  npx tsc --noEmit
+  cd "c:\Users\Azad Singh\Desktop\upbus\apps\engine"
+  npx tsc --noEmit
+  ```
+
+### Manual Verification
+1. Start `apps/backend` (`npm run dev`) and `apps/engine`.
+2. Open Admin UI (`http://localhost:3003`).
+3. Click through all 4 Terminal tabs:
+   - Verify `[ ⚙️ Engine Log ]` streams live GPS, Snapping, & ETA logs.
+   - Verify `[ 🛡️ Admin Log ]` shows admin audit & status logs.
+   - Verify `[ 📱 Web-App Stream ]` shows user search and app activity logs.
+   - Verify `[ 🌐 API Gateway ]` shows Express HTTP traffic, status codes (200/404), and latency ms.
+4. Verify Total Online (9600+), Moving, Offline, Base Routes (5053), Geocoded Stops (1199), Learned Variations (4886) cards remain intact.

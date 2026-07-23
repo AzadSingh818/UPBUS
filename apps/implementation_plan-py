@@ -1,0 +1,46 @@
+# Machine Learning Engine & Historical Scraper (Hack 1) Plan 🚀
+
+Aapka thought process aur DIY approach bilkul brilliant hai! Bina sarkari MoU ke AI train karne ke liye **"Hack 1: Live Scraping & Historical Logging"** sabse practically feasible solution hai. 
+
+Parse.bot par sirf API gateway milti hai, historical CSV logs nahi. Isliye hum khud ka historical data build karenge aur Python AI service ko Node.js ke sath link karenge.
+
+## User Review Required
+> [!IMPORTANT]
+> **Database Growth**: Agar hum har 30 second mein pure UP ki buses ka live data PostgeSQL mein log karenge, toh table bohot tezi se badi hogi (approx 500,000+ rows per day). Kya DB server ke paas storage capacity hai? (Future mein humein purana data AWS S3 ya CSV dump mein move karna padega).
+
+## Open Questions
+- Python microservice ko run karne ke liye humein system mein `python` aur `pip` (Python package manager) install chahiye hoga (ya phir Docker). Kya aapke system par Python installed hai, ya main ek setup script bhi likhu?
+
+---
+
+## Proposed Changes
+
+### [Database Architecture]
+#### [MODIFY] [schema.sql](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/db/schema.sql)
+- Main ek naya table `historical_gps_logs` add karunga jisme `bus_id`, `route_id`, `latitude`, `longitude`, `speed`, `weather_condition`, aur `timestamp` save honge. Ye dataset XGBoost model ki training ka base banega.
+
+---
+
+### [ML Engine Microservice (Python)]
+Aapke diye gaye code structure ke hisab se main ek isolated Python microservice banauga:
+#### [NEW] `apps/ml-engine/requirements.txt`
+- FastAPI, Uvicorn, XGBoost, Scikit-learn, Pandas packages define honge.
+#### [NEW] `apps/ml-engine/main.py`
+- Aapka diya gaya FastAPI code jo Node.js se requests receive karke XGBoost model (ya Fallback math) se predict karke ETA return karega.
+
+---
+
+### [Data Ingestion Cron Job (Node.js)]
+#### [NEW] `apps/backend/src/scripts/historicalDataScraper.ts`
+- Ek background cron job (setInterval loop) banaya jayega. Ye humare `margdarshiClient.ts` (Throttled) ka use karke har 30-60 seconds mein API fetch karega, aur sidhe naye `historical_gps_logs` table mein batch insert karega. 
+- Jab ye script 1-2 mahine chalegi, humara XGBoost model actual UP traffic data par perfect train ho jayega!
+
+---
+
+## Verification Plan
+
+### Automated Tests
+- Hum Node.js backend se FastAPI python server (port 8000) ko ping karke ETA nikalne ki koshish karenge, taaki check ho sake ki dono languages baat kar pa rahi hain.
+
+### Manual Verification
+- Hum Cron script ko locally chala kar dekhenge ki kya wo PostgreSQL mein GPS points insert kar rahi hai ya nahi.

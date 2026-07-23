@@ -1,0 +1,11 @@
+- `[/]` Task 1: Smart ETA (Time Prediction) - Update backend `eta.ts`
+  - `[ ]` Factor in real-time speed in ETA calculation
+  - `[ ]` Introduce traffic modifiers or historical average speed fallback
+  - `[ ]` Precisely calculate distance remaining along polyline
+- `[ ]` Task 2: Live Map Tracking (Smooth WebSockets Animation)
+  - `[ ]` Update `LiveMap.tsx` with smooth interpolation (`requestAnimationFrame` or CSS transitions)
+  - `[ ]` Ensure heading rotates smoothly
+- `[ ]` Task 3: Scale Up (Pure UP State Expansion)
+  - `[ ]` Add indexes to DB (`bus_live_state`, `stops`) for faster querying
+  - `[ ]` Verify `routeSeeder.ts` robustness
+- `[ ]` Verify Changes and create Walkthrough

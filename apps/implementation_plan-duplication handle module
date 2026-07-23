@@ -1,0 +1,62 @@
+# Enterprise Route Architecture: Duplication & Concurrency
+
+This document outlines the architectural changes required to bring UPBus to enterprise-level scalability, addressing Route Data Duplication and Concurrency exactly as requested (based on the GSRTC model).
+
+## User Review Required
+> [!IMPORTANT]
+> **PostGIS Requirement:** The plan includes converting stop coordinates to PostGIS geometry and using `ST_DWithin` for spatial anti-duplication. This requires the PostgreSQL database to have the PostGIS extension installed. 
+> 
+> **Redis / Kafka Requirement:** For the Live Tracking Concurrency (Scenario C), the plan introduces Redis Streams (or Kafka). We will use Redis Streams as it's typically easier to set up alongside a standard Node.js backend. 
+
+## Open Questions
+- Do we have the PostGIS extension enabled on our current Postgres database, or should I include the `CREATE EXTENSION postgis;` migration?
+- For the Message Broker (Scenario C), would you prefer we implement this using **Redis Streams** (lighter, easier to maintain) or **Apache Kafka** (heavier, true enterprise)? I recommend Redis for this stack.
+
+---
+
+## Proposed Changes
+
+### Database Schema (Migration)
+We will modify the core `schema.sql` to separate physical geometry from business routes and implement optimistic locking.
+
+#### [MODIFY] [schema.sql](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/db/schema.sql)
+- **Stops Table (Anti-Duplication):** Convert latitude/longitude to a PostGIS `GEOMETRY(Point, 4326)` column with a GIST index. 
+- **Route Segments (New Table):** Add `route_segments` containing `origin_stop_id`, `destination_stop_id`, and `geometry (LineString)`. Add a `UNIQUE (origin_stop_id, destination_stop_id)` constraint.
+- **Routes (MVCC):** Add `version_id` (integer) and `is_active` (boolean) to the `routes` table to support background admin editing without breaking live trips.
+- **Route Manifest (New Table):** Replaces `route_stops`. Maps `route_id` to `segment_id` with a `sequence_number`.
+- **Trips (Optimistic Locking):** Add `version_number` (integer, default 1) to `trips` to prevent double-booking or simultaneous driver assignments.
+
+---
+
+### Backend Logic & Algorithms
+We will introduce new services and algorithms to enforce the new schema constraints.
+
+#### [NEW] [frechetDistance.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/engine/frechetDistance.ts)
+- Implement the **Discrete Fréchet Distance** algorithm.
+- This will be used as a cleanup cron job/utility to detect parallel routes (within 200m) and merge them into a single master segment ID.
+
+#### [NEW] [routeManager.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/services/routeManager.ts)
+- Implement **MVCC (Multi-Version Concurrency Control)** for Route Edits.
+- When an admin updates a route, it creates a V2 clone in the database.
+- A midnight cron job deprecates V1 and makes V2 active.
+
+#### [MODIFY] [tripService.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/services/tripService.ts)
+- Implement **Optimistic Locking** for trip assignments.
+- SQL queries will explicitly include `WHERE id = $1 AND version_number = $2`. If `rowCount === 0`, it rejects the assignment (preventing race conditions).
+
+#### [NEW] [gpsIngestionQueue.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/backend/src/services/gpsIngestionQueue.ts)
+- Replace direct DB inserts with a **Redis Stream** (or Kafka) publisher/consumer model.
+- Pings are published to the stream using `vehicle_id` as the partition key.
+- A consumer processes messages strictly in chronological order, discarding older timestamps if a newer one was already processed.
+
+---
+
+## Verification Plan
+
+### Automated Tests
+- Run unit tests for the Discrete Fréchet Distance algorithm to ensure it correctly identifies duplicate trajectories.
+- Write tests simulating concurrent driver check-ins to verify the Optimistic Locking rejects the second attempt.
+
+### Manual Verification
+- Attempt to assign the same trip to two vehicles simultaneously in the UI/Admin panel.
+- Update a route in the Admin panel and verify live tracking doesn't crash for active buses on that route.

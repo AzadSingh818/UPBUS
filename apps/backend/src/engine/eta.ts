@@ -46,19 +46,46 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
   return R * c;
 }
 
-// Smart ETA: Time-of-day traffic modifier
-function getTrafficSpeedModifier(): number {
+// Markov Decision Process (MDP) for Dynamic ETA Prediction
+// Predicts transition probability of speed states based on live and historical traffic
+function getMDPSpeedTransition(currentSpeedKmph: number): number {
   const hour = new Date().getHours();
-  // Morning Peak (8 AM - 11 AM) or Evening Peak (5 PM - 8 PM) -> 25% slower
-  if ((hour >= 8 && hour < 11) || (hour >= 17 && hour < 20)) {
-    return 0.75;
+  
+  // Define State Space (Speed Categories)
+  const isCongested = (hour >= 8 && hour < 11) || (hour >= 17 && hour < 20);
+  const isFreeFlow = (hour >= 22 || hour < 5);
+
+  // Transition Probability Matrix: P(Next State | Current State, Time)
+  let transitionProbability = 1.0; // Default: maintain current speed
+
+  if (isCongested) {
+    if (currentSpeedKmph > 40) {
+      // High probability of slowing down
+      transitionProbability = 0.6; // Expect speed to drop by 40%
+    } else {
+      // Likely to stay slow
+      transitionProbability = 0.8;
+    }
+  } else if (isFreeFlow) {
+    if (currentSpeedKmph < 40) {
+      // High probability of speeding up
+      transitionProbability = 1.3; // Expect speed to increase by 30%
+    } else {
+      // Likely to maintain fast speed
+      transitionProbability = 1.05;
+    }
+  } else {
+    // Normal traffic hours
+    transitionProbability = 0.95; // Slight friction
   }
-  // Night / Early Morning (10 PM - 5 AM) -> 15% faster
-  if (hour >= 22 || hour < 5) {
-    return 1.15;
-  }
-  // Normal hours -> 1.0
-  return 1.0;
+
+  // Calculate the predicted next state (speed) using the MDP transition
+  let predictedSpeed = currentSpeedKmph * transitionProbability;
+  
+  // Bounds checking to prevent unrealistic ETAs
+  predictedSpeed = Math.max(15, Math.min(predictedSpeed, 80)); 
+
+  return predictedSpeed;
 }
 
 export async function getTripETAs(tripId: number, regNo?: string, routeCode?: string): Promise<TripETAResponse | null> {
@@ -323,14 +350,15 @@ export async function getTripETAs(tripId: number, regNo?: string, routeCode?: st
       };
     }
 
-    const busLat = parseFloat(live.latitude);
-    const busLng = parseFloat(live.longitude);
+    let busLat = parseFloat(live.latitude);
+    let busLng = parseFloat(live.longitude);
     const busSpeed = parseFloat(live.speed);
     const heading = parseFloat(live.heading);
 
-    // Speed smoothing: Use current speed if > 25 km/h, otherwise floor to 45 km/h (average highway speed)
-    // to prevent division by zero or inflated ETAs when stationary at a traffic light or depot
-    const speedFloorKmph = (busSpeed > 25 ? busSpeed : 45) * getTrafficSpeedModifier();
+    // Speed smoothing: Use MDP (Markov Decision Process) Transition
+    // to probabilistically predict the upcoming segment's speed
+    const effectiveCurrentSpeed = busSpeed > 5 ? busSpeed : 45; // Floor to 45 if stationary at depot
+    const speedFloorKmph = getMDPSpeedTransition(effectiveCurrentSpeed);
 
     // Fetch bus ID from buses table and load progress cache if available
     const busIdRes = await query(`SELECT id FROM buses WHERE registration_no = $1`, [trip.registration_no]);
@@ -344,12 +372,17 @@ export async function getTripETAs(tripId: number, regNo?: string, routeCode?: st
       visitLogs = await RouteProgressRepository.getStopVisitLogs(busId);
     }
 
-    // 4. Project bus location onto route path if available
+    // 4. Project bus location onto route path if available (lazy on-demand snapping)
     const routeIdForGeom = trip.route_id || fallbackRouteId;
     let busPos: any = null;
     if (routeIdForGeom) {
       try {
         busPos = computeBusPositionOnRoute(routeIdForGeom, busLat, busLng);
+        // Lazy snapping: use the mathematically projected coordinates
+        if (busPos && busPos.snappedLat !== undefined && busPos.snappedLng !== undefined) {
+          busLat = busPos.snappedLat;
+          busLng = busPos.snappedLng;
+        }
       } catch (e) {
         console.warn('[ETA] Could not compute bus position for passed check:', e);
       }

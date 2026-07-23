@@ -4,11 +4,18 @@ export interface MapMatchResult {
   coveredDistance: number; // in meters
 }
 
+export interface HMMState {
+  lastCoveredDistance: number;
+  lastTimestamp: number;
+}
+
 export class MapMatcher {
   static match(
     lat: number,
     lng: number,
-    stops: { latitude: number; longitude: number; distance_from_start: number }[]
+    stops: { latitude: number; longitude: number; distance_from_start: number }[],
+    hmmState?: HMMState,
+    currentTimestampMs?: number
   ): MapMatchResult {
     if (stops.length === 0) {
       return {
@@ -26,14 +33,19 @@ export class MapMatcher {
       };
     }
 
-    let bestDist = Infinity;
+    let bestScore = Infinity;
     let bestLat = lat;
     let bestLng = lng;
-    let bestCoveredDistance = 0;
+    let bestCoveredDistance = hmmState ? hmmState.lastCoveredDistance : 0;
 
     for (let i = 0; i < stops.length - 1; i++) {
       const a = stops[i];
       const b = stops[i + 1];
+
+      // Prevent snapping to segments that are strictly "behind" us if we have a strong HMM state
+      if (hmmState && b.distance_from_start < hmmState.lastCoveredDistance - 500) {
+         continue; // Only allow slight backwards drift
+      }
 
       const dx = b.longitude - a.longitude;
       const dy = b.latitude - a.latitude;
@@ -48,23 +60,45 @@ export class MapMatcher {
       const projLat = a.latitude + t * dy;
       const projLng = a.longitude + t * dx;
 
-      // Haversine distance from raw GPS to projected point on segment
+      // 1. Emission Probability (Cost): How far is GPS point from the road segment?
       const R = 6371;
       const dLat = (projLat - lat) * Math.PI / 180;
       const dLon = (projLng - lng) * Math.PI / 180;
       const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat * Math.PI / 180) * Math.cos(projLat * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
-      const distKm = R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
-      const distMeters = distKm * 1000;
+      const emissionDistMeters = (R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h))) * 1000;
+      
+      const segLength = b.distance_from_start - a.distance_from_start;
+      const candidateCoveredDistance = Math.round(a.distance_from_start + t * segLength);
 
-      if (distMeters < bestDist) {
-        bestDist = distMeters;
+      // 2. Transition Probability (Cost): Is it physically possible?
+      let transitionCost = 0;
+      if (hmmState && currentTimestampMs) {
+        const dtSeconds = (currentTimestampMs - hmmState.lastTimestamp) / 1000;
+        const distMoved = candidateCoveredDistance - hmmState.lastCoveredDistance;
+        
+        if (dtSeconds > 0) {
+           const impliedSpeed = Math.abs(distMoved) / dtSeconds; // m/s
+           // If implied speed is > 35 m/s (126 km/h), heavily penalize
+           if (impliedSpeed > 35) {
+              transitionCost += (impliedSpeed - 35) * 100;
+           }
+        }
+        
+        // Penalize moving backwards significantly
+        if (distMoved < -50) {
+           transitionCost += Math.abs(distMoved) * 10;
+        }
+      }
+
+      // Total Cost = Emission Cost + Transition Cost
+      // We want to minimize this score
+      const totalScore = emissionDistMeters + transitionCost;
+
+      if (totalScore < bestScore) {
+        bestScore = totalScore;
         bestLat = projLat;
         bestLng = projLng;
-
-        // Covered distance along route in meters:
-        // distance_from_start(a) + t * (distance_from_start(b) - distance_from_start(a))
-        const segLength = b.distance_from_start - a.distance_from_start;
-        bestCoveredDistance = Math.round(a.distance_from_start + t * segLength);
+        bestCoveredDistance = candidateCoveredDistance;
       }
     }
 

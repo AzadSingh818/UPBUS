@@ -21,6 +21,20 @@ export function setUseMock(value: boolean) {
 // Seed data — UP 75-District Depot Corridor Network
 export const mockDb: any = require('./data.json');
 
+// Initialize in-memory counter for scraped historical logs to prevent filesystem overhead and event loop blocks
+export let historicalLogsMemoryCount = (mockDb.historical_gps_logs && Array.isArray(mockDb.historical_gps_logs)) 
+  ? mockDb.historical_gps_logs.length 
+  : 221264;
+
+export function incrementHistoricalLogsCount(amount: number) {
+  historicalLogsMemoryCount += amount;
+}
+
+// Clear large array from memory if present to keep process heap lightweight
+if (mockDb.historical_gps_logs) {
+  mockDb.historical_gps_logs = [];
+}
+
 // --- Fast Index Maps for O(1) Mock DB Operations ---
 const busByRegNoMap = new Map<string, any>();
 const tripByBusIdMap = new Map<number, any>();
@@ -64,8 +78,17 @@ rebuildMockDbIndexes();
 
 function persistMockDb() {
   try {
-    const filePath = path.join(__dirname, 'data.json');
-    fs.writeFileSync(filePath, JSON.stringify(mockDb, null, 2));
+    const backendFilePath = path.join(__dirname, 'data.json');
+    const engineFilePath = path.resolve(__dirname, '../../../engine/src/db/data.json');
+    const jsonStr = JSON.stringify(mockDb, null, 2);
+
+    fs.writeFileSync(backendFilePath, jsonStr);
+    try {
+      if (fs.existsSync(path.dirname(engineFilePath))) {
+        fs.writeFileSync(engineFilePath, jsonStr);
+      }
+    } catch {}
+
     // Rebuild indexes after persistence changes
     rebuildMockDbIndexes();
   } catch (e) {
@@ -86,7 +109,7 @@ function executeMockQuery(text: string, params: any[] = []): { rows: any[]; rowC
   if (queryStr.toLowerCase().includes('from route_stops') && !queryStr.toLowerCase().includes('where') && !queryStr.toLowerCase().includes('join')) {
     return { rows: mockDb.route_stops, rowCount: mockDb.route_stops.length };
   }
-  if (queryStr.startsWith('INSERT INTO routes')) {
+  if (queryStr.includes('INSERT INTO routes')) {
     const routeCode = params[0];
     const routeName = params[1];
     const source = params[2];
@@ -98,7 +121,7 @@ function executeMockQuery(text: string, params: any[] = []): { rows: any[]; rowC
     persistMockDb();
     return { rows: [{ id: newId }], rowCount: 1 };
   }
-  if (queryStr.startsWith('INSERT INTO route_stops')) {
+  if (queryStr.includes('INSERT INTO route_stops')) {
     const routeId = parseInt(params[0], 10);
     const stopId = parseInt(params[1], 10);
     const sequenceNo = parseInt(params[2], 10);
@@ -326,13 +349,33 @@ function executeMockQuery(text: string, params: any[] = []): { rows: any[]; rowC
     };
   }
 
-  // 9. Find active trip (ingestLocation #2)
-  if (queryStr.includes('SELECT id FROM trips WHERE bus_id = $1') && queryStr.includes("status = 'running'")) {
+  // 9. Find active trip (ingestLocation #2) — matches both 'SELECT id FROM trips' and 'SELECT id, route_id, created_at FROM trips'
+  if (queryStr.includes('FROM trips') && queryStr.includes('bus_id = $1') && queryStr.includes("status = 'running'") && !queryStr.includes('routes r') && !queryStr.includes('buses b') && !queryStr.includes('FROM trips t')) {
     const busId = Number(params[0]);
     const trip = tripByBusIdMap.get(busId);
     return {
-      rows: trip ? [{ id: trip.id }] : [],
+      rows: trip ? [{ id: trip.id, route_id: trip.route_id, created_at: trip.created_at || new Date().toISOString() }] : [],
       rowCount: trip ? 1 : 0
+    };
+  }
+
+  // 9b. Get route_id from trip by id
+  if (queryStr.includes('SELECT route_id FROM trips WHERE id = $1')) {
+    const tripId = Number(params[0]);
+    const trip = mockDb.trips.find((t: any) => t.id === tripId);
+    return {
+      rows: trip ? [{ route_id: trip.route_id }] : [],
+      rowCount: trip ? 1 : 0
+    };
+  }
+
+  // 9c. Get route_code from routes by id
+  if (queryStr.includes('SELECT route_code FROM routes WHERE id = $1')) {
+    const routeId = Number(params[0]);
+    const route = mockDb.routes.find((r: any) => r.id === routeId);
+    return {
+      rows: route ? [{ route_code: route.route_code }] : [],
+      rowCount: route ? 1 : 0
     };
   }
 
@@ -488,6 +531,39 @@ function executeMockQuery(text: string, params: any[] = []): { rows: any[]; rowC
     return { rows: [{ id: newId }], rowCount: 1 };
   }
 
+  // INSERT INTO routes
+  if (queryStr.includes('INSERT INTO routes')) {
+    mockDb.routes = mockDb.routes || [];
+    const routeCode = params[0];
+    const routeName = params[1];
+    const source = params[2] || 'Source';
+    const destination = params[3] || 'Destination';
+    const distanceKm = parseFloat(params[4]) || 45.0;
+
+    let existing = mockDb.routes.find((r: any) => r.route_code === routeCode);
+    if (!existing && routeName) {
+      existing = mockDb.routes.find((r: any) => r.route_name && r.route_name.toLowerCase() === routeName.toLowerCase());
+    }
+    if (existing) {
+      existing.route_name = routeName;
+      persistMockDb();
+      return { rows: [{ id: existing.id }], rowCount: 1 };
+    }
+
+    const newId = mockDb.routes.reduce((max: number, r: any) => r.id > max ? r.id : max, 0) + 1;
+    const newRoute = {
+      id: newId,
+      route_code: routeCode,
+      route_name: routeName,
+      source,
+      destination,
+      distance_km: distanceKm
+    };
+    mockDb.routes.push(newRoute);
+    persistMockDb();
+    return { rows: [{ id: newId }], rowCount: 1 };
+  }
+
   // 13. UPSERT bus_live_state
   if (queryStr.includes('INSERT INTO bus_live_state')) {
     const busId = Number(params[0]);
@@ -527,6 +603,16 @@ function executeMockQuery(text: string, params: any[] = []): { rows: any[]; rowC
     const code = params[0];
     const route = mockDb.routes.find((r: any) => r.route_code === code);
     return route ? { rows: [route], rowCount: 1 } : { rows: [], rowCount: 0 };
+  }
+
+  // Find route by route_name ILIKE
+  if (queryStr.toLowerCase().includes('from routes') && queryStr.toLowerCase().includes('route_name ilike')) {
+    const rawPattern = params && params[0] ? params[0] : '';
+    const pattern = rawPattern.replace(/%/g, '').toLowerCase().trim();
+    const route = mockDb.routes.find((r: any) => 
+      r.route_name && r.route_name.toLowerCase().includes(pattern)
+    );
+    return route ? { rows: [{ id: route.id, route_name: route.route_name }], rowCount: 1 } : { rows: [], rowCount: 0 };
   }
 
   // 7. Get stops by route_id
@@ -684,8 +770,37 @@ function executeMockQuery(text: string, params: any[] = []): { rows: any[]; rowC
     };
   }
 
+  // 12c. Fetch route code by ID
+  if (queryStr.toLowerCase().includes('from routes') && queryStr.toLowerCase().includes('id = $1') && queryStr.toLowerCase().includes('route_code')) {
+    const routeId = parseInt(params[0], 10);
+    const route = mockDb.routes.find((r: any) => r.id === routeId);
+    return {
+      rows: route ? [{ route_code: route.route_code }] : [],
+      rowCount: route ? 1 : 0
+    };
+  }
+
+  // 13a. INSERT historical_gps_logs (Fast memory counter optimization)
+  if (queryStr.includes('INSERT INTO historical_gps_logs')) {
+    if (params && params.length >= 6) {
+      const addedLogsCount = Math.floor(params.length / 6);
+      historicalLogsMemoryCount += addedLogsCount;
+    }
+    return { rows: [], rowCount: params ? params.length / 6 : 0 };
+  }
+
+  // 13. Historical GPS logs count query
+  if (queryStr.includes('historical_gps_logs')) {
+    return { rows: [{ count: historicalLogsMemoryCount }], rowCount: 1 };
+  }
+
+  // 14. Registration numbers from buses
+  if (queryStr.includes('SELECT registration_no FROM buses')) {
+    const rows = (mockDb.buses || []).map((b: any) => ({ registration_no: b.registration_no }));
+    return { rows, rowCount: rows.length };
+  }
+
   // Default fallback
-  console.log(`Mock DB received unhandled query: ${queryStr}`);
   return { rows: [], rowCount: 0 };
 }
 

@@ -1,0 +1,52 @@
+# Microservices Architecture & Frontend Restoration
+
+This plan addresses your request to split the backend into two separate microservices and restore the missing frontend tracking/map functionality.
+
+## Background Context
+Currently, the `backend` handles everything in one process:
+1. Scraping live data from UPSRTC/Margdarshi.
+2. Calculating route geometries and learning new stops.
+3. Serving frontend user searches (REST API) and WebSockets.
+
+As you correctly observed, the heavy background engines can block the Node.js event loop, preventing the API from responding quickly to user searches.
+
+## Proposed Architecture (Microservices)
+
+We will split `apps/backend` into two distinct apps:
+
+### 1. `apps/engine` (The Background Worker)
+- **Role:** Purely for data ingestion and background processing.
+- **Tasks:** Runs `adapter_live.ts` (polling UPSRTC) and `routeSeeder.ts` (learning new routes).
+- **Communication:** Writes live data directly to the PostgreSQL database. Does not expose any HTTP ports.
+
+### 2. `apps/backend` (The User API)
+- **Role:** Purely for serving the frontend `web-app` and `admin` app.
+- **Tasks:** Serves REST API (`/api/v1/journey`, `/stops`, etc.) and the WebSocket server for real-time tracking.
+- **Communication:** Reads from PostgreSQL and broadcasts live updates. Will be 100% dedicated to user traffic, ensuring lightning-fast search responses.
+
+## Proposed Changes
+
+### Microservice Split
+- [NEW] Create `apps/engine` directory with its own `package.json` and `tsconfig.json`.
+- [MODIFY] Move `ingestion/` and `engine/routeSeeder.ts` logic into `apps/engine`.
+- [MODIFY] Update `apps/backend/src/index.ts` to remove the background polling engines.
+- [MODIFY] Update the root `package.json` and `turbo.json` to include the new `engine` app so that `npm run dev` starts all 3 services (`web-app`, `backend`, `engine`).
+
+### Frontend Map & Tracking Restoration
+- [MODIFY] `apps/web-app/src/app/page.tsx`
+
+> [!WARNING]
+> **Open Question for User:**
+> Aapne kaha ki "jab mai user side pr search krta hu toh vha se bhut sare functionality remove ho gaye hai... phle usmai track krne ka bhi tha map bhi tha".
+> 
+> Currently, jab aap "Saharanpur to Gangoh" search karte hain, toh woh "Available Ways" dikhata hai. Ussme ek **"Track Bus"** button hai. Jab aap uss button par click karte hain, tab Map aur Tracking on hoti hai.
+> 
+> **Mera Sawaal:** Kya aap chahte hain ki Journey Search karte hi Map par saari buses automatically track hone lagein (bina "Track Bus" button dabaye)? Ya phir aapka matlab hai ki jo purani "Direct Routes" ki tracking thi (jisme Left Panel par Stop Timeline dikhti thi) woh ab gayab lag rahi hai? Kripya bataiye ki aap exactly kaunsi map UI wapas chahte hain!
+
+## Verification Plan
+
+### Automated/Manual Verification
+1. Run `npm run dev` at the root to ensure `web-app`, `backend`, and `engine` boot up concurrently.
+2. Verify that `engine` logs `[Route Learning]` and `[NewBusDiscovery]`.
+3. Verify that `backend` starts cleanly on port 5000 and responds instantly to `/api/v1/journey`.
+4. Implement the requested UI changes in the frontend based on your answer to the open question.

@@ -1,25 +1,53 @@
 -- Database Schema for UP Roadways Live Tracking Platform
 
--- 1. Routes Table
+CREATE EXTENSION IF NOT EXISTS postgis;
+
+-- 1. Routes Table (Logical Master with MVCC)
 CREATE TABLE IF NOT EXISTS routes (
     id SERIAL PRIMARY KEY,
-    route_code VARCHAR(50) UNIQUE NOT NULL,
+    route_code VARCHAR(50) NOT NULL,
     route_name VARCHAR(255) NOT NULL,
     source VARCHAR(100) NOT NULL,
     destination VARCHAR(100) NOT NULL,
-    distance_km NUMERIC(6, 2)
+    distance_km NUMERIC(6, 2),
+    version_id INTEGER DEFAULT 1,
+    is_active BOOLEAN DEFAULT TRUE,
+    UNIQUE(route_code, version_id)
 );
 
--- 2. Stops Table
+-- 2. Stops Table (Spatial Data)
 CREATE TABLE IF NOT EXISTS stops (
     id SERIAL PRIMARY KEY,
     stop_code VARCHAR(50) UNIQUE NOT NULL,
     name VARCHAR(255) NOT NULL,
     latitude DOUBLE PRECISION NOT NULL,
-    longitude DOUBLE PRECISION NOT NULL
+    longitude DOUBLE PRECISION NOT NULL,
+    geom GEOMETRY(Point, 4326)
 );
 
--- 3. Route Stops Mapping Table (to define the sequence of stops on a route)
+-- Index for Spatial Anti-Duplication
+CREATE INDEX IF NOT EXISTS idx_stops_geom ON stops USING GIST (geom);
+
+-- 3. Route Segments (Physical Geometry)
+CREATE TABLE IF NOT EXISTS route_segments (
+    id SERIAL PRIMARY KEY,
+    origin_stop_id INTEGER REFERENCES stops(id) ON DELETE CASCADE,
+    destination_stop_id INTEGER REFERENCES stops(id) ON DELETE CASCADE,
+    path_geom GEOMETRY(LineString, 4326),
+    distance_km NUMERIC(6, 2),
+    UNIQUE(origin_stop_id, destination_stop_id)
+);
+
+-- 3.5. Route Manifest (Maps Segments to Logical Routes)
+CREATE TABLE IF NOT EXISTS route_manifest (
+    id SERIAL PRIMARY KEY,
+    route_id INTEGER REFERENCES routes(id) ON DELETE CASCADE,
+    segment_id INTEGER REFERENCES route_segments(id) ON DELETE CASCADE,
+    sequence_no INTEGER NOT NULL,
+    UNIQUE(route_id, sequence_no)
+);
+
+-- Legacy mapping (kept for backward compatibility during migration)
 CREATE TABLE IF NOT EXISTS route_stops (
     route_id INTEGER REFERENCES routes(id) ON DELETE CASCADE,
     stop_id INTEGER REFERENCES stops(id) ON DELETE CASCADE,
@@ -36,13 +64,14 @@ CREATE TABLE IF NOT EXISTS buses (
     depot_name VARCHAR(100)
 );
 
--- 5. Trips Table
+-- 5. Trips Table (With Optimistic Locking)
 CREATE TABLE IF NOT EXISTS trips (
     id SERIAL PRIMARY KEY,
     bus_id INTEGER REFERENCES buses(id) ON DELETE CASCADE,
     route_id INTEGER REFERENCES routes(id) ON DELETE CASCADE,
     scheduled_start TIMESTAMP NOT NULL,
     status VARCHAR(20) DEFAULT 'scheduled', -- scheduled, running, completed, cancelled
+    version_number INTEGER DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -248,3 +277,16 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
 CREATE INDEX IF NOT EXISTS idx_passenger_reports_trip ON passenger_reports(trip_id);
 CREATE INDEX IF NOT EXISTS idx_passenger_reports_time ON passenger_reports(created_at);
 
+-- 9. Historical GPS Logs (For Deep Learning AI Training)
+CREATE TABLE IF NOT EXISTS historical_gps_logs (
+    id SERIAL PRIMARY KEY,
+    bus_id INTEGER,
+    route_id INTEGER,
+    latitude DOUBLE PRECISION NOT NULL,
+    longitude DOUBLE PRECISION NOT NULL,
+    speed NUMERIC(5, 2) DEFAULT 0,
+    weather_condition INTEGER DEFAULT 0, -- 0=Clear, 1=Rain, 2=Fog
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_historical_gps_logs_time ON historical_gps_logs(timestamp);
