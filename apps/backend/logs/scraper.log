@@ -3770,3 +3770,9 @@
 {"level":"info","message":"Fetching live data...","module":"SCRAPER","timestamp":"2026-08-25T11:12:05.136Z"}
 {"level":"debug","message":"Received 9875 active buses. Logging to DB...","module":"SCRAPER","timestamp":"2026-08-25T11:12:08.930Z"}
 {"level":"info","message":"Successfully logged 9875 records.","module":"SCRAPER","timestamp":"2026-08-25T11:12:52.431Z"}
+{"level":"info","message":"Fetching live data...","module":"SCRAPER","timestamp":"2026-08-25T11:12:52.554Z"}
+{"level":"debug","message":"Received 9875 active buses. Logging to DB...","module":"SCRAPER","timestamp":"2026-08-25T11:12:52.838Z"}
+{"level":"info","message":"Successfully logged 9875 records.","module":"SCRAPER","timestamp":"2026-08-25T11:13:13.580Z"}
+{"level":"info","message":"Fetching live data...","module":"SCRAPER","timestamp":"2026-08-25T11:13:22.671Z"}
+{"level":"debug","message":"Received 9875 active buses. Logging to DB...","module":"SCRAPER","timestamp":"2026-08-25T11:13:25.083Z"}
+{"level":"info","message":"Successfully logged 9875 records.","module":"SCRAPER","timestamp":"2026-08-25T11:14:15.297Z"}
