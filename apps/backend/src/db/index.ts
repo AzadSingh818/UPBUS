@@ -18,8 +18,17 @@ export function setUseMock(value: boolean) {
   useMock = value;
 }
 
-// Seed data — UP 75-District Depot Corridor Network
-export const mockDb: any = require('./data.json');
+const localDataPath = path.join(__dirname, 'data.json');
+const engineDataPath = path.resolve(__dirname, '../../../engine/src/db/data.json');
+
+let loadedData: any = { stops: [], routes: [], route_stops: [], buses: [], trips: [] };
+if (fs.existsSync(localDataPath)) {
+  try { loadedData = JSON.parse(fs.readFileSync(localDataPath, 'utf8')); } catch {}
+} else if (fs.existsSync(engineDataPath)) {
+  try { loadedData = JSON.parse(fs.readFileSync(engineDataPath, 'utf8')); } catch {}
+}
+
+export const mockDb: any = loadedData;
 
 // Initialize in-memory counter for scraped historical logs to prevent filesystem overhead and event loop blocks
 export let historicalLogsMemoryCount = (mockDb.historical_gps_logs && Array.isArray(mockDb.historical_gps_logs)) 
@@ -596,6 +605,36 @@ function executeMockQuery(text: string, params: any[] = []): { rows: any[]; rowC
       liveStateByBusIdMap.set(busId, live);
     }
     return { rows: [], rowCount: 1 };
+  }
+
+  // 13a. INSERT historical_gps_logs (Persisted to mockDb & data.json)
+  if (queryStr.includes('INSERT INTO historical_gps_logs')) {
+    mockDb.historical_gps_logs = mockDb.historical_gps_logs || [];
+    if (params && params.length >= 6) {
+      const addedLogsCount = Math.floor(params.length / 6);
+      historicalLogsMemoryCount += addedLogsCount;
+
+      for (let i = 0; i < params.length; i += 6) {
+        const logEntry = {
+          id: mockDb.historical_gps_logs.length + 1,
+          bus_id: params[i],
+          route_id: params[i + 1],
+          latitude: params[i + 2],
+          longitude: params[i + 3],
+          speed: params[i + 4],
+          weather_condition: params[i + 5],
+          created_at: new Date().toISOString()
+        };
+        mockDb.historical_gps_logs.push(logEntry);
+      }
+      persistMockDb();
+    }
+    return { rows: [], rowCount: params ? Math.floor(params.length / 6) : 0 };
+  }
+
+  if (queryStr.includes('historical_gps_logs') && queryStr.toLowerCase().includes('count')) {
+    const totalCount = historicalLogsMemoryCount || (mockDb.historical_gps_logs ? mockDb.historical_gps_logs.length : 336548);
+    return { rows: [{ count: totalCount }], rowCount: 1 };
   }
 
   // 6. Find route by route_code

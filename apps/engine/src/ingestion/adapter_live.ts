@@ -354,6 +354,7 @@ export async function ingestLocation(location: CanonicalVehicleLocation): Promis
  * Main ingestion cycle — fetch all buses and process in parallel batches.
  */
 async function runLiveIngestionCycle(): Promise<void> {
+  console.log('[Live Adapter] ⏳ Fetching live bus telemetry from UPSRTC Margdarshi API...');
   const buses = await fetchMargdarshiLive();
 
   if (buses.length === 0) {

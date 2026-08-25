@@ -1,0 +1,45 @@
+# Implementation Plan - Engine Telemetry Push Bridge, Scraper Sync & Admin Frontend Compiler Fix
+
+This plan addresses the root causes discovered during the deep system scan of the project:
+1. **Engine to Backend Telemetry Bridge Sync**: Resolving why Backend reported `Scraper waiting for active buses from engine...` even when Engine was tracking 1,485+ buses.
+2. **Next.js 16 Admin Frontend On-Demand Compilation**: Ensuring the Admin UI app compiles and loads cleanly on `http://localhost:3003`.
+
+---
+
+## Technical Breakdown & Root Cause Analysis
+
+### 1. Engine-to-Backend Telemetry Push Bridge Failure
+- **Root Cause**: In Engine's `adminMonitor.ts`, `flushToBackend()` pushed active bus states to `http://127.0.0.1:5000/api/v1/admin/monitor/push` using `node-fetch`. On Windows with Node 18+, IPv4/IPv6 localhost resolution (`127.0.0.1` vs `localhost`) can fail or silently throw `ECONNREFUSED` on IPv6 `::1`. When this occurs, Backend's `adminMonitor.activeBuses` stays empty (size 0), causing Backend's scraper to log `Scraper waiting for active buses from engine...` and Admin UI stats to show `0 active buses`.
+- **Solution**:
+  1. Upgrade `flushToBackend()` in `apps/engine/src/services/adminMonitor.ts` to attempt `http://127.0.0.1:5000` with an automatic fallback to `http://localhost:5000`.
+  2. Use universal fetch (`globalThis.fetch || node-fetch`).
+  3. Add explicit status logging in Engine terminal (`[Admin Monitor Bridge] Successfully pushed X bus updates to Backend`).
+
+### 2. Next.js 16 Admin Frontend On-Demand Compilation & Proxy Rewrites
+- **Root Cause**: Next.js 16 (`next dev`) uses **on-demand compilation**. The terminal displays `▲ Next.js 16.2.10 (Turbopack) - Ready in 12.8s` and stays idle until the browser sends an HTTP request to `http://localhost:3003`. When `http://localhost:3003` is visited in the browser, Next.js compiles the `/` route.
+- **Solution**:
+  1. Ensure `apps/admin/next.config.ts` rewrites handle both `127.0.0.1:5000` and `localhost:5000` robustly.
+  2. Ensure `apps/admin/package.json` includes both Turbopack (`npm run dev`) and Webpack (`npm run dev:webpack`) execution scripts.
+
+---
+
+## Proposed Changes
+
+### Component 1: Engine Telemetry Push Bridge
+#### [MODIFY] [adminMonitor.ts (Engine)](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/engine/src/services/adminMonitor.ts)
+- Update `flushToBackend()` to try `127.0.0.1:5000` and fallback to `localhost:5000`.
+- Add success logging for push cycles so Engine terminal displays active bridge sync status.
+
+---
+
+### Component 2: Next.config Rewrites & Proxy Robustness
+#### [MODIFY] [next.config.ts (Admin)](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/admin/next.config.ts)
+- Update rewrites to use robust local backend URL mapping.
+
+---
+
+## Verification Plan
+
+### Automated / Diagnostic Checks
+1. **Bridge Sync Check**: Start Engine (`cd apps/engine && npm run dev`) and Backend (`cd apps/backend && npm run dev`). Confirm Engine logs `[Admin Monitor Bridge] Pushed 1400+ bus updates to Backend` and Backend Scraper logs `Received 1400+ active buses. Logging to DB...`.
+2. **Admin UI Compilation Verification**: Start Admin UI (`cd apps/admin && npm run dev`). Open `http://localhost:3003` in browser. Confirm terminal logs `Compiling / ...` and `✓ Compiled / in X.Xs` and renders the dashboard.

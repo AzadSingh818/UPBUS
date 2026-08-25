@@ -207,22 +207,49 @@ class AdminMonitorService {
    * Called only by startBatchFlush — never directly per-event.
    */
   private async flushToBackend(payload: { logs: AdminLogItem[], busUpdates: ActiveBusState[] }) {
-    const backendUrl = process.env.BACKEND_INTERNAL_URL || 'http://127.0.0.1:5000';
-    try {
-      const fetch = (await import('node-fetch')).default;
-      const response = await fetch(`${backendUrl}/api/v1/admin/monitor/push`, {
+    const primaryUrl = process.env.BACKEND_INTERNAL_URL || 'http://127.0.0.1:5000';
+    const fallbackUrl = 'http://localhost:5000';
+    const bodyStr = JSON.stringify(payload);
+
+    const tryPush = async (baseUrl: string) => {
+      const fetchFn = (globalThis as any).fetch || (await import('node-fetch')).default;
+      return await fetchFn(`${baseUrl}/api/v1/admin/monitor/push`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: bodyStr
       });
-      if (!response.ok) {
+    };
+
+    try {
+      let response = await tryPush(primaryUrl);
+      if (!response.ok && primaryUrl.includes('127.0.0.1')) {
+        response = await tryPush(fallbackUrl);
+      }
+      if (response.ok && payload.busUpdates.length > 0) {
+        // Log periodically or on first push
+        if (Math.random() < 0.1) {
+          console.log(`[Admin Monitor Bridge] Pushed ${payload.busUpdates.length} active bus telemetry states to Backend.`);
+        }
+      } else if (!response.ok) {
         console.error(`[Admin Monitor Bridge] Failed to push to backend: HTTP ${response.status}`);
       }
     } catch (err: any) {
-      if (err.code === 'ECONNREFUSED') {
-        console.warn('[Admin Monitor Bridge] Warning: Backend server on port 5000 is not running yet (waiting for backend to start).');
-      } else {
-        console.warn('[Admin Monitor Bridge] Backend connection pending:', err.message);
+      try {
+        const fetchFn = (globalThis as any).fetch || (await import('node-fetch')).default;
+        const fallbackRes = await fetchFn(`${fallbackUrl}/api/v1/admin/monitor/push`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: bodyStr
+        });
+        if (fallbackRes.ok && payload.busUpdates.length > 0) {
+          console.log(`[Admin Monitor Bridge] Pushed ${payload.busUpdates.length} active bus telemetry states to Backend (via fallback).`);
+        }
+      } catch (fallbackErr: any) {
+        if (err.code === 'ECONNREFUSED' || fallbackErr.code === 'ECONNREFUSED') {
+          console.warn('[Admin Monitor Bridge] Warning: Backend server on port 5000 is not running yet (waiting for backend to start).');
+        } else {
+          console.warn('[Admin Monitor Bridge] Backend connection pending:', err.message);
+        }
       }
     }
   }
