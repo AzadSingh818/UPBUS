@@ -12622,3 +12622,16 @@
 {"level":"debug","message":"Received 20000 active buses. Logging to DB...","module":"SCRAPER","timestamp":"2026-11-05T17:11:18.777Z"}
 {"level":"info","message":"Successfully logged 20000 records.","module":"SCRAPER","timestamp":"2026-11-05T17:11:20.048Z"}
 {"level":"info","message":"Starting cron job. Interval: 30000ms","module":"SCRAPER","timestamp":"2026-11-05T19:31:19.233Z"}
+{"level":"info","message":"Starting cron job. Interval: 30000ms","module":"SCRAPER","timestamp":"2026-11-05T19:57:08.981Z"}
+{"level":"info","message":"Fetching live data...","module":"SCRAPER","timestamp":"2026-11-05T19:57:39.384Z"}
+{"level":"info","message":"Scraper waiting for active buses from engine...","module":"SCRAPER","timestamp":"2026-11-05T19:57:39.456Z"}
+{"level":"info","message":"Fetching live data...","module":"SCRAPER","timestamp":"2026-11-05T19:58:09.006Z"}
+{"level":"info","message":"Scraper waiting for active buses from engine...","module":"SCRAPER","timestamp":"2026-11-05T19:58:09.011Z"}
+{"level":"info","message":"Fetching live data...","module":"SCRAPER","timestamp":"2026-11-05T19:58:39.020Z"}
+{"level":"info","message":"Scraper waiting for active buses from engine...","module":"SCRAPER","timestamp":"2026-11-05T19:58:39.025Z"}
+{"level":"info","message":"Fetching live data...","module":"SCRAPER","timestamp":"2026-11-05T19:59:09.043Z"}
+{"level":"info","message":"Scraper waiting for active buses from engine...","module":"SCRAPER","timestamp":"2026-11-05T19:59:09.049Z"}
+{"level":"info","message":"Fetching live data...","module":"SCRAPER","timestamp":"2026-11-05T19:59:39.123Z"}
+{"level":"info","message":"Scraper waiting for active buses from engine...","module":"SCRAPER","timestamp":"2026-11-05T19:59:39.165Z"}
+{"level":"info","message":"Fetching live data...","module":"SCRAPER","timestamp":"2026-11-05T20:00:09.092Z"}
+{"level":"info","message":"Scraper waiting for active buses from engine...","module":"SCRAPER","timestamp":"2026-11-05T20:00:09.097Z"}
