@@ -12621,3 +12621,4 @@
 {"level":"info","message":"Fetching live data...","module":"SCRAPER","timestamp":"2026-11-05T17:11:18.676Z"}
 {"level":"debug","message":"Received 20000 active buses. Logging to DB...","module":"SCRAPER","timestamp":"2026-11-05T17:11:18.777Z"}
 {"level":"info","message":"Successfully logged 20000 records.","module":"SCRAPER","timestamp":"2026-11-05T17:11:20.048Z"}
+{"level":"info","message":"Starting cron job. Interval: 30000ms","module":"SCRAPER","timestamp":"2026-11-05T19:31:19.233Z"}
