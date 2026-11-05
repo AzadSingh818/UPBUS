@@ -12635,3 +12635,8 @@
 {"level":"info","message":"Scraper waiting for active buses from engine...","module":"SCRAPER","timestamp":"2026-11-05T19:59:39.165Z"}
 {"level":"info","message":"Fetching live data...","module":"SCRAPER","timestamp":"2026-11-05T20:00:09.092Z"}
 {"level":"info","message":"Scraper waiting for active buses from engine...","module":"SCRAPER","timestamp":"2026-11-05T20:00:09.097Z"}
+{"level":"info","message":"Fetching live data...","module":"SCRAPER","timestamp":"2026-11-05T20:00:39.104Z"}
+{"level":"info","message":"Scraper waiting for active buses from engine...","module":"SCRAPER","timestamp":"2026-11-05T20:00:39.622Z"}
+{"level":"info","message":"Fetching live data...","module":"SCRAPER","timestamp":"2026-11-05T20:01:09.940Z"}
+{"level":"debug","message":"Received 20000 active buses. Logging to DB...","module":"SCRAPER","timestamp":"2026-11-05T20:01:10.324Z"}
+{"level":"info","message":"Successfully logged 20000 records.","module":"SCRAPER","timestamp":"2026-11-05T20:01:13.795Z"}
