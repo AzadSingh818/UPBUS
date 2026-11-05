@@ -8,15 +8,14 @@ const nextConfig: NextConfig = {
     root: path.resolve(__dirname),
   },
   async rewrites() {
-    // When running locally, proxy to local backend. On Vercel, proxy to AWS backend.
-    const destination = process.env.NODE_ENV === 'development' 
-      ? 'http://127.0.0.1:5000/api/:path*' 
-      : 'http://51.20.190.81:5000/api/:path*';
+    const backendBase = process.env.BACKEND_URL || (process.env.NODE_ENV === 'development' 
+      ? 'http://127.0.0.1:5000' 
+      : 'http://65.2.150.27:5000');
       
     return [
       {
         source: '/api/:path*',
-        destination,
+        destination: `${backendBase}/api/:path*`,
       },
     ];
   },
