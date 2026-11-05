@@ -66,27 +66,32 @@ body {
 .app-root {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
 }
 
 .app-header {
-  background: rgba(12, 19, 38, 0.8);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
+  background: rgba(10, 15, 30, 0.9);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--card-border);
-  padding: 16px 24px;
+  padding: 0 24px;
+  height: 60px;
+  display: flex;
+  align-items: center;
   position: sticky;
   top: 0;
   z-index: 50;
+  flex-shrink: 0;
 }
 
 .header-inner {
-  max-width: 1400px;
-  margin: 0 auto;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  width: 100%;
 }
 
 .logo-group {
@@ -134,42 +139,87 @@ body {
 .page-body {
   display: flex;
   flex: 1;
-  max-width: 1400px;
   width: 100%;
-  margin: 0 auto;
-  padding: 24px;
-  gap: 24px;
+  max-width: 100%;
+  height: calc(100vh - 60px);
+  margin: 0;
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
 }
 
 @media (max-width: 1024px) {
+  .app-root {
+    height: auto;
+    overflow: auto;
+  }
   .page-body {
     flex-direction: column;
+    height: auto;
+    overflow: visible;
   }
 }
 
 /* Left Search Panel */
 .search-panel {
-  width: 420px;
+  width: 460px;
   flex-shrink: 0;
+  height: 100%;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
+  background: rgba(10, 15, 30, 0.95);
+  border-right: 1px solid var(--card-border);
+  padding: 20px;
+  overflow-y: auto;
+  backdrop-filter: blur(20px);
+  z-index: 10;
 }
 
 @media (max-width: 1024px) {
   .search-panel {
     width: 100%;
+    height: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--card-border);
   }
 }
 
 /* Right Map/Tracking Section */
 .map-section {
   flex: 1;
+  height: 100%;
   display: flex;
   flex-direction: column;
   position: relative;
-  border-radius: 16px;
-  min-height: calc(100vh - 120px);
+  border-radius: 0;
+  background: #060913;
+  overflow: hidden;
+}
+
+.map-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  flex: 1;
+}
+
+.map-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100% !important;
+  height: 100% !important;
+  z-index: 1;
+}
+
+.leaflet-container {
+  width: 100% !important;
+  height: 100% !important;
+  background-color: #0b0f19 !important;
 }
 
 .tracking-panel {
@@ -753,17 +803,13 @@ body {
 }
 
 /* Right Section: Map placeholder / Live Tracking panel */
-.map-section {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-
 .map-placeholder {
-  background: rgba(18, 25, 47, 0.4);
-  border: 1px dashed rgba(255, 255, 255, 0.1);
-  border-radius: 20px;
+  background: radial-gradient(circle at 50% 50%, rgba(30, 41, 59, 0.3) 0%, rgba(6, 9, 19, 0.95) 100%);
+  border: none;
+  border-radius: 0;
   flex: 1;
+  width: 100%;
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -772,23 +818,25 @@ body {
 
 .placeholder-inner {
   text-align: center;
-  max-width: 500px;
+  max-width: 540px;
   color: var(--text-secondary);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 16px;
+  gap: 18px;
 }
 
 .placeholder-title {
-  font-size: 24px;
+  font-size: 26px;
   font-weight: 800;
   color: #ffffff;
+  letter-spacing: 0.5px;
 }
 
 .placeholder-sub {
   font-size: 14px;
   line-height: 1.6;
+  color: #9ca3af;
 }
 
 .sample-queries {
@@ -812,39 +860,49 @@ body {
 }
 
 .sample-chip {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);
   color: #d1d5db;
-  padding: 6px 12px;
+  padding: 8px 16px;
   border-radius: 20px;
   font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
   transition: var(--transition-smooth);
 }
 
 .sample-chip:hover {
-  background: rgba(79, 70, 229, 0.15);
+  background: rgba(79, 70, 229, 0.2);
   border-color: var(--primary);
   color: #ffffff;
+  transform: translateY(-1px);
 }
 
 /* Active Live Tracking Panel */
 .tracking-panel {
-  background: var(--card-bg);
-  border: 1px solid var(--card-border);
-  border-radius: 20px;
-  padding: 20px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 0;
   flex: 1;
+  height: 100%;
+  overflow: hidden;
 }
 
 .tracking-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  padding: 14px 20px;
+  background: rgba(10, 15, 30, 0.95);
+  border-bottom: 1px solid var(--card-border);
+  backdrop-filter: blur(16px);
+  z-index: 10;
+  flex-shrink: 0;
 }
 
 .tracking-title {
@@ -910,6 +968,12 @@ body {
 .tracking-stats {
   display: flex;
   gap: 10px;
+  padding: 10px 20px;
+  background: rgba(8, 12, 23, 0.7);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  align-items: center;
+  flex-wrap: wrap;
+  flex-shrink: 0;
 }
 
 .stat-pill {
@@ -940,20 +1004,29 @@ body {
 }
 
 .map-wrapper {
-  border-radius: 14px;
+  border-radius: 0;
   overflow: hidden;
-  border: 1px solid var(--card-border);
-  height: 380px;
+  border: none;
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  min-height: 350px;
+  position: relative;
+  margin: 0;
 }
 
 /* Live Stops Timeline (Where is my train style) */
 .stops-timeline {
   display: flex;
   flex-direction: column;
-  max-height: 350px;
+  max-height: 300px;
+  flex-shrink: 0;
   overflow-y: auto;
-  padding-right: 4px;
-  margin-top: 12px;
+  padding: 16px 20px;
+  margin-top: 0;
+  background: rgba(10, 15, 30, 0.95);
+  border-top: 1px solid var(--card-border);
+  backdrop-filter: blur(20px);
 }
 
 .stops-title {
@@ -1662,19 +1735,43 @@ input:checked + .toggle-slider:before {
 
 /* Map Container Styles */
 .map-wrapper {
-  margin: 12px 0;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
   width: 100%;
+  height: 100%;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
 }
 
 .map-container {
-  height: 350px;
-  width: 100%;
-  border-radius: 8px;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 100% !important;
   z-index: 1;
-  background-color: rgba(255, 255, 255, 0.02); /* Fallback before tiles load */
+  background-color: var(--bg-dark);
 }
 
-/* Dark theme for leaflet popups */
+/* Dark theme for leaflet popups & container */
+.leaflet-container {
+  position: absolute !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 100% !important;
+  background-color: #070a13 !important;
+}
 .leaflet-popup-content-wrapper, .leaflet-popup-tip {
   background: #1e293b !important;
   color: #f3f4f6 !important;
@@ -1854,5 +1951,57 @@ input:checked + .toggle-slider:before {
 /* Smooth Marker Animation for WebSocket updates */
 .leaflet-marker-icon.bus-marker-icon,
 .leaflet-marker-icon.nav-marker-icon {
-  transition: transform 1.5s cubic-bezier(0.25, 1, 0.5, 1);
+  transition: transform 1.2s cubic-bezier(0.25, 1, 0.5, 1);
+  z-index: 3000 !important;
+}
+
+/* ── Timeline Bus Badge & Vertical Smooth Line Progress ────────────────────── */
+.timeline-bus-badge {
+  position: absolute;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 22px;
+  height: 22px;
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.85), 0 2px 5px rgba(0, 0, 0, 0.4);
+  z-index: 10;
+  transition: top 1.2s linear, transform 0.3s ease;
+  animation: pulse-bus-icon 1.6s infinite ease-in-out;
+}
+
+.timeline-bus-badge.stop-overlay {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.timeline-bus-icon {
+  color: #ffffff;
+}
+
+.line-segment-passed {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  background: #10b981;
+  transition: height 1.2s linear;
+  border-radius: 2px;
+}
+
+@keyframes pulse-bus-icon {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(245, 158, 11, 0.6), 0 2px 4px rgba(0,0,0,0.3);
+    transform: translate(-50%, -50%) scale(1);
+  }
+  50% {
+    box-shadow: 0 0 16px rgba(245, 158, 11, 0.95), 0 3px 8px rgba(0,0,0,0.5);
+    transform: translate(-50%, -50%) scale(1.15);
+  }
 }

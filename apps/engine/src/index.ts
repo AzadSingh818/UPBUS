@@ -1,6 +1,7 @@
 process.noDeprecation = true;
 import { startIngestion, stopIngestion } from './ingestion/adapter_live';
 import { startRouteSeeder, stopRouteSeeder } from './engine/routeSeeder';
+import { runRouteDeduplicationCycle } from './engine/routeDeduplicationEngine';
 import { buildGraph } from './engine/graph';
 import { buildRouteGeometries } from './engine/routeGeometry';
 import fs from 'fs';
@@ -35,6 +36,12 @@ async function main() {
 
   // Boot Autonomous Route Seeder (learns routes over time)
   startRouteSeeder();
+
+  // Boot Master-Mapping Route Deduplication Engine
+  runRouteDeduplicationCycle().catch(err => console.error('[Engine] Error running initial route dedup cycle:', err));
+  setInterval(() => {
+    runRouteDeduplicationCycle().catch(err => console.error('[Engine] Error running scheduled route dedup cycle:', err));
+  }, 5 * 60 * 1000);
 }
 
 // Graceful Shutdown

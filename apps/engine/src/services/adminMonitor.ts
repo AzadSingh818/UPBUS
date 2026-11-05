@@ -139,6 +139,20 @@ class AdminMonitorService {
     const existing = this.activeBuses.get(busId);
     const isNewBus = !existing;
     
+    let finalRouteName = data.routeName ?? existing?.routeName;
+    let finalRouteCode = data.routeCode ?? existing?.routeCode;
+
+    if (!finalRouteName || finalRouteName === 'Lucknow - Kanpur Express' || finalRouteName === 'UNKNOWN') {
+      try {
+        const { resolveSmartRouteName } = require('../engine/smartRouteResolver');
+        const resolved = resolveSmartRouteName(regNo, data.latitude ?? existing?.latitude ?? 0, data.longitude ?? existing?.longitude ?? 0, data.routeName);
+        finalRouteName = resolved.routeName;
+        if (!finalRouteCode || finalRouteCode === 'R_UNKNOWN') {
+          finalRouteCode = resolved.routeCode;
+        }
+      } catch {}
+    }
+
     const updated: ActiveBusState = {
       busId: busId,
       regNo: regNo || existing?.regNo || 'UP-UNKNOWN',
@@ -147,8 +161,8 @@ class AdminMonitorService {
       speed: data.speed ?? existing?.speed ?? 0,
       heading: data.heading ?? existing?.heading ?? 0,
       lastSeen: new Date().toISOString(),
-      routeCode: data.routeCode ?? existing?.routeCode,
-      routeName: data.routeName ?? existing?.routeName,
+      routeCode: finalRouteCode,
+      routeName: finalRouteName,
       tripId: data.tripId ?? existing?.tripId,
       currentStop: data.currentStop ?? existing?.currentStop,
       zoneName: data.zoneName ?? existing?.zoneName,

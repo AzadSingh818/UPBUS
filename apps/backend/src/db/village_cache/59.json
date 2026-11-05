@@ -1,5 +1,5 @@
 {
-  "fetchedAt": "2026-06-28T16:30:04.957Z",
+  "fetchedAt": "2026-09-27T06:09:17.542Z",
   "villages": [
     {
       "name": "Khudana",
@@ -38,8 +38,8 @@
     },
     {
       "name": "Hardeki",
-      "latitude": 29.790671,
-      "longitude": 77.4821017
+      "latitude": 29.7908241,
+      "longitude": 77.482109
     },
     {
       "name": "Devpura",
@@ -120,11 +120,6 @@
       "name": "Babri",
       "latitude": 29.4925426,
       "longitude": 77.4280357
-    },
-    {
-      "name": "Sabdalpur",
-      "latitude": 29.9178235,
-      "longitude": 77.4777808
     },
     {
       "name": "Raichanda",

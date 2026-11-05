@@ -1,5 +1,5 @@
 {
-  "fetchedAt": "2026-06-29T06:22:41.014Z",
+  "fetchedAt": "2026-09-16T20:23:34.877Z",
   "villages": [
     {
       "name": "Shermau",
@@ -12,9 +12,19 @@
       "longitude": 77.4777808
     },
     {
+      "name": "Hajipur",
+      "latitude": 29.809901,
+      "longitude": 77.3041836
+    },
+    {
       "name": "Bahadur Nagar",
       "latitude": 29.7655803,
       "longitude": 77.2223028
+    },
+    {
+      "name": "Alipura",
+      "latitude": 29.8178345,
+      "longitude": 77.309867
     },
     {
       "name": "Jukheri",
@@ -30,6 +40,11 @@
       "name": "Kapuri",
       "latitude": 29.8625406,
       "longitude": 77.3937554
+    },
+    {
+      "name": "Salhapur",
+      "latitude": 29.9509415,
+      "longitude": 77.3397677
     }
   ]
 }

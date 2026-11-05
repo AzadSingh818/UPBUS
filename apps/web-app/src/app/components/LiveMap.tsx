@@ -104,6 +104,11 @@ export default function LiveMap({
         mapInstanceRef.current.invalidateSize();
       }
     }, 100);
+    setTimeout(() => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.invalidateSize();
+      }
+    }, 400);
 
     // 2. Clear old stop markers
     stopMarkersRef.current.forEach(marker => marker.remove());
@@ -384,8 +389,9 @@ export default function LiveMap({
         busMarkerRef.current.setLatLng([latitude, longitude]);
         busMarkerRef.current.setIcon(selectedIcon);
         busMarkerRef.current.setPopupContent(popupContent);
+        busMarkerRef.current.setZIndexOffset(3000);
       } else {
-        busMarkerRef.current = L.marker([latitude, longitude], { icon: selectedIcon })
+        busMarkerRef.current = L.marker([latitude, longitude], { icon: selectedIcon, zIndexOffset: 3000 })
           .addTo(map)
           .bindPopup(popupContent);
       }
@@ -393,12 +399,8 @@ export default function LiveMap({
 
     if (isNavigationMode) {
       map.setView([latitude, longitude], 15);
-    } else if (!multipleRoutes || multipleRoutes.length === 0) {
-      // Only pan to bus location when NOT showing a route polyline
-      // (fitBounds already handles map center for route display)
-      if (latitude && longitude && !isNaN(latitude) && !isNaN(longitude)) {
-        map.panTo([latitude, longitude]);
-      }
+    } else if (latitude && longitude && !isNaN(latitude) && !isNaN(longitude) && busRegNo) {
+      map.panTo([latitude, longitude], { animate: true, duration: 1.2 });
     }
 
     return () => {
@@ -608,39 +610,43 @@ export default function LiveMap({
   };
 
   return (
-    <div className="glass-panel" style={{ padding: '12px', width: '100%' }}>
-      <style>{`
-        @keyframes navPulse {
-          0% { transform: scale(0.6); opacity: 1; }
-          100% { transform: scale(1.3); opacity: 0; }
-        }
-      `}</style>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '8px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#9ca3af' }}>
-          <span>🔴 Live GPS Track {stops && stops.length > 0 && <strong style={{color: '#10b981', marginLeft: '6px'}}>→ To {stops[stops.length-1].name}</strong>}</span>
-          <span>ID: {busRegNo}</span>
+    <div style={{ position: 'relative', width: '100%', height: '100%', minHeight: '100%' }}>
+      <div ref={mapContainerRef} className="map-container" style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1 }} />
+
+      {/* Sleek Floating Status Badge on Map */}
+      <div style={{
+        position: 'absolute',
+        top: '12px',
+        right: '12px',
+        zIndex: 1000,
+        background: 'rgba(10, 15, 30, 0.85)',
+        backdropFilter: 'blur(12px)',
+        border: '1px solid rgba(255, 255, 255, 0.1)',
+        borderRadius: '12px',
+        padding: '8px 14px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '10px',
+        fontSize: '12px',
+        color: '#f3f4f6',
+        boxShadow: '0 4px 15px rgba(0,0,0,0.4)',
+        pointerEvents: 'none'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span style={{ width: '8px', height: '8px', background: '#10b981', borderRadius: '50%', boxShadow: '0 0 8px #10b981' }}></span>
+          <span style={{ fontWeight: 600 }}>{busRegNo ? `Bus ${busRegNo}` : 'Live Route Track'}</span>
         </div>
-        {routeName && (
-          <div style={{ fontSize: '13px', color: '#f3f4f6', fontWeight: 600 }}>
-            🗺️ Route: {routeName}
-          </div>
+        {villages && villages.length > 0 && (
+          <span style={{ color: '#ff9f1c', borderLeft: '1px solid rgba(255,255,255,0.15)', paddingLeft: '8px', fontWeight: 600 }}>
+            📍 {villages.length} Villages
+          </span>
         )}
       </div>
-      {villages && villages.length > 0 && (
-        <div style={{ fontSize: '11px', color: '#ff9f1c', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={{ width: '7px', height: '7px', background: '#ff9f1c', borderRadius: '50%', display: 'inline-block' }}></span>
-          {villages.length} village{villages.length > 1 ? 's' : ''} on this route
-        </div>
-      )}
-      
-      <div style={{ position: 'relative', width: '100%' }}>
-        <div ref={mapContainerRef} className="map-container" />
 
-        {/* Floating overlays for Navigation Mode */}
-        {isNavigationMode && (
-          <>
-            {/* Top Instruction Banner */}
-            <div className="nav-top-banner" style={{
+      {/* Floating overlays for Navigation Mode */}
+      {isNavigationMode && (
+        <>
+          <div className="nav-top-banner" style={{
               position: 'absolute',
               top: '16px',
               left: '50%',
@@ -808,6 +814,5 @@ export default function LiveMap({
           </>
         )}
       </div>
-    </div>
-  );
+    );
 }

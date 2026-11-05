@@ -4,9 +4,9 @@
   "description": "Backend API and tracking ingestion engine for UP Roadways Live Tracking",
   "main": "dist/index.js",
   "scripts": {
-    "dev": "ts-node-dev --ignore-watch src/db/data.json --respawn --transpile-only src/index.ts",
-    "build": "tsc && node -e \"require('fs').copyFileSync('src/db/data.json', 'dist/db/data.json')\"",
-    "start": "node dist/index.js"
+    "dev": "ts-node-dev --max-old-space-size=4096 --ignore-watch src/db/data.json --respawn --transpile-only src/index.ts",
+    "build": "node --max-old-space-size=4096 ./node_modules/typescript/bin/tsc",
+    "start": "node --max-old-space-size=4096 dist/index.js"
   },
   "dependencies": {
     "@aws-sdk/client-ec2": "^3.1079.0",

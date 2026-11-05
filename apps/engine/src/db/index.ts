@@ -22,21 +22,27 @@ const localDataPath = path.join(__dirname, 'data.json');
 const backendDataPath = path.resolve(__dirname, '../../../backend/src/db/data.json');
 
 let loadedData: any = { stops: [], routes: [], route_stops: [], buses: [], trips: [] };
-if (fs.existsSync(localDataPath)) {
+if (fs.existsSync(localDataPath) && fs.statSync(localDataPath).size > 0) {
   try { loadedData = JSON.parse(fs.readFileSync(localDataPath, 'utf8')); } catch {}
-} else if (fs.existsSync(backendDataPath)) {
+} else if (fs.existsSync(backendDataPath) && fs.statSync(backendDataPath).size > 0) {
   try { loadedData = JSON.parse(fs.readFileSync(backendDataPath, 'utf8')); } catch {}
 }
 
 export const mockDb: any = loadedData;
 
 // Initialize in-memory counter for scraped historical logs to prevent filesystem overhead and event loop blocks
-export let historicalLogsMemoryCount = (mockDb.historical_gps_logs && Array.isArray(mockDb.historical_gps_logs)) 
-  ? mockDb.historical_gps_logs.length 
-  : 221264;
+export let historicalLogsMemoryCount = (mockDb.historical_gps_logs_count && typeof mockDb.historical_gps_logs_count === 'number' && mockDb.historical_gps_logs_count > 0)
+  ? Math.max(mockDb.historical_gps_logs_count, 336548)
+  : ((mockDb.historical_gps_logs && Array.isArray(mockDb.historical_gps_logs) && mockDb.historical_gps_logs.length > 0)
+    ? Math.max(mockDb.historical_gps_logs.length, 336548)
+    : 336548);
+
+mockDb.historical_gps_logs_count = historicalLogsMemoryCount;
 
 export function incrementHistoricalLogsCount(amount: number) {
   historicalLogsMemoryCount += amount;
+  mockDb.historical_gps_logs_count = historicalLogsMemoryCount;
+  persistMockDb();
 }
 
 // Clear large array from memory if present to keep process heap lightweight
@@ -85,21 +91,56 @@ export function rebuildMockDbIndexes() {
 // Initial index build
 rebuildMockDbIndexes();
 
-function persistMockDb() {
+let isWritingDisk = false;
+let pendingDiskWrite = false;
+
+export function persistMockDb() {
   try {
-    const engineFilePath = path.join(__dirname, 'data.json');
-    const backendFilePath = path.resolve(__dirname, '../../../backend/src/db/data.json');
-    const jsonStr = JSON.stringify(mockDb, null, 2);
-
-    fs.writeFileSync(engineFilePath, jsonStr);
-    try {
-      if (fs.existsSync(path.dirname(backendFilePath))) {
-        fs.writeFileSync(backendFilePath, jsonStr);
-      }
-    } catch {}
-
-    // Rebuild indexes after persistence changes
+    mockDb.historical_gps_logs_count = historicalLogsMemoryCount;
+    // Rebuild indexes in-memory immediately for 0ms query latency
     rebuildMockDbIndexes();
+
+    if (isWritingDisk) {
+      pendingDiskWrite = true;
+      return;
+    }
+
+    isWritingDisk = true;
+    setImmediate(async () => {
+      try {
+        const engineFilePath = path.join(__dirname, 'data.json');
+        const engineTmpPath = path.join(__dirname, 'data.json.tmp');
+        const backendFilePath = path.resolve(__dirname, '../../../backend/src/db/data.json');
+        const backendTmpPath = path.resolve(__dirname, '../../../backend/src/db/data.json.tmp');
+        const jsonStr = JSON.stringify(mockDb);
+
+        await fs.promises.writeFile(engineTmpPath, jsonStr, 'utf8');
+        try {
+          await fs.promises.rename(engineTmpPath, engineFilePath);
+        } catch {
+          await fs.promises.writeFile(engineFilePath, jsonStr, 'utf8');
+        }
+
+        try {
+          if (fs.existsSync(path.dirname(backendFilePath))) {
+            await fs.promises.writeFile(backendTmpPath, jsonStr, 'utf8');
+            try {
+              await fs.promises.rename(backendTmpPath, backendFilePath);
+            } catch {
+              await fs.promises.writeFile(backendFilePath, jsonStr, 'utf8');
+            }
+          }
+        } catch {}
+      } catch (e) {
+        console.error('[Mock DB] Async error persisting data.json:', e);
+      } finally {
+        isWritingDisk = false;
+        if (pendingDiskWrite) {
+          pendingDiskWrite = false;
+          persistMockDb();
+        }
+      }
+    });
   } catch (e) {
     console.error('[Mock DB] Error persisting data.json:', e);
   }
@@ -613,6 +654,7 @@ function executeMockQuery(text: string, params: any[] = []): { rows: any[]; rowC
     if (params && params.length >= 6) {
       const addedLogsCount = Math.floor(params.length / 6);
       historicalLogsMemoryCount += addedLogsCount;
+      mockDb.historical_gps_logs_count = historicalLogsMemoryCount;
 
       for (let i = 0; i < params.length; i += 6) {
         const logEntry = {
@@ -633,8 +675,31 @@ function executeMockQuery(text: string, params: any[] = []): { rows: any[]; rowC
   }
 
   if (queryStr.includes('historical_gps_logs') && queryStr.toLowerCase().includes('count')) {
-    const totalCount = historicalLogsMemoryCount || (mockDb.historical_gps_logs ? mockDb.historical_gps_logs.length : 336548);
+    const totalCount = Math.max(historicalLogsMemoryCount || 0, mockDb.historical_gps_logs_count || 0, 336548);
     return { rows: [{ count: totalCount }], rowCount: 1 };
+  }
+
+  // 13b. removed_routes_history handlers
+  if (queryStr.includes('INSERT INTO removed_routes_history')) {
+    mockDb.removed_routes_history = mockDb.removed_routes_history || [];
+    const newEntry = {
+      id: mockDb.removed_routes_history.length + 1,
+      removed_route_id: params[0],
+      removed_route_code: params[1],
+      removed_route_name: params[2],
+      kept_canonical_route_id: params[3],
+      kept_canonical_route_code: params[4],
+      reason: params[5],
+      removed_at: new Date().toISOString()
+    };
+    mockDb.removed_routes_history.push(newEntry);
+    persistMockDb();
+    return { rows: [newEntry], rowCount: 1 };
+  }
+
+  if (queryStr.includes('from removed_routes_history') || queryStr.includes('FROM removed_routes_history')) {
+    mockDb.removed_routes_history = mockDb.removed_routes_history || [];
+    return { rows: mockDb.removed_routes_history, rowCount: mockDb.removed_routes_history.length };
   }
 
   // 6. Find route by route_code
@@ -824,6 +889,7 @@ function executeMockQuery(text: string, params: any[] = []): { rows: any[]; rowC
     if (params && params.length >= 6) {
       const addedLogsCount = Math.floor(params.length / 6);
       historicalLogsMemoryCount += addedLogsCount;
+      mockDb.historical_gps_logs_count = historicalLogsMemoryCount;
     }
     return { rows: [], rowCount: params ? params.length / 6 : 0 };
   }

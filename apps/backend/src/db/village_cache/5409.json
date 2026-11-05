@@ -1,0 +1,465 @@
+{
+  "fetchedAt": "2026-09-16T19:56:23.769Z",
+  "villages": [
+    {
+      "name": "Jahidpur",
+      "latitude": 28.9276151,
+      "longitude": 77.7235868
+    },
+    {
+      "name": "Sakhan Khurd",
+      "latitude": 29.7350918,
+      "longitude": 77.6620101
+    },
+    {
+      "name": "Daurala",
+      "latitude": 29.1149252,
+      "longitude": 77.7054571
+    },
+    {
+      "name": "Tehsil",
+      "latitude": 28.7303496,
+      "longitude": 77.7757653
+    },
+    {
+      "name": "Ghasipura",
+      "latitude": 29.3686372,
+      "longitude": 77.7053546
+    },
+    {
+      "name": "Gurudwara Chowk",
+      "latitude": 28.7302908,
+      "longitude": 77.7743893
+    },
+    {
+      "name": "Leporsty Colony",
+      "latitude": 28.7417348,
+      "longitude": 77.7730369
+    },
+    {
+      "name": "Adarshnagar Colony",
+      "latitude": 28.7319389,
+      "longitude": 77.7732794
+    },
+    {
+      "name": "Teacher Colony",
+      "latitude": 28.7279645,
+      "longitude": 77.7743664
+    },
+    {
+      "name": "Lothi Gate Nagar",
+      "latitude": 28.7292626,
+      "longitude": 77.7777412
+    },
+    {
+      "name": "Krishna Vihar",
+      "latitude": 28.7444939,
+      "longitude": 77.7687833
+    },
+    {
+      "name": "Thehri Buzurg",
+      "latitude": 29.7668218,
+      "longitude": 77.649481
+    },
+    {
+      "name": "Kaili",
+      "latitude": 28.790604,
+      "longitude": 77.7562093
+    },
+    {
+      "name": "Sanjay Vihar",
+      "latitude": 28.743224,
+      "longitude": 77.7755551
+    },
+    {
+      "name": "Nihal Kheri",
+      "latitude": 29.6277669,
+      "longitude": 77.6861793
+    },
+    {
+      "name": "Phaphunda",
+      "latitude": 28.8851512,
+      "longitude": 77.739129
+    },
+    {
+      "name": "Jaroda Jatt",
+      "latitude": 29.6368888,
+      "longitude": 77.6931666
+    },
+    {
+      "name": "Krishna Nagar",
+      "latitude": 28.7371096,
+      "longitude": 77.7780968
+    },
+    {
+      "name": "Keshav Nagar",
+      "latitude": 28.7421846,
+      "longitude": 77.7671955
+    },
+    {
+      "name": "Madhuban Colony",
+      "latitude": 28.735767,
+      "longitude": 77.7688348
+    },
+    {
+      "name": "Trivanti Ganj",
+      "latitude": 28.7267231,
+      "longitude": 77.7797027
+    },
+    {
+      "name": "Meghrajpur",
+      "latitude": 29.7199944,
+      "longitude": 77.6642626
+    },
+    {
+      "name": "Govindnagar",
+      "latitude": 28.7315027,
+      "longitude": 77.7693228
+    },
+    {
+      "name": "Rajender Nagar",
+      "latitude": 28.7346244,
+      "longitude": 77.7799984
+    },
+    {
+      "name": "Rafiq Nagar Majeedpura",
+      "latitude": 28.7236039,
+      "longitude": 77.7738644
+    },
+    {
+      "name": "Kharkhauda",
+      "latitude": 28.8367041,
+      "longitude": 77.7407598
+    },
+    {
+      "name": "Gandhi Ganj",
+      "latitude": 28.7286882,
+      "longitude": 77.7825156
+    },
+    {
+      "name": "Shahpur",
+      "latitude": 29.7577461,
+      "longitude": 77.6593494
+    },
+    {
+      "name": "Ravi Nagar",
+      "latitude": 28.742866,
+      "longitude": 77.7798092
+    },
+    {
+      "name": "Sarsina",
+      "latitude": 29.7835985,
+      "longitude": 77.6466035
+    },
+    {
+      "name": "Sarrafa Bazar",
+      "latitude": 28.7248919,
+      "longitude": 77.782371
+    },
+    {
+      "name": "Sakoti",
+      "latitude": 29.1852876,
+      "longitude": 77.7140235
+    },
+    {
+      "name": "Ganeshpura Mohalla",
+      "latitude": 28.7346374,
+      "longitude": 77.765239
+    },
+    {
+      "name": "Panchsheel Colony",
+      "latitude": 28.7395827,
+      "longitude": 77.7639652
+    },
+    {
+      "name": "Manipakka Bagh",
+      "latitude": 28.7318039,
+      "longitude": 77.7836082
+    },
+    {
+      "name": "Kotla Mewantiyan Purani chungi",
+      "latitude": 28.7217033,
+      "longitude": 77.779719
+    },
+    {
+      "name": "Sakhan Kalan",
+      "latitude": 29.7402341,
+      "longitude": 77.649393
+    },
+    {
+      "name": "Shiv Puri",
+      "latitude": 28.7341733,
+      "longitude": 77.7839536
+    },
+    {
+      "name": "Kasimpura",
+      "latitude": 29.7106841,
+      "longitude": 77.6642228
+    },
+    {
+      "name": "Walidpur",
+      "latitude": 29.1468391,
+      "longitude": 77.715311
+    },
+    {
+      "name": "Shrinagar",
+      "latitude": 28.7379182,
+      "longitude": 77.7831564
+    },
+    {
+      "name": "Inderalok Coloni",
+      "latitude": 28.7306121,
+      "longitude": 77.7857742
+    },
+    {
+      "name": "Akash Vikas Colony",
+      "latitude": 28.7196914,
+      "longitude": 77.7782762
+    },
+    {
+      "name": "Jurranpur",
+      "latitude": 28.9221262,
+      "longitude": 77.7135109
+    },
+    {
+      "name": "Sikandarpur",
+      "latitude": 28.7232149,
+      "longitude": 77.7851976
+    },
+    {
+      "name": "Baseda",
+      "latitude": 29.8108646,
+      "longitude": 77.6373452
+    },
+    {
+      "name": "Bajout",
+      "latitude": 28.9291233,
+      "longitude": 77.7111671
+    },
+    {
+      "name": "Budhana Kalan",
+      "latitude": 29.5681692,
+      "longitude": 77.6831171
+    },
+    {
+      "name": "Arjun Nagar",
+      "latitude": 28.7307812,
+      "longitude": 77.7615162
+    },
+    {
+      "name": "Jasrup Nagar",
+      "latitude": 28.7334281,
+      "longitude": 77.7600702
+    },
+    {
+      "name": "Navjyoty Colony",
+      "latitude": 28.7270059,
+      "longitude": 77.7901654
+    },
+    {
+      "name": "Kavi Nagar",
+      "latitude": 28.7332228,
+      "longitude": 77.7899829
+    },
+    {
+      "name": "Chandralok Colony",
+      "latitude": 28.7407845,
+      "longitude": 77.75649
+    },
+    {
+      "name": "Talheri Buzurg",
+      "latitude": 29.769332,
+      "longitude": 77.6629972
+    },
+    {
+      "name": "Ghosipur",
+      "latitude": 28.9277012,
+      "longitude": 77.7408075
+    },
+    {
+      "name": "Jarauda",
+      "latitude": 29.4019178,
+      "longitude": 77.687931
+    },
+    {
+      "name": "Foolgadiapur",
+      "latitude": 28.7232268,
+      "longitude": 77.7909622
+    },
+    {
+      "name": "Mehtab Garhi",
+      "latitude": 28.7201179,
+      "longitude": 77.7893035
+    },
+    {
+      "name": "Ra j Nagar Colony",
+      "latitude": 28.739443,
+      "longitude": 77.7912599
+    },
+    {
+      "name": "Syam Nagar",
+      "latitude": 28.7355873,
+      "longitude": 77.7547334
+    },
+    {
+      "name": "Gunarsa",
+      "latitude": 29.6513606,
+      "longitude": 77.6678466
+    },
+    {
+      "name": "Bheem Nagar",
+      "latitude": 28.7267064,
+      "longitude": 77.7949952
+    },
+    {
+      "name": "Hashimpura",
+      "latitude": 29.6998991,
+      "longitude": 77.7027419
+    },
+    {
+      "name": "Loiya",
+      "latitude": 29.1548973,
+      "longitude": 77.7262973
+    },
+    {
+      "name": "Sarvoday Colony",
+      "latitude": 28.7309273,
+      "longitude": 77.796034
+    },
+    {
+      "name": "Lisari",
+      "latitude": 28.9379495,
+      "longitude": 77.6994306
+    },
+    {
+      "name": "Jeetpur",
+      "latitude": 29.18821,
+      "longitude": 77.7278852
+    },
+    {
+      "name": "Samiah Garden City",
+      "latitude": 28.7100849,
+      "longitude": 77.7829353
+    },
+    {
+      "name": "Dwarika City",
+      "latitude": 29.4493151,
+      "longitude": 77.7283261
+    },
+    {
+      "name": "Shiv Nagar",
+      "latitude": 28.7290064,
+      "longitude": 77.7499942
+    },
+    {
+      "name": "Kheri Aasa",
+      "latitude": 29.7198504,
+      "longitude": 77.6420919
+    },
+    {
+      "name": "Isharpur",
+      "latitude": 29.6680158,
+      "longitude": 77.6602578
+    },
+    {
+      "name": "Nanhera Aasa",
+      "latitude": 29.7284957,
+      "longitude": 77.6366901
+    },
+    {
+      "name": "गोविन्दपुरी",
+      "latitude": 28.8559128,
+      "longitude": 77.7698564
+    },
+    {
+      "name": "Tabita",
+      "latitude": 29.2403869,
+      "longitude": 77.7326059
+    },
+    {
+      "name": "Khajoori",
+      "latitude": 29.7088541,
+      "longitude": 77.6456164
+    },
+    {
+      "name": "Labakri",
+      "latitude": 29.6964199,
+      "longitude": 77.6497455
+    },
+    {
+      "name": "Sabli",
+      "latitude": 28.7110572,
+      "longitude": 77.7537103
+    },
+    {
+      "name": "Sisauna",
+      "latitude": 29.53125,
+      "longitude": 77.73239
+    },
+    {
+      "name": "Nangla Sher Khan",
+      "latitude": 28.9336971,
+      "longitude": 77.6879169
+    },
+    {
+      "name": "Gesupur Baphawat",
+      "latitude": 29.0966771,
+      "longitude": 77.6716661
+    },
+    {
+      "name": "Prahlad Nagar",
+      "latitude": 28.7366876,
+      "longitude": 77.8091764
+    },
+    {
+      "name": "New Mandi",
+      "latitude": 28.7257393,
+      "longitude": 77.8114433
+    },
+    {
+      "name": "Sidki",
+      "latitude": 29.8765972,
+      "longitude": 77.631626
+    },
+    {
+      "name": "Achheja",
+      "latitude": 28.7252431,
+      "longitude": 77.7361755
+    },
+    {
+      "name": "Rankhandi",
+      "latitude": 29.6161473,
+      "longitude": 77.6506805
+    },
+    {
+      "name": "Manki",
+      "latitude": 29.6989013,
+      "longitude": 77.724967
+    },
+    {
+      "name": "Salawa",
+      "latitude": 29.2299012,
+      "longitude": 77.6613235
+    },
+    {
+      "name": "Patna",
+      "latitude": 28.7330571,
+      "longitude": 77.8227763
+    },
+    {
+      "name": "Gokulpur",
+      "latitude": 28.94563,
+      "longitude": 77.7689139
+    },
+    {
+      "name": "Aterna",
+      "latitude": 29.1737848,
+      "longitude": 77.655682
+    },
+    {
+      "name": "Tatarpur",
+      "latitude": 28.7185477,
+      "longitude": 77.8242102
+    }
+  ]
+}

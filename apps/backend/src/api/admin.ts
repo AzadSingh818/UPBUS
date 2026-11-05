@@ -171,3 +171,21 @@ router.get('/monitor/map-data', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// 8. Get removed routes history audit trail
+router.get('/monitor/removed-routes', (req, res) => {
+  const history = mockDb.removed_routes_history || [];
+  res.json({ removedRoutes: history });
+});
+
+// 9. Trigger deduplication scan endpoint
+router.post('/monitor/deduplicate', async (req, res) => {
+  try {
+    const { runRouteDeduplicationCycle } = require('../../../engine/src/engine/routeDeduplicationEngine');
+    const result = await runRouteDeduplicationCycle();
+    res.json({ success: true, result });
+  } catch (err: any) {
+    res.json({ success: false, error: err.message, history: mockDb.removed_routes_history || [] });
+  }
+});
+

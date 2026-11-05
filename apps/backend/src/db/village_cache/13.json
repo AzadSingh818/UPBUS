@@ -1,5 +1,5 @@
 {
-  "fetchedAt": "2026-06-28T16:20:47.560Z",
+  "fetchedAt": "2026-09-27T06:31:55.704Z",
   "villages": [
     {
       "name": "Khudana",
@@ -130,6 +130,11 @@
       "name": "Raichanda",
       "latitude": 29.7340483,
       "longitude": 77.4929666
+    },
+    {
+      "name": "Titoly",
+      "latitude": 29.467512,
+      "longitude": 77.273755
     },
     {
       "name": "Garhi Pukhta",

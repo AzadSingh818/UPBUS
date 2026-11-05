@@ -46,7 +46,138 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
   return R * c;
 }
 
-const getDistinguishingStop = (journey: Journey, allJourneys: Journey[]) => {
+function getCoreStopWord(str: string): string {
+  if (!str) return '';
+  return str
+    .toLowerCase()
+    .replace(/\s+(bus station|bus stand|depot|terminal|isbt|peer|village)$/gi, '')
+    .trim();
+}
+
+function getSegmentViaText(
+  stops: { name: string; sequenceNo?: number }[],
+  fromName: string,
+  toName: string,
+  rawRouteName?: string
+): string {
+  if (!stops || stops.length === 0 || !fromName || !toName) return '';
+
+  const fromCore = getCoreStopWord(fromName);
+  const toCore = getCoreStopWord(toName);
+
+  if (!fromCore || !toCore) return '';
+
+  let fromIdx = stops.findIndex(s => {
+    const sCore = getCoreStopWord(s.name);
+    return sCore.includes(fromCore) || fromCore.includes(sCore);
+  });
+  let toIdx = stops.findIndex(s => {
+    const sCore = getCoreStopWord(s.name);
+    return sCore.includes(toCore) || toCore.includes(sCore);
+  });
+
+  if (fromIdx === -1 || toIdx === -1) {
+    if (fromIdx === -1) fromIdx = 0;
+    if (toIdx === -1) toIdx = stops.length - 1;
+  }
+
+  if (fromIdx >= toIdx) {
+    return '';
+  }
+
+  const intermediateStops = stops.slice(fromIdx + 1, toIdx);
+
+  const viaMatch = rawRouteName?.match(/\(via\s+([^)]+)\)/i);
+  if (viaMatch && viaMatch[1]) {
+    const viaTarget = viaMatch[1].trim();
+    const viaTargetCore = getCoreStopWord(viaTarget);
+
+    const isActuallyInSegment = intermediateStops.some(s => {
+      const sCore = getCoreStopWord(s.name);
+      return sCore.includes(viaTargetCore) || viaTargetCore.includes(sCore);
+    });
+
+    if (isActuallyInSegment) {
+      return viaTarget;
+    }
+  }
+
+  const keyStops = ['Nakur', 'Ambehta', 'Khera Afghan', 'Phandpuri', 'Chilkana', 'Sarsawa', 'Nanauta', 'Rampur Maniharan'];
+  for (const key of keyStops) {
+    const keyCore = getCoreStopWord(key);
+    const foundStop = intermediateStops.find(s => {
+      const sCore = getCoreStopWord(s.name);
+      return sCore.includes(keyCore) || keyCore.includes(sCore);
+    });
+    if (foundStop) {
+      return key;
+    }
+  }
+
+  return '';
+}
+
+function getDeduplicatedRoutes(routes: Route[], fromStop: string, toStop: string): { route: Route; viaText: string }[] {
+  if (!routes || routes.length === 0) return [];
+
+  const grouped = new Map<string, { route: Route; viaText: string }>();
+
+  for (const r of routes) {
+    const viaText = getSegmentViaText(r.stops || [], fromStop, toStop, r.route_name);
+    const key = `${getCoreStopWord(fromStop)}_${getCoreStopWord(toStop)}_${viaText.toLowerCase()}`;
+
+    if (!grouped.has(key)) {
+      grouped.set(key, {
+        route: {
+          ...r,
+          nextTrips: [...(r.nextTrips || [])],
+          missedTrips: [...(r.missedTrips || [])]
+        },
+        viaText
+      });
+    } else {
+      const existing = grouped.get(key)!;
+      const existingNextIds = new Set(existing.route.nextTrips.map(t => t.tripId));
+      for (const trip of (r.nextTrips || [])) {
+        if (!existingNextIds.has(trip.tripId)) {
+          existing.route.nextTrips.push(trip);
+        }
+      }
+      const existingMissedIds = new Set(existing.route.missedTrips.map(t => t.tripId));
+      for (const trip of (r.missedTrips || [])) {
+        if (!existingMissedIds.has(trip.tripId)) {
+          existing.route.missedTrips.push(trip);
+        }
+      }
+    }
+  }
+
+  return Array.from(grouped.values());
+}
+
+function getDeduplicatedJourneys(journeys: Journey[], fromStop: string, toStop: string): Journey[] {
+  if (!journeys || journeys.length === 0) return [];
+
+  const seenKeys = new Set<string>();
+  const deduplicated: Journey[] = [];
+
+  for (const j of journeys) {
+    if (j.totalTransfers === 0 && j.legs && j.legs.length > 0) {
+      const stops = j.legs[0].stops || [];
+      const viaText = getSegmentViaText(stops, fromStop, toStop, j.legs[0].routeName);
+      const key = `${getCoreStopWord(fromStop)}_${getCoreStopWord(toStop)}_${viaText.toLowerCase()}`;
+      if (seenKeys.has(key)) continue;
+      seenKeys.add(key);
+      deduplicated.push(j);
+    } else {
+      deduplicated.push(j);
+    }
+  }
+
+  return deduplicated;
+}
+
+const getDistinguishingStop = (journey: Journey, allJourneys: Journey[], fromCity: string, toCity: string) => {
   if (allJourneys.length <= 1 || journey.totalTransfers > 0 || !journey.legs || journey.legs.length === 0) {
     return 'Direct';
   }
@@ -54,55 +185,12 @@ const getDistinguishingStop = (journey: Journey, allJourneys: Journey[]) => {
   const currentStops = journey.legs[0].stops || [];
   if (currentStops.length === 0) return 'Direct';
 
-  // Read from leg's source and destination to avoid undefined journey properties
-  const fromCity = (journey.legs[0].from || '').toLowerCase();
-  const toCity = (journey.legs[0].to || '').toLowerCase();
-
-  // Specific check for Saharanpur <-> Gangoh
-  if (
-    (fromCity.includes('saharanpur') && toCity.includes('gangoh')) ||
-    (fromCity.includes('gangoh') && toCity.includes('saharanpur'))
-  ) {
-    // Saharanpur to Gangoh (division after Phandpuri/Khera Afgan into Ambehta/Nakur)
-    if (fromCity.includes('saharanpur') && toCity.includes('gangoh')) {
-      const hasAmbehta = currentStops.some(s => s.name.toLowerCase().includes('ambehta'));
-      if (hasAmbehta) return 'Ambehta';
-      const hasNakur = currentStops.some(s => s.name.toLowerCase().includes('nakur'));
-      if (hasNakur) return 'Nakur';
-    }
-    // Gangoh to Saharanpur (meeting at Phandpuri)
-    if (fromCity.includes('gangoh') && toCity.includes('saharanpur')) {
-      const hasPhandpuri = currentStops.some(s => s.name.toLowerCase().includes('phandpuri'));
-      if (hasPhandpuri) return 'Phandpuri';
-    }
+  const viaText = getSegmentViaText(currentStops, fromCity, toCity, journey.legs[0].routeName);
+  if (viaText) {
+    return viaText;
   }
 
-  // General fallback logic:
-  // If the route name itself contains "via <StopName>", extract and return it!
-  const routeName = journey.legs[0].routeName || '';
-  const viaMatch = routeName.match(/\(via\s+([^)]+)\)/i);
-  if (viaMatch && viaMatch[1]) {
-    return viaMatch[1].trim();
-  }
-
-  // Fallback to general distinguishing stop algorithm
-  const otherDirectJourneys = allJourneys.filter(oj => oj !== journey && oj.totalTransfers === 0 && oj.legs && oj.legs.length > 0);
-  if (otherDirectJourneys.length === 0) return 'Direct';
-
-  for (let i = 1; i < currentStops.length; i++) {
-    const currentStopName = currentStops[i].name;
-    const hasDifference = otherDirectJourneys.some(oj => {
-      const otherStops = oj.legs[0].stops || [];
-      return !otherStops[i] || otherStops[i].name !== currentStopName;
-    });
-
-    if (hasDifference) {
-      return currentStopName
-        .replace(/\s+(Bus Stand|Depot|Terminal|Peer|Village)$/i, '')
-        .trim();
-    }
-  }
-  return currentStops[1]?.name.replace(/\s+(Bus Stand|Depot|Terminal|Peer|Village)$/i, '').trim() || 'Direct';
+  return 'Direct';
 };
 
 let API_BASE = '/api/v1';
@@ -300,15 +388,61 @@ export default function Home() {
   const [fromSuggestions, setFromSuggestions] = useState<{ id: number; name: string }[]>([]);
   const [toSuggestions, setToSuggestions] = useState<{ id: number; name: string }[]>([]);
 
+  const filterAndDeduplicateStops = (stops: { id: number; name: string }[], queryVal: string) => {
+    const q = queryVal.toLowerCase().trim();
+    if (!q) return [];
+
+    const matches = stops.filter(s => s.name.toLowerCase().includes(q));
+
+    const isRawAllCaps = (str: string) => {
+      const letters = str.replace(/[^a-zA-Z]/g, '');
+      return letters.length > 0 && letters === letters.toUpperCase();
+    };
+
+    const sortedCandidates = [...matches].sort((a, b) => {
+      const aAllCaps = isRawAllCaps(a.name);
+      const bAllCaps = isRawAllCaps(b.name);
+
+      if (aAllCaps && !bAllCaps) return 1;
+      if (!aAllCaps && bAllCaps) return -1;
+
+      const terminalRegex = /(Bus Station|Bus Stand|Terminal|ISBT|Depot)/i;
+      const aIsTerminal = terminalRegex.test(a.name);
+      const bIsTerminal = terminalRegex.test(b.name);
+
+      if (aIsTerminal && !bIsTerminal) return -1;
+      if (!aIsTerminal && bIsTerminal) return 1;
+
+      return a.name.localeCompare(b.name);
+    });
+
+    const result: { id: number; name: string }[] = [];
+    const seenNames = new Set<string>();
+
+    for (const stop of sortedCandidates) {
+      const lowerName = stop.name.toLowerCase().trim();
+
+      if (isRawAllCaps(stop.name)) {
+        const hasFormattedEquivalent = result.some(r => r.name.toLowerCase().includes(lowerName));
+        if (hasFormattedEquivalent) continue;
+      }
+
+      if (seenNames.has(lowerName)) continue;
+
+      seenNames.add(lowerName);
+      result.push(stop);
+    }
+
+    return result.slice(0, 8);
+  };
+
   const handleFromChange = (val: string) => {
     setFrom(val);
     if (!val.trim()) {
       setFromSuggestions([]);
       return;
     }
-    const filtered = allStops.filter(s => 
-      s.name.toLowerCase().includes(val.toLowerCase())
-    ).slice(0, 10);
+    const filtered = filterAndDeduplicateStops(allStops, val);
     setFromSuggestions(filtered);
     setShowFromSuggestions(true);
   };
@@ -319,9 +453,7 @@ export default function Home() {
       setToSuggestions([]);
       return;
     }
-    const filtered = allStops.filter(s => 
-      s.name.toLowerCase().includes(val.toLowerCase())
-    ).slice(0, 10);
+    const filtered = filterAndDeduplicateStops(allStops, val);
     setToSuggestions(filtered);
     setShowToSuggestions(true);
   };
@@ -341,7 +473,6 @@ export default function Home() {
   const [journeys, setJourneys] = useState<Journey[]>([]);
   const [selectedJourneyIdx, setSelectedJourneyIdx] = useState(0);
   const [selectedRouteIdx, setSelectedRouteIdx] = useState(0);
-  const journey = journeys[selectedJourneyIdx] || null;
   const [hasSearched, setHasSearched] = useState(false);
   const [viewMode, setViewMode] = useState<'direct' | 'journey' | 'bus'>('bus');
   const [busNumber, setBusNumber] = useState('UP11AT0072');
@@ -554,16 +685,18 @@ export default function Home() {
 
     try {
       if (viewMode === 'journey') {
-        const res = await fetch(`${API_BASE}/journey?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
-        const data = await res.json();
+        const [jRes, rRes] = await Promise.all([
+          fetch(`${API_BASE}/journey?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
+          fetch(`${API_BASE}/search/routes?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`)
+        ]);
+        const data = await jRes.json();
+        const d2 = await rRes.json();
+
         const journeysList = data.journeys || (data.legs ? [data] : []);
         setJourneys(journeysList);
         setSelectedJourneyIdx(0);
-        const r2 = await fetch(`${API_BASE}/search/routes?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
-        const d2 = await r2.json();
         setRoutes(d2.routes || []);
-        // Fetch villages — use routeId from leg (now included by backend),
-        // or fall back to matching routeCode in the direct-routes list
+
         const firstLeg = journeysList[0]?.legs?.[0];
         const routeIdToFetch = firstLeg?.routeId
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -612,7 +745,7 @@ export default function Home() {
       const res = await fetch(`${API_BASE}/search/bus/${busNumber}`);
       if (!res.ok) {
         if (res.status === 404) alert('Bus not found or offline');
-        throw new Error('Bus fetch failed');
+        return;
       }
       const data = await res.json();
       setSelectedTrip({ trip_id: data.tripId, status: data.status, registration_no: data.busRegNo, bus_type: data.busType, depot_name: 'Margdarshi Live' });
@@ -702,10 +835,14 @@ export default function Home() {
     setIsPassenger(false);
   };
 
+  const displayRoutes = getDeduplicatedRoutes(routes, from, to);
+  const displayJourneys = getDeduplicatedJourneys(journeys, from, to);
+  const journey = displayJourneys[selectedJourneyIdx] || null;
+
   // Auto-track bus when selecting a route in Bus Mode
   useEffect(() => {
-    if (viewMode === 'bus' && hasDirectRoutes && routes[selectedRouteIdx]) {
-      const r = routes[selectedRouteIdx];
+    if (viewMode === 'bus' && displayRoutes.length > 0 && displayRoutes[selectedRouteIdx]) {
+      const r = displayRoutes[selectedRouteIdx].route;
       
       const trip = r.nextTrips?.[0] || r.missedTrips?.[0];
       if (trip && !isPassenger) {
@@ -714,12 +851,12 @@ export default function Home() {
         stopTracking();
       }
     }
-  }, [selectedRouteIdx, routes, viewMode, isPassenger]);
+  }, [selectedRouteIdx, displayRoutes, viewMode, isPassenger]);
 
   // Auto-track bus when selecting a journey option
   useEffect(() => {
-    if (viewMode === 'journey' && journeys.length > 0 && journeys[selectedJourneyIdx]) {
-      const journey = journeys[selectedJourneyIdx];
+    if (viewMode === 'journey' && displayJourneys.length > 0 && displayJourneys[selectedJourneyIdx]) {
+      const journey = displayJourneys[selectedJourneyIdx];
       const firstLeg = journey.legs[0];
       if (firstLeg && firstLeg.busInfo && !isPassenger) {
         handleTrackBus(firstLeg.busInfo.trip_id, firstLeg.busInfo.registration_no, firstLeg.routeCode);
@@ -727,7 +864,7 @@ export default function Home() {
         stopTracking();
       }
     }
-  }, [selectedJourneyIdx, journeys, viewMode, isPassenger]);
+  }, [selectedJourneyIdx, displayJourneys, viewMode, isPassenger]);
 
   // ── Crowd-sourced location reporting effect ──────────────────────────────
   useEffect(() => {
@@ -860,8 +997,8 @@ export default function Home() {
   let mapBusSpeed = 0;
   let mapBusRouteName = '';
 
-  if (viewMode === 'journey' && journeys.length > 0) {
-    const selectedJourney = journeys[selectedJourneyIdx];
+  if (viewMode === 'journey' && displayJourneys.length > 0) {
+    const selectedJourney = displayJourneys[selectedJourneyIdx];
     if (selectedJourney) {
       // Set map center to start stop of first leg
       const firstStop = selectedJourney.legs?.[0]?.stops?.[0];
@@ -882,8 +1019,8 @@ export default function Home() {
         mapBusRouteName = activeLeg.routeName;
       }
     }
-  } else if (viewMode === 'direct' && routes.length > 0) {
-    const selectedRoute = routes[selectedRouteIdx];
+  } else if (viewMode === 'direct' && displayRoutes.length > 0) {
+    const selectedRoute = displayRoutes[selectedRouteIdx]?.route;
     if (selectedRoute) {
       const firstStop = selectedRoute.stops?.[0];
       if (firstStop) {
@@ -906,9 +1043,33 @@ export default function Home() {
   }
 
   // ── Render ───────────────────────────────────────────────────────────────
-  const hasDirectRoutes = routes.length > 0;
-  const hasJourney = journey && journey.legs && journey.legs.length > 0;
+  const hasDirectRoutes = displayRoutes.length > 0;
+  const hasJourney = displayJourneys.length > 0 && journey && journey.legs && journey.legs.length > 0;
   const showTrackingPanel = liveDetails !== null;
+
+  // Filtered stops for active tracking bus
+  const fromQuery = (from || '').toLowerCase().trim();
+  const toQuery = (to || '').toLowerCase().trim();
+
+  let filteredStops: StopETA[] = [];
+  if (liveDetails && liveDetails.stops) {
+    let startIdx = 0;
+    if (fromQuery) {
+      const idx = liveDetails.stops.findIndex(s => s.name.toLowerCase().includes(fromQuery));
+      if (idx !== -1) startIdx = idx;
+    }
+    let endIdx = liveDetails.stops.length - 1;
+    if (toQuery) {
+      const idx = liveDetails.stops.findIndex(s => s.name.toLowerCase().includes(toQuery));
+      if (idx !== -1) endIdx = idx;
+    }
+    let sIdx = startIdx;
+    let eIdx = endIdx;
+    if (sIdx > eIdx) {
+      [sIdx, eIdx] = [eIdx, sIdx];
+    }
+    filteredStops = liveDetails.stops.slice(sIdx, eIdx + 1);
+  }
 
   return (
     <main className="app-root">
@@ -929,14 +1090,14 @@ export default function Home() {
       </header>
 
       <div className="page-body">
-        {/* ── Search Panel ── */}
+        {/* ── Search Panel (Left Sidebar) ── */}
         <aside className="search-panel">
           <form onSubmit={viewMode === 'bus' ? handleSearchBus : handleSearch} className="search-form">
             <div className="search-title">Find Your Bus</div>
 
             {/* Mode toggle */}
             <div className="mode-toggle">
-              <button type="button" className={`mode-btn ${viewMode === 'bus' ? 'active' : ''}`} onClick={() => setViewMode('bus')}>
+              <button type="button" className={`mode-btn ${viewMode === 'bus' ? 'active' : ''}`} onClick={() => { setViewMode('bus'); setJourneys([]); setRoutes([]); stopTracking(); }}>
                 <Bus size={13} /> Bus No.
               </button>
               <button type="button" className={`mode-btn ${viewMode === 'journey' ? 'active' : ''}`} onClick={() => setViewMode('journey')}>
@@ -1031,15 +1192,243 @@ export default function Home() {
             </button>
           </form>
 
-          {/* ── Results ── */}
-          {hasSearched && !loading && (
+          {/* ── Active Bus Live Tracking Details (Sidebar) ── */}
+          {showTrackingPanel && liveDetails && !liveDetails.error && (
+            <div className="sidebar-tracking-details">
+              <div className="tracking-header">
+                <div className="tracking-title">
+                  <Bus size={18} />
+                  <div>
+                    <div className="tracking-reg">{liveDetails.busRegNo}</div>
+                    <div className="tracking-route">{liveDetails.routeName}</div>
+                  </div>
+                </div>
+                <div className="tracking-right">
+                  {lastUpdated && (
+                    <div className="last-updated" style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <button onClick={fetchLiveDetailsManual} disabled={isRefreshing} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-primary)', padding: 0 }}>
+                        <RefreshCcw size={14} className={isRefreshing ? 'spin' : ''} />
+                      </button>
+                    </div>
+                  )}
+                  <div className={`ws-badge ${isWebSocket ? 'ws-live' : 'ws-poll'}`}>
+                    {isWebSocket ? '🟢 WS' : '🔵 POLL'}
+                  </div>
+                  <button className="close-btn" onClick={stopTracking}>✕</button>
+                </div>
+              </div>
+
+              {/* Speed + Status */}
+              <div className="tracking-stats">
+                <div className="stat-pill">
+                  <Navigation size={13} />
+                  <span>{liveDetails.currentSpeedKmph} km/h</span>
+                </div>
+                <div className="stat-pill">
+                  <div className={`status-dot ${liveDetails.status === 'running' ? 'running' : 'halted'}`} />
+                  <span>{liveDetails.status}</span>
+                </div>
+                <div className="stat-pill">
+                  <Clock size={13} />
+                  <span>{new Date(liveDetails.lastSeen).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</span>
+                </div>
+                {(liveDetails as any).trackingMethod && (
+                  <div className="stat-pill tracking-source-badge">
+                    <Zap size={12} />
+                    <span>
+                      {(liveDetails as any).trackingMethod === 'gps' ? 'Crowd GPS' : 
+                       (liveDetails as any).trackingMethod === 'network' ? 'Network' : 'Cell Tower'}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setShowReportModal(true)}
+                  style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '12px', padding: '8px 10px' }}
+                >
+                  ⚠️ Report
+                </button>
+                <button
+                  type="button"
+                  className={`btn ${isSubscribed ? 'btn-danger' : 'btn-primary'}`}
+                  onClick={handleNotificationToggle}
+                  style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '12px', padding: '8px 10px' }}
+                >
+                  🔔 {isSubscribed ? 'Disable' : 'Notify Me'}
+                </button>
+              </div>
+
+              {/* Passenger Toggle */}
+              <div className="passenger-toggle-card">
+                <div className="passenger-toggle-row">
+                  <div className="toggle-left">
+                    <div className="toggle-label">Are you inside this bus?</div>
+                    <div className="toggle-sublabel">Share phone location for waiting passengers</div>
+                  </div>
+                  <label className="toggle-switch">
+                    <input
+                      type="checkbox"
+                      checked={isPassenger}
+                      onChange={e => setIsPassenger(e.target.checked)}
+                    />
+                    <span className="toggle-slider"></span>
+                  </label>
+                </div>
+
+                {isPassenger && (
+                  <div className="passenger-settings-panel">
+                    <div className="settings-section">
+                      <div className="settings-label">Tracking Mode:</div>
+                      <div className="tracking-options">
+                        <button
+                          type="button"
+                          className={`track-option-btn ${trackingSource === 'gps' ? 'active' : ''}`}
+                          onClick={() => setTrackingSource('gps')}
+                        >
+                          ⚡ GPS
+                        </button>
+                        <button
+                          type="button"
+                          className={`track-option-btn ${trackingSource === 'network' ? 'active' : ''}`}
+                          onClick={() => setTrackingSource('network')}
+                        >
+                          📶 Network
+                        </button>
+                        <button
+                          type="button"
+                          className={`track-option-btn ${trackingSource === 'cell' ? 'active' : ''}`}
+                          onClick={() => setTrackingSource('cell')}
+                        >
+                          🗼 Cell Tower
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="demo-checkbox-row">
+                      <input
+                        type="checkbox"
+                        id="demo-mode-checkbox"
+                        checked={demoPassenger}
+                        onChange={e => setDemoPassenger(e.target.checked)}
+                      />
+                      <label htmlFor="demo-mode-checkbox" className="demo-label">
+                        Demo Passenger Mode (Simulate movement)
+                      </label>
+                    </div>
+
+                    <div className="location-sharing-indicator">
+                      <span className="sharing-dot pulse-green"></span>
+                      <span>
+                        {demoPassenger ? 'Simulating passenger updates...' : 'Broadcasting real browser Geolocation...'}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Live Stops Progress Timeline */}
+              <div className="stops-timeline">
+                <div className="stops-title">🗺 Live Stops & ETAs</div>
+                {(() => {
+                  const lastPassedIdx = filteredStops.map(s => s.status).lastIndexOf('passed');
+                  const nextUpcomingIdx = filteredStops.findIndex(s => s.status === 'upcoming' || s.status === 'arriving_soon');
+
+                  let busAtStopIdx = -1;
+                  filteredStops.forEach((s, idx) => {
+                    if (s.status === 'arriving_now' || s.status === 'arriving_soon' || s.status === 'on_stop') {
+                      busAtStopIdx = idx;
+                    }
+                  });
+
+                  const busBetweenStopsAfterIdx = (busAtStopIdx === -1 && lastPassedIdx !== -1 && lastPassedIdx < filteredStops.length - 1) ? lastPassedIdx : -1;
+
+                  return filteredStops.map((stop, idx) => {
+                    const isLast = idx === filteredStops.length - 1;
+                    const isPassed   = stop.status === 'passed';
+                    const isOnStop   = stop.status === 'on_stop';
+                    const isBusHere  = idx === busAtStopIdx;
+                    const isBusAfterThis = idx === busBetweenStopsAfterIdx;
+
+                    const statusClass = isPassed ? 'passed' : isOnStop ? 'on-stop' : isBusHere ? 'arriving' : 'upcoming';
+
+                    let busSegmentProgress = 50;
+                    if (isBusAfterThis && idx < filteredStops.length - 1) {
+                      const nextStop = filteredStops[idx + 1];
+                      if (nextStop && nextStop.distanceRemainingKm !== undefined) {
+                        const segDist = calculateDistance(stop.latitude, stop.longitude, nextStop.latitude, nextStop.longitude) || 5;
+                        const ratio = Math.max(0.1, Math.min(0.9, 1 - (nextStop.distanceRemainingKm / segDist)));
+                        busSegmentProgress = Math.round(ratio * 100);
+                      }
+                    }
+
+                    return (
+                      <div key={stop.stopId} className={`stop-row ${statusClass}`}>
+                        <div className="stop-left">
+                          {!isLast && (
+                            <div className={`stop-line ${isPassed && !isBusAfterThis ? 'passed' : 'upcoming'}`}>
+                              {isBusAfterThis && (
+                                <>
+                                  <div className="line-segment-passed" style={{ height: `${busSegmentProgress}%` }} />
+                                  <div className="timeline-bus-badge pulsing-bus" style={{ top: `${busSegmentProgress}%` }}>
+                                    <Bus size={11} className="timeline-bus-icon" />
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          )}
+
+                          {isBusHere ? (
+                            <div className="timeline-bus-badge stop-overlay pulsing-bus">
+                              <Bus size={11} className="timeline-bus-icon" />
+                            </div>
+                          ) : (
+                            <div className={`stop-dot ${statusClass}`}>
+                              {idx === nextUpcomingIdx && <div className="pulse-ring" />}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="stop-body">
+                          <div className="stop-name">{stop.name}</div>
+                          <div className="stop-sub">Uttar Pradesh</div>
+                        </div>
+
+                        <div className="stop-right">
+                          {isPassed ? (
+                            <span className="stop-badge passed-badge">Passed</span>
+                          ) : stop.status === 'on_stop' ? (
+                            <span className="stop-badge on-stop-badge">On Stop</span>
+                          ) : (stop.status === 'arriving_now' || stop.status === 'arriving_soon') ? (
+                            <span className="stop-badge arriving-badge">Arriving Now</span>
+                          ) : (
+                            <span className="stop-badge upcoming-badge" style={{ background: 'var(--accent)', color: '#000', fontWeight: 'bold' }}>✨ AI ~{stop.etaMinutes}m</span>
+                          )}
+                          {stop.distanceRemainingKm > 0 && (
+                            <span className="stop-dist">{stop.distanceRemainingKm.toFixed(1)} km</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            </div>
+          )}
+
+          {/* ── Search Results Area (Sidebar) ── */}
+          {!showTrackingPanel && hasSearched && !loading && (
             <div className="results-area">
               {/* Journey planner result */}
-              {viewMode === 'journey' && journeys.length > 0 && (
+              {viewMode === 'journey' && displayJourneys.length > 0 && (
                 <div className="journey-options-container">
-                  <div className="journey-options-title">Available Ways ({journeys.length})</div>
+                  <div className="journey-options-title">Available Ways ({displayJourneys.length})</div>
                   <div className="journey-options-list">
-                    {journeys.map((j, idx) => {
+                    {displayJourneys.map((j, idx) => {
                       const isSelected = idx === selectedJourneyIdx;
                       return (
                         <div
@@ -1051,7 +1440,7 @@ export default function Home() {
                             <span className="option-badge">Option {idx + 1}</span>
                             {j.totalTransfers === 0 ? (
                               <span className="direct-badge">
-                                ⚡ {getDistinguishingStop(j, journeys) === 'Direct' ? 'Direct' : `via ${getDistinguishingStop(j, journeys)}`}
+                                ⚡ {getDistinguishingStop(j, displayJourneys, from, to) === 'Direct' ? 'Direct' : `via ${getDistinguishingStop(j, displayJourneys, from, to)}`}
                               </span>
                             ) : (
                               <span className="transfer-badge-pill">🔄 {j.totalTransfers} Change{j.totalTransfers > 1 ? 's' : ''}</span>
@@ -1077,6 +1466,16 @@ export default function Home() {
                       );
                     })}
                   </div>
+
+                  {/* Selected Journey Timeline Details in Sidebar */}
+                  {journey && (
+                    <div style={{ marginTop: '16px', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '16px' }}>
+                      <div style={{ fontSize: '13px', fontWeight: 700, color: '#fff', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        🗺 Journey Details (Option {selectedJourneyIdx + 1})
+                      </div>
+                      <JourneyTimeline journey={journey} onTrackBus={handleTrackBus} />
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1084,7 +1483,7 @@ export default function Home() {
               {hasDirectRoutes && (
                 <div className="direct-routes">
                   {viewMode === 'journey' && <div className="direct-header" style={{ marginTop: '20px', marginBottom: '8px' }}>Alternative Direct Routes</div>}
-                  {routes.map((route, i) => {
+                  {displayRoutes.map(({ route, viaText }, i) => {
                     const isSelected = i === selectedRouteIdx;
                     return (
                       <div 
@@ -1094,7 +1493,16 @@ export default function Home() {
                         style={{ cursor: 'pointer' }}
                       >
                         <div className="route-top">
-                          <div className="route-name">{route.route_name}</div>
+                          <div>
+                            <div className="route-name">
+                              {from && to ? `${from} → ${to}` : route.route_name}
+                            </div>
+                            {from && to && (
+                              <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '2px', fontWeight: 500 }}>
+                                Bus towards {route.destination || 'Destination'} {viaText ? `(via ${viaText})` : ''}
+                              </div>
+                            )}
+                          </div>
                           <div className="route-dist">
                             {parseFloat(route.distance_km).toFixed(0)} km
                             {route.nextTrips && route.nextTrips.length > 0 && (
@@ -1188,284 +1596,47 @@ export default function Home() {
               )}
             </div>
           )}
+
+          {/* Default initial state (popular search chips inside sidebar) */}
+          {!hasSearched && !showTrackingPanel && (
+            <div className="sample-queries" style={{ marginTop: '12px' }}>
+              <div className="sample-label">Popular Routes:</div>
+              <div className="sample-chips" style={{ justifyContent: 'flex-start' }}>
+                {[
+                  ['Saharanpur', 'Gangoh'],
+                  ['Saharanpur', 'Meerut'],
+                  ['Lucknow', 'Prayagraj'],
+                  ['Gorakhpur', 'Varanasi'],
+                  ['Jhansi', 'Kanpur'],
+                  ['Meerut', 'Delhi']
+                ].map(([f, t]) => (
+                  <button key={f + t} className="sample-chip" onClick={() => { setFrom(f); setTo(t); setViewMode('journey'); }}>
+                    {f} → {t}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </aside>
 
-        {/* ── Right Panel: Map + Tracking ── */}
+        {/* ── Right Panel: 100% Full-Bleed Leaflet Map ── */}
         <section className="map-section">
           {showTrackingPanel && liveDetails && !liveDetails.error ? (
-            <div className="tracking-panel">
-              {/* Tracking Header */}
-              <div className="tracking-header">
-                <div className="tracking-title">
-                  <Bus size={18} />
-                  <div>
-                    <div className="tracking-reg">{liveDetails.busRegNo}</div>
-                    <div className="tracking-route">{liveDetails.routeName}</div>
-                  </div>
-                </div>
-                <div className="tracking-right">
-                  {lastUpdated && (
-                    <div className="last-updated" style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px', marginRight: '8px' }}>
-                      Updated: {lastUpdated.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'})}
-                      <button onClick={fetchLiveDetailsManual} disabled={isRefreshing} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-primary)', marginLeft: '4px', padding: 0 }}>
-                        <RefreshCcw size={14} className={isRefreshing ? 'spin' : ''} />
-                      </button>
-                    </div>
-                  )}
-                  <div className={`ws-badge ${isWebSocket ? 'ws-live' : 'ws-poll'}`}>
-                    {isWebSocket ? '🟢 WS' : '🔵 POLL'}
-                  </div>
-                  <button className="close-btn" onClick={stopTracking}>✕</button>
-                </div>
-              </div>
-
-              {/* Speed + Status */}
-              <div className="tracking-stats">
-                <div className="stat-pill">
-                  <Navigation size={13} />
-                  <span>{liveDetails.currentSpeedKmph} km/h</span>
-                </div>
-                <div className="stat-pill">
-                  <div className={`status-dot ${liveDetails.status === 'running' ? 'running' : 'halted'}`} />
-                  <span>{liveDetails.status}</span>
-                </div>
-                <div className="stat-pill">
-                  <Clock size={13} />
-                  <span>{new Date(liveDetails.lastSeen).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</span>
-                </div>
-                {(liveDetails as any).trackingMethod && (
-                  <div className="stat-pill tracking-source-badge">
-                    <Zap size={12} />
-                    <span>
-                      {(liveDetails as any).trackingMethod === 'gps' ? 'Crowd-Sourced GPS' : 
-                       (liveDetails as any).trackingMethod === 'network' ? 'Network Inferred' : 'Cell Tower Triangulation'}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* Action Buttons for Report & Notification */}
-              <div style={{ display: 'flex', gap: '8px', padding: '0 16px 12px 16px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() => setShowReportModal(true)}
-                  style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '13px', padding: '8px 12px' }}
-                >
-                  ⚠️ Report Status
-                </button>
-                <button
-                  type="button"
-                  className={`btn ${isSubscribed ? 'btn-danger' : 'btn-primary'}`}
-                  onClick={handleNotificationToggle}
-                  style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '13px', padding: '8px 12px' }}
-                >
-                  🔔 {isSubscribed ? 'Disable Alerts' : 'Notify Me'}
-                </button>
-              </div>
-
-              {/* Inside the Bus Panel */}
-              <div className="passenger-toggle-card">
-                <div className="passenger-toggle-row">
-                  <div className="toggle-left">
-                    <div className="toggle-label">Are you inside this bus?</div>
-                    <div className="toggle-sublabel">Share your phone location to update live arrival times for waiting passengers</div>
-                  </div>
-                  <label className="toggle-switch">
-                    <input
-                      type="checkbox"
-                      checked={isPassenger}
-                      onChange={e => setIsPassenger(e.target.checked)}
-                    />
-                    <span className="toggle-slider"></span>
-                  </label>
-                </div>
-
-                {isPassenger && (
-                  <div className="passenger-settings-panel">
-                    <div className="settings-section">
-                      <div className="settings-label">Tracking Mode:</div>
-                      <div className="tracking-options">
-                        <button
-                          type="button"
-                          className={`track-option-btn ${trackingSource === 'gps' ? 'active' : ''}`}
-                          onClick={() => setTrackingSource('gps')}
-                        >
-                          ⚡ Geolocation GPS
-                        </button>
-                        <button
-                          type="button"
-                          className={`track-option-btn ${trackingSource === 'network' ? 'active' : ''}`}
-                          onClick={() => setTrackingSource('network')}
-                        >
-                          📶 Network Info
-                        </button>
-                        <button
-                          type="button"
-                          className={`track-option-btn ${trackingSource === 'cell' ? 'active' : ''}`}
-                          onClick={() => setTrackingSource('cell')}
-                        >
-                          🗼 Cell Triangulation
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="demo-checkbox-row">
-                      <input
-                        type="checkbox"
-                        id="demo-mode-checkbox"
-                        checked={demoPassenger}
-                        onChange={e => setDemoPassenger(e.target.checked)}
-                      />
-                      <label htmlFor="demo-mode-checkbox" className="demo-label">
-                        Enable Demo Passenger Mode (Simulates movement along route)
-                      </label>
-                    </div>
-
-                    <div className="location-sharing-indicator">
-                      <span className="sharing-dot pulse-green"></span>
-                      <span>
-                        {demoPassenger ? 'Simulating passenger location updates...' : 'Broadcasting real browser Geolocation...'}
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Live Map */}
-              {(() => {
-                const fromQuery = (from || '').toLowerCase().trim();
-                const toQuery = (to || '').toLowerCase().trim();
-
-                let startIdx = 0;
-                if (fromQuery) {
-                  const idx = liveDetails.stops.findIndex(s => s.name.toLowerCase().includes(fromQuery));
-                  if (idx !== -1) startIdx = idx;
-                }
-
-                let endIdx = liveDetails.stops.length - 1;
-                if (toQuery) {
-                  const idx = liveDetails.stops.findIndex(s => s.name.toLowerCase().includes(toQuery));
-                  if (idx !== -1) endIdx = idx;
-                }
-
-                let sIdx = startIdx;
-                let eIdx = endIdx;
-                if (sIdx > eIdx) {
-                  [sIdx, eIdx] = [eIdx, sIdx];
-                }
-
-                const filteredStops = liveDetails.stops.slice(sIdx, eIdx + 1);
-
-                return (
-                  <>
-                    <div className="map-wrapper">
-                      <LiveMap
-                        latitude={liveDetails.busLatitude || (filteredStops.length > 0 ? filteredStops[0].latitude : 26.8467)}
-                        longitude={liveDetails.busLongitude || (filteredStops.length > 0 ? filteredStops[0].longitude : 80.9462)}
-                        stops={filteredStops}
-                        busRegNo={liveDetails.busRegNo}
-                        heading={liveDetails.heading}
-                        villages={villages}
-                        reports={passengerReports}
-                        isNavigationMode={isPassenger}
-                        currentSpeedKmph={liveDetails.currentSpeedKmph}
-                        onCloseNavigation={() => setIsPassenger(false)}
-                        routeName={liveDetails.routeName}
-                      />
-                    </div>
-
-                    {/* Stops Timeline — "Where is my train" style */}
-                    <div className="stops-timeline">
-                      <div className="stops-title">🗺 Stops & Live Progress</div>
-                      {(() => {
-                        const lastPassedIdx = filteredStops.map(s => s.status).lastIndexOf('passed');
-                        const nextUpcomingIdx = filteredStops.findIndex(s => s.status === 'upcoming' || s.status === 'arriving_soon');
-
-                        let busAtStopIdx = -1;
-                        filteredStops.forEach((s, idx) => {
-                          if (s.status === 'arriving_now' || s.status === 'arriving_soon' || s.status === 'on_stop') {
-                            busAtStopIdx = idx;
-                          }
-                        });
-
-                        const busBetweenStopsAfterIdx = (busAtStopIdx === -1 && lastPassedIdx !== -1 && lastPassedIdx < filteredStops.length - 1) ? lastPassedIdx : -1;
-
-                        return filteredStops.map((stop, idx) => {
-                          const isLast = idx === filteredStops.length - 1;
-                          const isPassed   = stop.status === 'passed';
-                          const isOnStop   = stop.status === 'on_stop';
-                          const isBusHere  = idx === busAtStopIdx;
-                          const isBusAfterThis = idx === busBetweenStopsAfterIdx;
-
-                          const statusClass = isPassed ? 'passed' : isOnStop ? 'on-stop' : isBusHere ? 'arriving' : 'upcoming';
-
-                          return (
-                            <div key={stop.stopId} className={`stop-row ${statusClass}`}>
-                              <div className="stop-left">
-                                {/* Stop Line */}
-                                {!isLast && (
-                                  <div className={`stop-line ${isPassed && !isBusAfterThis ? 'passed' : 'upcoming'}`}>
-                                    {/* Draw split colored line segment if the bus is between this stop and next */}
-                                    {isBusAfterThis && (
-                                      <>
-                                        <div className="line-segment-passed" />
-                                        <div className="line-segment-upcoming" />
-                                        <div className="timeline-bus-badge pulsing-bus">
-                                          <Bus size={11} className="timeline-bus-icon" />
-                                        </div>
-                                      </>
-                                    )}
-                                  </div>
-                                )}
-
-                                {/* Dot or Bus overlay */}
-                                {isBusHere ? (
-                                  <div className="timeline-bus-badge stop-overlay pulsing-bus">
-                                    <Bus size={11} className="timeline-bus-icon" />
-                                  </div>
-                                ) : (
-                                  <div className={`stop-dot ${statusClass}`}>
-                                    {idx === nextUpcomingIdx && <div className="pulse-ring" />}
-                                  </div>
-                                )}
-                              </div>
-
-                              <div className="stop-body">
-                                <div className="stop-name">{stop.name}</div>
-                                <div className="stop-sub">Uttar Pradesh</div>
-                              </div>
-
-                              <div className="stop-right">
-                                {isPassed ? (
-                                  <span className="stop-badge passed-badge">Passed</span>
-                                ) : stop.status === 'on_stop' ? (
-                                  <span className="stop-badge on-stop-badge">On Stop</span>
-                                ) : (stop.status === 'arriving_now' || stop.status === 'arriving_soon') ? (
-                                  <span className="stop-badge arriving-badge">Arriving Now</span>
-                                ) : (
-                                  <span className="stop-badge upcoming-badge" style={{ background: 'var(--accent)', color: '#000', fontWeight: 'bold' }}>✨ AI ~{stop.etaMinutes}m</span>
-                                )}
-                                {stop.distanceRemainingKm > 0 && (
-                                  <span className="stop-dist">{stop.distanceRemainingKm.toFixed(1)} km</span>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        });
-                      })()}
-                    </div>
-                  </>
-                );
-              })()}
-
-              {/* Refresh FAB */}
-              <button 
-                className="refresh-fab" 
-                onClick={fetchLiveDetailsManual}
-                disabled={isRefreshing}
-                title="Refresh Live Status"
-              >
+            <div className="map-wrapper" style={{ width: '100%', height: '100%', position: 'relative' }}>
+              <LiveMap
+                latitude={liveDetails.busLatitude || (filteredStops.length > 0 ? filteredStops[0].latitude : 26.8467)}
+                longitude={liveDetails.busLongitude || (filteredStops.length > 0 ? filteredStops[0].longitude : 80.9462)}
+                stops={filteredStops}
+                busRegNo={liveDetails.busRegNo}
+                heading={liveDetails.heading}
+                villages={villages}
+                reports={passengerReports}
+                isNavigationMode={isPassenger}
+                currentSpeedKmph={liveDetails.currentSpeedKmph}
+                onCloseNavigation={() => setIsPassenger(false)}
+                routeName={liveDetails.routeName}
+              />
+              <button className="refresh-fab" onClick={fetchLiveDetailsManual} disabled={isRefreshing} title="Refresh Live Status">
                 <RefreshCcw size={22} className={isRefreshing ? 'spin' : ''} />
               </button>
             </div>
@@ -1473,69 +1644,15 @@ export default function Home() {
             <div className="map-placeholder">
               <div className="placeholder-inner">
                 <Bus size={64} strokeWidth={1} color="#ef4444" />
-                <div className="placeholder-title" style={{color: '#ef4444'}}>Tracking Failed</div>
+                <div className="placeholder-title" style={{ color: '#ef4444' }}>Tracking Failed</div>
                 <div className="placeholder-sub">{liveDetails.error}</div>
-                <button className="btn btn-primary" onClick={() => fetchLiveDetailsManual()} style={{marginTop: '16px'}}>
+                <button className="btn btn-primary" onClick={() => fetchLiveDetailsManual()} style={{ marginTop: '16px' }}>
                   Try Again
                 </button>
               </div>
             </div>
-          ) : viewMode === 'journey' && journeys.length > 0 ? (
-            <div className="tracking-panel">
-              <div className="map-wrapper" style={{ margin: 0, height: '350px', flexShrink: 0 }}>
-                <LiveMap
-                  latitude={mapBusLat}
-                  longitude={mapBusLng}
-                  stops={[]}
-                  busRegNo={mapBusRegNo}
-                  heading={mapBusHeading}
-                  villages={villages}
-                  reports={passengerReports}
-                  currentSpeedKmph={mapBusSpeed}
-                  routeName={mapBusRouteName}
-                  multipleRoutes={journeys.map((j, i) => {
-                    // Flatten all leg stops then clip to the passenger's from→to segment
-                    const allStops = j.legs.flatMap(leg => leg.stops || []).map(s => ({
-                      stopId: s.stopId,
-                      name: s.name,
-                      sequenceNo: s.sequenceNo,
-                      latitude: s.latitude,
-                      longitude: s.longitude,
-                      status: 'upcoming' as const
-                    }));
-                    const clipped = clipStopsToSegment(allStops, from, to);
-                    return {
-                      stops: clipped,
-                      color: i === selectedJourneyIdx ? '#4f46e5' : '#6b7280',
-                      weight: i === selectedJourneyIdx ? 6 : 3,
-                      opacity: i === selectedJourneyIdx ? 0.9 : 0.4
-                    };
-                  })}
-                  onSelectRoute={async (idx) => {
-                    setSelectedJourneyIdx(idx);
-                    // Fetch villages — routeId from leg or routeCode fallback
-                    const leg = journeys[idx]?.legs?.[0];
-                    const rid = leg?.routeId
-                      || routes.find(r => r.route_code === leg?.routeCode)?.id;
-                    if (rid) {
-                      try {
-                        const vRes = await fetch(`${API_BASE}/routes/${rid}/villages`);
-                        const vData = await vRes.json();
-                        setVillages(vData.villages || []);
-                      } catch { setVillages([]); }
-                    }
-                  }}
-                />
-              </div>
-              <div className="stops-timeline" style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
-                <div className="stops-title" style={{ marginBottom: '16px' }}>🗺 Journey Plan Details</div>
-                {journey && (
-                  <JourneyTimeline journey={journey} onTrackBus={handleTrackBus} />
-                )}
-              </div>
-            </div>
-          ) : viewMode === 'direct' && routes.length > 0 ? (
-            <div className="map-wrapper">
+          ) : viewMode === 'journey' && displayJourneys.length > 0 ? (
+            <div className="map-wrapper" style={{ width: '100%', height: '100%' }}>
               <LiveMap
                 latitude={mapBusLat}
                 longitude={mapBusLng}
@@ -1546,18 +1663,60 @@ export default function Home() {
                 reports={passengerReports}
                 currentSpeedKmph={mapBusSpeed}
                 routeName={mapBusRouteName}
-                multipleRoutes={routes.map((r, i) => ({
-                  // Clip full route stops to only the passenger's from→to segment
-                  stops: clipStopsToSegment(r.stops || [], from, to),
+                multipleRoutes={displayJourneys.map((j, i) => {
+                  const allStops = j.legs.flatMap(leg => leg.stops || []).map(s => ({
+                    stopId: s.stopId,
+                    name: s.name,
+                    sequenceNo: s.sequenceNo,
+                    latitude: s.latitude,
+                    longitude: s.longitude,
+                    status: 'upcoming' as const
+                  }));
+                  const clipped = clipStopsToSegment(allStops, from, to);
+                  return {
+                    stops: clipped,
+                    color: i === selectedJourneyIdx ? '#4f46e5' : '#6b7280',
+                    weight: i === selectedJourneyIdx ? 6 : 3,
+                    opacity: i === selectedJourneyIdx ? 0.9 : 0.4
+                  };
+                })}
+                onSelectRoute={async (idx) => {
+                  setSelectedJourneyIdx(idx);
+                  const leg = displayJourneys[idx]?.legs?.[0];
+                  const rid = leg?.routeId
+                    || routes.find(r => r.route_code === leg?.routeCode)?.id;
+                  if (rid) {
+                    try {
+                      const vRes = await fetch(`${API_BASE}/routes/${rid}/villages`);
+                      const vData = await vRes.json();
+                      setVillages(vData.villages || []);
+                    } catch { setVillages([]); }
+                  }
+                }}
+              />
+            </div>
+          ) : viewMode === 'direct' && displayRoutes.length > 0 ? (
+            <div className="map-wrapper" style={{ width: '100%', height: '100%' }}>
+              <LiveMap
+                latitude={mapBusLat}
+                longitude={mapBusLng}
+                stops={[]}
+                busRegNo={mapBusRegNo}
+                heading={mapBusHeading}
+                villages={villages}
+                reports={passengerReports}
+                currentSpeedKmph={mapBusSpeed}
+                routeName={mapBusRouteName}
+                multipleRoutes={displayRoutes.map(({ route }, i) => ({
+                  stops: clipStopsToSegment(route.stops || [], from, to),
                   color: i === selectedRouteIdx ? '#4f46e5' : '#6b7280',
                   weight: i === selectedRouteIdx ? 6 : 3,
                   opacity: i === selectedRouteIdx ? 0.9 : 0.4
                 }))}
                 onSelectRoute={async (idx) => {
                   setSelectedRouteIdx(idx);
-                  // Fetch villages for newly selected route
                   try {
-                    const vRes = await fetch(`${API_BASE}/routes/${routes[idx].id}/villages`);
+                    const vRes = await fetch(`${API_BASE}/routes/${displayRoutes[idx].route.id}/villages`);
                     const vData = await vRes.json();
                     setVillages(vData.villages || []);
                   } catch { setVillages([]); }
@@ -1565,22 +1724,16 @@ export default function Home() {
               />
             </div>
           ) : (
-            <div className="map-placeholder">
-              <div className="placeholder-inner">
-                <Bus size={64} strokeWidth={1} />
-                <div className="placeholder-title">UP Bus Live Tracker</div>
-                <div className="placeholder-sub">Search a route to plan your journey or track a live bus on the map</div>
-                <div className="sample-queries">
-                  <div className="sample-label">Try searching:</div>
-                  <div className="sample-chips">
-                    {[['Saharanpur','Meerut'],['Lucknow','Prayagraj'],['Gorakhpur','Varanasi'],['Jhansi','Kanpur'],['Meerut','Delhi']].map(([f,t]) => (
-                      <button key={f+t} className="sample-chip" onClick={() => { setFrom(f); setTo(t); }}>
-                        {f} → {t}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
+            <div className="map-wrapper" style={{ width: '100%', height: '100%' }}>
+              <LiveMap
+                latitude={26.8467}
+                longitude={80.9462}
+                stops={[]}
+                busRegNo=""
+                heading={0}
+                villages={villages}
+                reports={passengerReports}
+              />
             </div>
           )}
         </section>

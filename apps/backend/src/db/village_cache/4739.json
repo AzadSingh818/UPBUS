@@ -1,0 +1,155 @@
+{
+  "fetchedAt": "2026-09-27T06:07:53.679Z",
+  "villages": [
+    {
+      "name": "Budhana Kalan",
+      "latitude": 29.5681692,
+      "longitude": 77.6831171
+    },
+    {
+      "name": "Rankhandi",
+      "latitude": 29.6161473,
+      "longitude": 77.6506805
+    },
+    {
+      "name": "Nanhera Aasa",
+      "latitude": 29.7284957,
+      "longitude": 77.6366901
+    },
+    {
+      "name": "Kurdi",
+      "latitude": 29.7226446,
+      "longitude": 77.6121425
+    },
+    {
+      "name": "Khajoori",
+      "latitude": 29.7088541,
+      "longitude": 77.6456164
+    },
+    {
+      "name": "Labakri",
+      "latitude": 29.6964199,
+      "longitude": 77.6497455
+    },
+    {
+      "name": "Kheri Aasa",
+      "latitude": 29.7198504,
+      "longitude": 77.6420919
+    },
+    {
+      "name": "Isharpur",
+      "latitude": 29.6680158,
+      "longitude": 77.6602578
+    },
+    {
+      "name": "Gunarsa",
+      "latitude": 29.6513606,
+      "longitude": 77.6678466
+    },
+    {
+      "name": "Bhaila",
+      "latitude": 29.6992368,
+      "longitude": 77.6128291
+    },
+    {
+      "name": "Chandena Koli",
+      "latitude": 29.7518594,
+      "longitude": 77.5950622
+    },
+    {
+      "name": "Nihal Kheri",
+      "latitude": 29.6277669,
+      "longitude": 77.6861793
+    },
+    {
+      "name": "Sakhan Kalan",
+      "latitude": 29.7402341,
+      "longitude": 77.649393
+    },
+    {
+      "name": "Kasimpura",
+      "latitude": 29.7106841,
+      "longitude": 77.6642228
+    },
+    {
+      "name": "Dwarika City",
+      "latitude": 29.4493151,
+      "longitude": 77.7283261
+    },
+    {
+      "name": "Meghrajpur",
+      "latitude": 29.7199944,
+      "longitude": 77.6642626
+    },
+    {
+      "name": "Thehri Buzurg",
+      "latitude": 29.7668218,
+      "longitude": 77.649481
+    },
+    {
+      "name": "Jaroda Jatt",
+      "latitude": 29.6368888,
+      "longitude": 77.6931666
+    },
+    {
+      "name": "Nunabadi",
+      "latitude": 29.7234645,
+      "longitude": 77.5860499
+    },
+    {
+      "name": "Sakhan Khurd",
+      "latitude": 29.7350918,
+      "longitude": 77.6620101
+    },
+    {
+      "name": "Baseda",
+      "latitude": 29.8108646,
+      "longitude": 77.6373452
+    },
+    {
+      "name": "Sarsina",
+      "latitude": 29.7835985,
+      "longitude": 77.6466035
+    },
+    {
+      "name": "Sisauna",
+      "latitude": 29.53125,
+      "longitude": 77.73239
+    },
+    {
+      "name": "Badhedi",
+      "latitude": 29.6774891,
+      "longitude": 77.5963092
+    },
+    {
+      "name": "Shahpur",
+      "latitude": 29.7577461,
+      "longitude": 77.6593494
+    },
+    {
+      "name": "Soobri",
+      "latitude": 29.6870944,
+      "longitude": 77.5906211
+    },
+    {
+      "name": "Belda",
+      "latitude": 29.7133408,
+      "longitude": 77.5789572
+    },
+    {
+      "name": "Dhoomgarh",
+      "latitude": 29.6943316,
+      "longitude": 77.5843036
+    },
+    {
+      "name": "Bhagwanpur",
+      "latitude": 29.7693693,
+      "longitude": 77.5589275
+    },
+    {
+      "name": "Talheri Buzurg",
+      "latitude": 29.769332,
+      "longitude": 77.6629972
+    }
+  ]
+}

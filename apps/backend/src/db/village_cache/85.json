@@ -1,0 +1,110 @@
+{
+  "fetchedAt": "2026-09-27T06:35:26.169Z",
+  "villages": [
+    {
+      "name": "Syawari",
+      "latitude": 27.2231552,
+      "longitude": 78.4378694
+    },
+    {
+      "name": "Hazratpur",
+      "latitude": 27.2130421,
+      "longitude": 78.2971063
+    },
+    {
+      "name": "Bijauli",
+      "latitude": 26.6905506,
+      "longitude": 79.1492396
+    },
+    {
+      "name": "Railway Colony",
+      "latitude": 27.2088413,
+      "longitude": 78.2363791
+    },
+    {
+      "name": "Sarai Ikdil",
+      "latitude": 26.7444212,
+      "longitude": 79.0935013
+    },
+    {
+      "name": "Hathwant",
+      "latitude": 27.2307861,
+      "longitude": 78.5037462
+    },
+    {
+      "name": "Jasrana",
+      "latitude": 27.2351,
+      "longitude": 78.6519
+    },
+    {
+      "name": "prakash nagar",
+      "latitude": 27.2013805,
+      "longitude": 78.0625895
+    },
+    {
+      "name": "Ussaini",
+      "latitude": 27.2034607,
+      "longitude": 78.3199385
+    },
+    {
+      "name": "Bakewar",
+      "latitude": 26.6628814,
+      "longitude": 79.1745361
+    },
+    {
+      "name": "Muradganj",
+      "latitude": 26.5209408,
+      "longitude": 79.3807181
+    },
+    {
+      "name": "P.P Nagar",
+      "latitude": 27.2223859,
+      "longitude": 77.9555538
+    },
+    {
+      "name": "Sachendi",
+      "latitude": 26.4254182,
+      "longitude": 80.1694349
+    },
+    {
+      "name": "Sarai Ajitmal",
+      "latitude": 26.5548,
+      "longitude": 79.3187
+    },
+    {
+      "name": "Rura",
+      "latitude": 26.489896,
+      "longitude": 79.9011355
+    },
+    {
+      "name": "Anwara",
+      "latitude": 27.1767746,
+      "longitude": 78.2239866
+    },
+    {
+      "name": "Hirangoan",
+      "latitude": 27.1774567,
+      "longitude": 78.3096577
+    },
+    {
+      "name": "SHWETA YADAV",
+      "latitude": 27.1833989,
+      "longitude": 78.5560647
+    },
+    {
+      "name": "Giror",
+      "latitude": 27.189295,
+      "longitude": 78.7998825
+    },
+    {
+      "name": "Derapur",
+      "latitude": 26.4186,
+      "longitude": 79.7932
+    },
+    {
+      "name": "Lakhna",
+      "latitude": 26.6480107,
+      "longitude": 79.1472205
+    }
+  ]
+}

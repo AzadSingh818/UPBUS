@@ -1,15 +1,40 @@
 {
-  "fetchedAt": "2026-07-01T18:13:52.559Z",
+  "fetchedAt": "2026-09-27T05:10:16.278Z",
   "villages": [
+    {
+      "name": "Alipura",
+      "latitude": 29.8178345,
+      "longitude": 77.309867
+    },
+    {
+      "name": "Hajipur",
+      "latitude": 29.809901,
+      "longitude": 77.3041836
+    },
     {
       "name": "Jukheri",
       "latitude": 29.8031215,
       "longitude": 77.3060984
     },
     {
+      "name": "Dhayaki",
+      "latitude": 29.8289868,
+      "longitude": 77.3389999
+    },
+    {
       "name": "Sabdalpur",
       "latitude": 29.9178235,
       "longitude": 77.4777808
+    },
+    {
+      "name": "Sheetalpur",
+      "latitude": 29.8142345,
+      "longitude": 77.3335636
+    },
+    {
+      "name": "Santaur",
+      "latitude": 29.8067882,
+      "longitude": 77.3276695
     },
     {
       "name": "Bahadur Nagar",

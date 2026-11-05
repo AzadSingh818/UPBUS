@@ -49,6 +49,8 @@ let graph: Map<number, GraphEdge[]> = new Map();
 let stopsMap: Map<number, any> = new Map();
 let routeStopsMap: Map<number, any[]> = new Map(); // route_id -> stops
 let cachedRoutes: any[] = [];
+const dfsPathCache = new Map<string, { timestamp: number; paths: JourneyPath[] }>();
+const DFS_CACHE_TTL_MS = 60000;
 
 /**
  * Initializes the graph from DB/Mock DB
@@ -57,6 +59,7 @@ export async function buildGraph() {
   graph.clear();
   stopsMap.clear();
   routeStopsMap.clear();
+  dfsPathCache.clear();
 
   // Load stops from database/mock
   const stopsRes = await query('SELECT id, stop_code, name, latitude, longitude FROM stops');
@@ -147,39 +150,129 @@ export function findPathsDFS(fromQuery: string, toQuery: string, maxTransfers: n
   fromQuery = fromQuery.toLowerCase().trim();
   toQuery = toQuery.toLowerCase().trim();
 
-  const startNodes: number[] = [];
-  const endNodes: Set<number> = new Set();
+  const cacheKey = `${fromQuery}_${toQuery}_${maxTransfers}`;
+  const cached = dfsPathCache.get(cacheKey);
+  if (cached && (Date.now() - cached.timestamp < DFS_CACHE_TTL_MS)) {
+    return cached.paths;
+  }
+
+  let initialStartNodes: number[] = [];
+  const initialEndNodes: Set<number> = new Set();
+
+  const isStopMatch = (stopName: string, queryStr: string) => {
+    const sName = stopName.toLowerCase().trim();
+    const qStr = queryStr.toLowerCase().trim();
+    
+    if (sName.includes(qStr)) return true;
+    
+    const cleanS = sName.replace(/\s+(bus station|bus stand|depot|terminal|isbt|kasba|village)$/gi, '').trim();
+    const cleanQ = qStr.replace(/\s+(bus station|bus stand|depot|terminal|isbt|kasba|village)$/gi, '').trim();
+    
+    if (cleanS.length >= 3 && cleanQ.length >= 3) {
+      if (cleanS.includes(cleanQ) || cleanQ.includes(cleanS)) return true;
+    }
+    
+    return false;
+  };
 
   for (const [id, stop] of stopsMap.entries()) {
-    const name = stop.name.toLowerCase();
-    if (name.includes(fromQuery)) startNodes.push(id);
-    if (name.includes(toQuery)) endNodes.add(id);
+    if (isStopMatch(stop.name, fromQuery)) initialStartNodes.push(id);
+    if (isStopMatch(stop.name, toQuery)) initialEndNodes.add(id);
   }
+
+  // Expand startNodes and endNodes to include nearby terminal nodes (within 2 km)
+  // E.g., if user selects "Saharanpur Bus Station", also include "Saharanpur Depot" (0.3 km away) so direct routes starting at the Depot are matched without a fake 0.3 km transfer!
+  const expandNearbyNodes = (nodeIds: number[]): number[] => {
+    const expanded = new Set<number>(nodeIds);
+    for (const id of nodeIds) {
+      const stop = stopsMap.get(id);
+      if (!stop) continue;
+      for (const [otherId, otherStop] of stopsMap.entries()) {
+        if (expanded.has(otherId)) continue;
+        const dist = haversineDistanceKm(
+          { lat: stop.latitude, lng: stop.longitude },
+          { lat: otherStop.latitude, lng: otherStop.longitude }
+        );
+        if (dist <= 2.0) { // Same terminal complex (within 2.0 km)
+          expanded.add(otherId);
+        }
+      }
+    }
+    return Array.from(expanded);
+  };
+
+  const startNodes = expandNearbyNodes(initialStartNodes);
+  const expandedEndNodes = new Set<number>(expandNearbyNodes(Array.from(initialEndNodes)));
 
   const results: JourneyPath[] = [];
   const state = { steps: 0 };
 
   for (const start of startNodes) {
-    dfs(start, endNodes, maxTransfers, [], new Set([start]), results, state);
+    dfs(start, expandedEndNodes, maxTransfers, [], new Set([start]), results, state);
+  }
+
+  // Filter out any fake micro-legs (under 1.5 km transfers within the same city hub)
+  const cleanedResults: JourneyPath[] = [];
+  for (const res of results) {
+    const validLegs = res.legs.filter(l => l.distanceKm > 1.2 || res.legs.length === 1);
+    if (validLegs.length > 0) {
+      let totalDist = 0;
+      validLegs.forEach(l => totalDist += l.distanceKm);
+      cleanedResults.push({
+        ...res,
+        legs: validLegs,
+        totalDistanceKm: totalDist,
+        totalTransfers: validLegs.length - 1
+      });
+    }
   }
 
   // Sort results by transfers, then OATS dynamic cost
-  results.sort((a, b) => {
+  cleanedResults.sort((a, b) => {
     if (a.totalTransfers !== b.totalTransfers) return a.totalTransfers - b.totalTransfers;
-    // Sort by dynamic edge weighting (traffic cost)
     return a.totalEffectiveCost - b.totalEffectiveCost;
   });
 
-  const uniquePaths = filterUniquePaths(results);
+  const uniquePaths = filterUniquePaths(cleanedResults);
 
-  // If any direct route (0 transfers) exists, only return the direct routes
-  const hasDirectRoute = uniquePaths.some(p => p.totalTransfers === 0);
-  if (hasDirectRoute) {
-    return uniquePaths.filter(p => p.totalTransfers === 0).slice(0, 10);
+  // Prioritize primary corridor routes matching the exact origin/destination city pair
+  const isPrimaryCorridor = (p: JourneyPath) => {
+    if (p.legs.length !== 1) return false;
+    const leg = p.legs[0];
+    const rInfo = cachedRoutes.find((r: any) => r.id === leg.routeId);
+    if (!rInfo) return false;
+    const src = (rInfo.source || '').toLowerCase();
+    const dest = (rInfo.destination || '').toLowerCase();
+    const cleanFrom = fromQuery.replace(/\s+(bus station|bus stand|depot|terminal|isbt|kasba|village)$/gi, '').trim();
+    const cleanTo = toQuery.replace(/\s+(bus station|bus stand|depot|terminal|isbt|kasba|village)$/gi, '').trim();
+    
+    const srcMatches = src.includes(cleanFrom) || cleanFrom.includes(src);
+    const destMatches = dest.includes(cleanTo) || cleanTo.includes(dest);
+    
+    return srcMatches && destMatches;
+  };
+
+  let finalPaths: JourneyPath[] = [];
+
+  const primaryCorridors = uniquePaths.filter(isPrimaryCorridor);
+  if (primaryCorridors.length > 0) {
+    finalPaths = primaryCorridors.slice(0, 10);
+  } else {
+    const hasDirectRoute = uniquePaths.some(p => p.totalTransfers === 0);
+    if (hasDirectRoute) {
+      finalPaths = uniquePaths.filter(p => p.totalTransfers === 0).slice(0, 10);
+    } else {
+      finalPaths = uniquePaths.slice(0, 10);
+    }
   }
 
-  // Otherwise return different paths as per current algorithm (with transfers)
-  return uniquePaths.slice(0, 10);
+  if (dfsPathCache.size > 500) {
+    const firstKey = dfsPathCache.keys().next().value;
+    if (firstKey) dfsPathCache.delete(firstKey);
+  }
+  dfsPathCache.set(cacheKey, { timestamp: Date.now(), paths: finalPaths });
+
+  return finalPaths;
 }
 
 function dfs(

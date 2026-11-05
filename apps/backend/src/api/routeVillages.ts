@@ -125,6 +125,8 @@ async function fetchAndCacheVillages(
 // GET /api/routes/:routeId/villages
 // ---------------------------------------------------------------------------
 
+const ramVillageCache = new Map<string, { timestamp: number; payload: any }>();
+
 router.get('/:routeId/villages', async (req: Request, res: Response) => {
   const routeId = parseInt(req.params.routeId, 10);
   if (isNaN(routeId)) {
@@ -132,6 +134,13 @@ router.get('/:routeId/villages', async (req: Request, res: Response) => {
   }
 
   const maxDistanceKm = parseFloat(req.query.maxDistanceKm as string) || 0.2; // Default to 0.2 km (200m) to match PRD
+  const ramKey = `${routeId}_${maxDistanceKm}`;
+
+  const ramCached = ramVillageCache.get(ramKey);
+  if (ramCached && (Date.now() - ramCached.timestamp < CACHE_TTL_MS)) {
+    res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
+    return res.json(ramCached.payload);
+  }
 
   try {
     // 1. Check cache
@@ -152,18 +161,24 @@ router.get('/:routeId/villages', async (req: Request, res: Response) => {
         polyline,
         maxDistanceKm
       );
-      return res.json({
+      const payload = {
         villages: filtered.map(v => ({ name: v.name, latitude: v.latitude, longitude: v.longitude })),
         _meta: { source: 'cache', cachedAt: cached.fetchedAt, count: filtered.length },
-      });
+      };
+      ramVillageCache.set(ramKey, { timestamp: Date.now(), payload });
+      res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
+      return res.json(payload);
     }
 
     // 2. Cache miss or stale → fetch from Overpass
     const villages = await fetchAndCacheVillages(routeId, maxDistanceKm);
-    return res.json({
+    const payload = {
       villages,
       _meta: { source: 'overpass', count: villages.length },
-    });
+    };
+    ramVillageCache.set(ramKey, { timestamp: Date.now(), payload });
+    res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
+    return res.json(payload);
 
   } catch (err: any) {
     console.error(`[Villages] Error for route ${routeId}:`, err.message);

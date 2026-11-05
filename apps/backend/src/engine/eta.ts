@@ -84,11 +84,19 @@ function getMDPSpeedTransition(currentSpeedKmph: number): number {
   
   // Bounds checking to prevent unrealistic ETAs
   predictedSpeed = Math.max(15, Math.min(predictedSpeed, 80)); 
-
   return predictedSpeed;
 }
 
+const etaResponseCache = new Map<string, { timestamp: number; data: TripETAResponse | null }>();
+const ETA_CACHE_TTL_MS = 1500;
+
 export async function getTripETAs(tripId: number, regNo?: string, routeCode?: string): Promise<TripETAResponse | null> {
+  const cacheKey = `${tripId}_${regNo || ''}_${routeCode || ''}`;
+  const cached = etaResponseCache.get(cacheKey);
+  if (cached && (Date.now() - cached.timestamp < ETA_CACHE_TTL_MS)) {
+    return cached.data;
+  }
+
   try {
     // 1. Fetch trip and bus details
     const tripRes = await query(
@@ -561,7 +569,7 @@ export async function getTripETAs(tripId: number, regNo?: string, routeCode?: st
       console.warn('[ETA] Could not compute waypoints:', e);
     }
 
-    return {
+    const result: TripETAResponse = {
       tripId,
       routeId: trip.route_id || fallbackRouteId,
       busRegNo: trip.registration_no,
@@ -577,6 +585,14 @@ export async function getTripETAs(tripId: number, regNo?: string, routeCode?: st
       stops: etas,
       waypoints
     };
+
+    if (etaResponseCache.size > 200) {
+      const firstKey = etaResponseCache.keys().next().value;
+      if (firstKey) etaResponseCache.delete(firstKey);
+    }
+    etaResponseCache.set(cacheKey, { timestamp: Date.now(), data: result });
+
+    return result;
   } catch (error) {
     console.error('Error generating trip ETAs:', error);
     return null;

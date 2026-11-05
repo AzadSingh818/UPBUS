@@ -1,0 +1,440 @@
+{
+  "fetchedAt": "2026-09-26T19:49:47.511Z",
+  "villages": [
+    {
+      "name": "Hindan Vihar",
+      "latitude": 28.6737477,
+      "longitude": 77.4103613
+    },
+    {
+      "name": "Bulandshr Road Indus Area",
+      "latitude": 28.6441142,
+      "longitude": 77.4554267
+    },
+    {
+      "name": "Islam Nagar",
+      "latitude": 28.665353,
+      "longitude": 77.4148703
+    },
+    {
+      "name": "Richalpuri",
+      "latitude": 28.6664314,
+      "longitude": 77.424502
+    },
+    {
+      "name": "Roza Zalalpur",
+      "latitude": 28.5997904,
+      "longitude": 77.4729794
+    },
+    {
+      "name": "Amrit Nagar",
+      "latitude": 28.6420209,
+      "longitude": 77.4474159
+    },
+    {
+      "name": "Chatta Mohalla",
+      "latitude": 28.6705687,
+      "longitude": 77.4196289
+    },
+    {
+      "name": "mukund nagar",
+      "latitude": 28.669632,
+      "longitude": 77.422249
+    },
+    {
+      "name": "Sewa Nagar",
+      "latitude": 28.6767079,
+      "longitude": 77.4097251
+    },
+    {
+      "name": "GAUPURI",
+      "latitude": 28.658354,
+      "longitude": 77.4205753
+    },
+    {
+      "name": "Arya nagar",
+      "latitude": 28.6764142,
+      "longitude": 77.4137517
+    },
+    {
+      "name": "Kailash Nagar",
+      "latitude": 28.6591617,
+      "longitude": 77.4182434
+    },
+    {
+      "name": "KALLUPURA",
+      "latitude": 28.6639649,
+      "longitude": 77.4333641
+    },
+    {
+      "name": "SANGHARSH COLONY",
+      "latitude": 28.6540986,
+      "longitude": 77.4249956
+    },
+    {
+      "name": "KAILA KHERA",
+      "latitude": 28.6620256,
+      "longitude": 77.4133011
+    },
+    {
+      "name": "JATWARA",
+      "latitude": 28.6659795,
+      "longitude": 77.4312612
+    },
+    {
+      "name": "Punchkula",
+      "latitude": 28.6253081,
+      "longitude": 77.4714415
+    },
+    {
+      "name": "Sanjay Nagar",
+      "latitude": 28.6313989,
+      "longitude": 77.4709115
+    },
+    {
+      "name": "Bhim Nagar",
+      "latitude": 28.6791175,
+      "longitude": 77.4170371
+    },
+    {
+      "name": "Charani Vihar",
+      "latitude": 28.6212964,
+      "longitude": 77.47528
+    },
+    {
+      "name": "Ispat Nagar",
+      "latitude": 28.6390184,
+      "longitude": 77.4400328
+    },
+    {
+      "name": "Patel Nagar",
+      "latitude": 28.6760162,
+      "longitude": 77.422914
+    },
+    {
+      "name": "Lal Kuan",
+      "latitude": 28.633381,
+      "longitude": 77.4737197
+    },
+    {
+      "name": "Vijay Nagar colony",
+      "latitude": 28.6426989,
+      "longitude": 77.4335389
+    },
+    {
+      "name": "Saini",
+      "latitude": 28.5650727,
+      "longitude": 77.4903205
+    },
+    {
+      "name": "OLD VIJAY NAGAR",
+      "latitude": 28.6481671,
+      "longitude": 77.4233433
+    },
+    {
+      "name": "Chhapraula",
+      "latitude": 28.6157485,
+      "longitude": 77.479643
+    },
+    {
+      "name": "New Arya Nagar",
+      "latitude": 28.6786424,
+      "longitude": 77.4240727
+    },
+    {
+      "name": "NEW VIJAY NAGAR",
+      "latitude": 28.6519331,
+      "longitude": 77.4145671
+    },
+    {
+      "name": "Mirzapur",
+      "latitude": 28.6505563,
+      "longitude": 77.4159643
+    },
+    {
+      "name": "Samridhi",
+      "latitude": 28.5942768,
+      "longitude": 77.4543375
+    },
+    {
+      "name": "Mata Colony",
+      "latitude": 28.6470455,
+      "longitude": 77.4202853
+    },
+    {
+      "name": "Dundahera",
+      "latitude": 28.6335729,
+      "longitude": 77.4389074
+    },
+    {
+      "name": "Bhola Rawal",
+      "latitude": 28.5699835,
+      "longitude": 77.492698
+    },
+    {
+      "name": "Sunpura",
+      "latitude": 28.5658021,
+      "longitude": 77.4941072
+    },
+    {
+      "name": "Bharam Puri",
+      "latitude": 28.6845962,
+      "longitude": 77.4195003
+    },
+    {
+      "name": "Ambedkar Nagar",
+      "latitude": 28.6400895,
+      "longitude": 77.42868
+    },
+    {
+      "name": "Shankar Vihar",
+      "latitude": 28.6061957,
+      "longitude": 77.48609
+    },
+    {
+      "name": "Advocate Colony",
+      "latitude": 28.6441473,
+      "longitude": 77.4205575
+    },
+    {
+      "name": "Teacher Colony",
+      "latitude": 28.647396,
+      "longitude": 77.4156263
+    },
+    {
+      "name": "Namoli",
+      "latitude": 28.4770294,
+      "longitude": 77.4763175
+    },
+    {
+      "name": "Shivpuri",
+      "latitude": 28.6410738,
+      "longitude": 77.4230232
+    },
+    {
+      "name": "Sihani Chungi",
+      "latitude": 28.6841987,
+      "longitude": 77.4254037
+    },
+    {
+      "name": "Khodna Khurd",
+      "latitude": 28.5446019,
+      "longitude": 77.5024763
+    },
+    {
+      "name": "Bhanauta",
+      "latitude": 28.550926,
+      "longitude": 77.5012968
+    },
+    {
+      "name": "Shafipur",
+      "latitude": 28.447521,
+      "longitude": 77.4861862
+    },
+    {
+      "name": "Khera Dharampura",
+      "latitude": 28.6059637,
+      "longitude": 77.4895581
+    },
+    {
+      "name": "Sarvodaya Nagar",
+      "latitude": 28.6418442,
+      "longitude": 77.4163347
+    },
+    {
+      "name": "Harbans Nagar",
+      "latitude": 28.6872014,
+      "longitude": 77.4267762
+    },
+    {
+      "name": "Bhim Nagar",
+      "latitude": 28.6364317,
+      "longitude": 77.4227538
+    },
+    {
+      "name": "ADARSH COLONY",
+      "latitude": 28.6345515,
+      "longitude": 77.4243518
+    },
+    {
+      "name": "Pratap Vihar",
+      "latitude": 28.6444638,
+      "longitude": 77.4097432
+    },
+    {
+      "name": "Krishna Nagar",
+      "latitude": 28.6885567,
+      "longitude": 77.4301912
+    },
+    {
+      "name": "Kheri",
+      "latitude": 28.5557958,
+      "longitude": 77.5067866
+    },
+    {
+      "name": "Siddharth Vihar",
+      "latitude": 28.6405415,
+      "longitude": 77.4112571
+    },
+    {
+      "name": "Rahul Vihar - II",
+      "latitude": 28.6415992,
+      "longitude": 77.4095764
+    },
+    {
+      "name": "Girdharpur Sunarashi",
+      "latitude": 28.6320625,
+      "longitude": 77.4904468
+    },
+    {
+      "name": "Modern Relwa City",
+      "latitude": 28.6292529,
+      "longitude": 77.4918607
+    },
+    {
+      "name": "Achheja",
+      "latitude": 28.597396,
+      "longitude": 77.4994566
+    },
+    {
+      "name": "Cristian Nagar",
+      "latitude": 28.6357558,
+      "longitude": 77.4141533
+    },
+    {
+      "name": "Bihari Pura",
+      "latitude": 28.6300538,
+      "longitude": 77.4218577
+    },
+    {
+      "name": "Rahul Vihar",
+      "latitude": 28.6387843,
+      "longitude": 77.40736
+    },
+    {
+      "name": "G B Nagar",
+      "latitude": 28.6314547,
+      "longitude": 77.4154482
+    },
+    {
+      "name": "Akash Nagar",
+      "latitude": 28.6009204,
+      "longitude": 77.5040857
+    },
+    {
+      "name": "Khodna Kalan",
+      "latitude": 28.5396624,
+      "longitude": 77.518078
+    },
+    {
+      "name": "Patwari ka bag",
+      "latitude": 28.6048247,
+      "longitude": 77.5041151
+    },
+    {
+      "name": "Nai Basti Dundahera",
+      "latitude": 28.630261,
+      "longitude": 77.4133068
+    },
+    {
+      "name": "Vikas Nagar",
+      "latitude": 28.6943897,
+      "longitude": 77.4365616
+    },
+    {
+      "name": "Kondli",
+      "latitude": 28.4367059,
+      "longitude": 77.4760375
+    },
+    {
+      "name": "Rani Laxmibai Nagar",
+      "latitude": 28.6246672,
+      "longitude": 77.4183816
+    },
+    {
+      "name": "Kailash Pur",
+      "latitude": 28.5517724,
+      "longitude": 77.5187556
+    },
+    {
+      "name": "Ambedkar Park",
+      "latitude": 28.600335,
+      "longitude": 77.5086391
+    },
+    {
+      "name": "Badauli Bangar",
+      "latitude": 28.4574293,
+      "longitude": 77.4608296
+    },
+    {
+      "name": "Tigri",
+      "latitude": 28.6277703,
+      "longitude": 77.4096737
+    },
+    {
+      "name": "Budh Vihar",
+      "latitude": 28.6322297,
+      "longitude": 77.400109
+    },
+    {
+      "name": "Rajnagar Extension",
+      "latitude": 28.7035915,
+      "longitude": 77.4332706
+    },
+    {
+      "name": "Badalpur",
+      "latitude": 28.5981896,
+      "longitude": 77.5139756
+    },
+    {
+      "name": "Dery machha",
+      "latitude": 28.5897937,
+      "longitude": 77.5166899
+    },
+    {
+      "name": "Gari Samastpur",
+      "latitude": 28.4290821,
+      "longitude": 77.4750042
+    },
+    {
+      "name": "Sikanderpur",
+      "latitude": 28.7043663,
+      "longitude": 77.3457076
+    },
+    {
+      "name": "chhajrasi colony",
+      "latitude": 28.6249084,
+      "longitude": 77.4050399
+    },
+    {
+      "name": "Dairy machha",
+      "latitude": 28.5833965,
+      "longitude": 77.5204208
+    },
+    {
+      "name": "Momnathal",
+      "latitude": 28.4199285,
+      "longitude": 77.502139
+    },
+    {
+      "name": "Jhatta",
+      "latitude": 28.4648067,
+      "longitude": 77.4502568
+    },
+    {
+      "name": "Garhi",
+      "latitude": 28.7050051,
+      "longitude": 77.4408746
+    },
+    {
+      "name": "Deri",
+      "latitude": 28.4440848,
+      "longitude": 77.4555886
+    },
+    {
+      "name": "Delelpur",
+      "latitude": 28.4483467,
+      "longitude": 77.4516503
+    }
+  ]
+}

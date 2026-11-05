@@ -54,8 +54,19 @@ function haversine(lat1: number, lon1: number, lat2: number, lon2: number): numb
  * according to their projection order (t) that we stored during fetching.
  */
 export function buildRouteGeometries(waypointsData: any | null) {
-  const dataPath = path.join(__dirname, '../db/data.json');
-  const data = JSON.parse(fs.readFileSync(dataPath, 'utf8'));
+  let dataPath = path.join(__dirname, '../db/data.json');
+  if (!fs.existsSync(dataPath) || fs.statSync(dataPath).size === 0) {
+    dataPath = path.resolve(__dirname, '../../../backend/src/db/data.json');
+  }
+
+  let data: any;
+  try {
+    data = JSON.parse(fs.readFileSync(dataPath, 'utf8'));
+  } catch (err) {
+    console.warn('[RouteGeometry] Reading fallback backend data.json due to engine data.json contention...');
+    const fallbackPath = path.resolve(__dirname, '../../../backend/src/db/data.json');
+    data = JSON.parse(fs.readFileSync(fallbackPath, 'utf8'));
+  }
   const stopsById: Record<number, any> = {};
   for (const s of data.stops) stopsById[s.id] = s;
 

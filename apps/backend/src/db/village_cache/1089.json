@@ -1,0 +1,110 @@
+{
+  "fetchedAt": "2026-09-26T19:50:22.281Z",
+  "villages": [
+    {
+      "name": "Sector 10",
+      "latitude": 28.5905888,
+      "longitude": 77.3325061
+    },
+    {
+      "name": "Chhalera",
+      "latitude": 28.5558509,
+      "longitude": 77.3420246
+    },
+    {
+      "name": "Chaukahndi",
+      "latitude": 28.6029849,
+      "longitude": 77.3974225
+    },
+    {
+      "name": "YUSUFPURI CHAK SABERI",
+      "latitude": 28.6151137,
+      "longitude": 77.4023363
+    },
+    {
+      "name": "Sadarpur",
+      "latitude": 28.5537834,
+      "longitude": 77.3506184
+    },
+    {
+      "name": "Budh Vihar",
+      "latitude": 28.6322297,
+      "longitude": 77.400109
+    },
+    {
+      "name": "chhajrasi colony",
+      "latitude": 28.6249084,
+      "longitude": 77.4050399
+    },
+    {
+      "name": "Green park colony",
+      "latitude": 28.6063758,
+      "longitude": 77.4045249
+    },
+    {
+      "name": "Ralpur Khadar",
+      "latitude": 28.5415907,
+      "longitude": 77.3379668
+    },
+    {
+      "name": "East Arjun Nagar",
+      "latitude": 28.6569534,
+      "longitude": 77.2947178
+    },
+    {
+      "name": "Tigri",
+      "latitude": 28.6277703,
+      "longitude": 77.4096737
+    },
+    {
+      "name": "Rahul Vihar",
+      "latitude": 28.6387843,
+      "longitude": 77.40736
+    },
+    {
+      "name": "Nai Basti Dundahera",
+      "latitude": 28.630261,
+      "longitude": 77.4133068
+    },
+    {
+      "name": "G B Nagar",
+      "latitude": 28.6314547,
+      "longitude": 77.4154482
+    },
+    {
+      "name": "Rahul Vihar - II",
+      "latitude": 28.6415992,
+      "longitude": 77.4095764
+    },
+    {
+      "name": "Rani Laxmibai Nagar",
+      "latitude": 28.6246672,
+      "longitude": 77.4183816
+    },
+    {
+      "name": "Cristian Nagar",
+      "latitude": 28.6357558,
+      "longitude": 77.4141533
+    },
+    {
+      "name": "Siddharth Vihar",
+      "latitude": 28.6405415,
+      "longitude": 77.4112571
+    },
+    {
+      "name": "Pratap Vihar",
+      "latitude": 28.6444638,
+      "longitude": 77.4097432
+    },
+    {
+      "name": "Bakhtawarpur",
+      "latitude": 28.5336502,
+      "longitude": 77.3516275
+    },
+    {
+      "name": "Bihari Pura",
+      "latitude": 28.6300538,
+      "longitude": 77.4218577
+    }
+  ]
+}
