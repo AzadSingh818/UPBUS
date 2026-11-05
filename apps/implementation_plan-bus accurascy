@@ -1,0 +1,38 @@
+# Implementation Plan - Hyper-Accurate Real-Time Telemetry & Lag Elimination
+
+Fixing real-time position delay, hardware timestamp parsing, 0ms telemetry bridge synchronization, and high-speed trajectory dead-reckoning snapping so our map marker matches the official Margdarshi mobile app with zero lag.
+
+## User Review Required
+
+> [!IMPORTANT]
+> - **Immediate 0ms Live Sync**: Live bus updates will be pushed to the Admin UI map **immediately upon receipt of the API payload** (0ms delay), rather than waiting for 35 seconds of database batch processing.
+> - **Hardware Timestamp Mapping**: `parseMargdarshiBus` will map `DeviceDatetime` / `st_timestamp` / `gpstime` directly from Margdarshi API to accurately reflect true bus hardware time.
+> - **High-Speed Dead-Reckoning Snap**: For buses moving at highway speeds (`speed > 40 km/h`), trajectory catch-up speed will be increased from `0.008` to `0.08` so markers instantly catch up to actual high-speed positions.
+
+## Proposed Changes
+
+### Engine Ingestion (`apps/engine/src/ingestion/adapter_live.ts`)
+
+#### [MODIFY] [adapter_live.ts](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/engine/src/ingestion/adapter_live.ts)
+- **Parse Hardware Datetime**: Update `parseMargdarshiBus` to extract hardware timestamp from `raw.DeviceDatetime || raw.DeviceDateTime || raw.device_datetime || raw.gpstime || raw.gps_date_time || raw.st_timestamp || raw.updatetime || raw.LastSeen`.
+- **0ms Instant UI Telemetry Sync**: In `runLiveIngestionCycle()`, iterate through the fetched `buses` array immediately after HTTP response and invoke `adminMonitor.updateBus()` for all buses in 0ms before starting database persistence batching.
+- **Pass True Hardware Timestamp**: Pass `lastSeen: location.timestamp.toISOString()` explicitly in `adminMonitor.updateBus(...)`.
+
+---
+
+### Admin Map Component (`apps/admin/src/components/SingleBusMap.tsx`)
+
+#### [MODIFY] [SingleBusMap.tsx](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/admin/src/components/SingleBusMap.tsx)
+- **Dynamic Speed-Based Lerp Catch-up**: Increase hardware re-anchor lerp factor from `0.008` to `0.08` when `speed > 40 km/h` so high-speed highway buses (73+ km/h) instantly catch up to new GPS pings without lagging behind.
+- **Time Delta Calculation**: Calculate age of hardware ping (`Date.now() - pingTime`) and project forward position based on highway velocity.
+
+---
+
+## Verification Plan
+
+### Automated Tests
+- Run `npx tsc --noEmit` across `apps/engine` and `apps/admin` to ensure 0 TypeScript compilation errors.
+
+### Manual Verification
+- Inspect Admin UI console log for `[Live Adapter] Instant UI sync: 9,800+ buses pushed in 0ms`.
+- Open `SingleBusMap` for bus `UP78FN7512` and verify `Last Hardware Ping` matches actual UTC hardware timestamp and bus marker positions accurately on Agra-Lucknow Expressway.

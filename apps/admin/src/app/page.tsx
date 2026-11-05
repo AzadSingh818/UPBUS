@@ -60,10 +60,23 @@ interface DatabaseStats {
   historicalLogsCount: number;
 }
 
+interface RemovedRouteLog {
+  id: number;
+  removed_route_id: number;
+  removed_route_code: string;
+  removed_route_name: string;
+  kept_canonical_route_id: number;
+  kept_canonical_route_code: string;
+  reason: string;
+  removed_at: string;
+}
+
 export default function AdminMonitor() {
   const [logs, setLogs] = useState<AdminLogItem[]>([]);
   const [buses, setBuses] = useState<ActiveBusState[]>([]);
   const [stats, setStats] = useState<DatabaseStats | null>(null);
+  const [removedRoutes, setRemovedRoutes] = useState<RemovedRouteLog[]>([]);
+  const [isDeduplicating, setIsDeduplicating] = useState(false);
   const [isLive, setIsLive] = useState(true);
   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
   const [isMounted, setIsMounted] = useState(false);
@@ -75,7 +88,7 @@ export default function AdminMonitor() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 50;
 
-  const [viewMode, setViewMode] = useState<'console' | 'map' | 'coverage'>('coverage');
+  const [viewMode, setViewMode] = useState<'console' | 'map' | 'coverage' | 'dedup'>('coverage');
   const [speedFilter, setSpeedFilter] = useState<'all' | 'moving' | 'halted'>('all');
   const [activeTerminal, setActiveTerminal] = useState<'engine' | 'admin' | 'webapp' | 'gateway'>('engine');
 
@@ -167,55 +180,77 @@ export default function AdminMonitor() {
   }, []);
   const API_BASE = '/api/v1/admin';
 
-  // Fetch all administrative data
-  const fetchData = async (isManual = false) => {
+  // Fetch administrative data
+  const fetchData = async (isManual = false, fetchRemoved = false) => {
     if (isManual) setIsRefreshing(true);
     try {
       const ts = Date.now();
-      // 1. Logs
-      const logsRes = await fetch(`${API_BASE}/monitor/logs?t=${ts}`, { cache: 'no-store' });
-      if (logsRes.ok) {
+      const [logsRes, busesRes, statsRes] = await Promise.all([
+        fetch(`${API_BASE}/monitor/logs?t=${ts}`, { cache: 'no-store' }).catch(() => null),
+        fetch(`${API_BASE}/monitor/buses?t=${ts}`, { cache: 'no-store' }).catch(() => null),
+        fetch(`${API_BASE}/monitor/stats?t=${ts}`, { cache: 'no-store' }).catch(() => null)
+      ]);
+
+      if (logsRes && logsRes.ok) {
         const logsData = await logsRes.json();
         setLogs(logsData.logs || []);
       }
 
-      // 2. Active Buses
-      const busesRes = await fetch(`${API_BASE}/monitor/buses?t=${ts}`, { cache: 'no-store' });
-      if (busesRes.ok) {
+      if (busesRes && busesRes.ok) {
         const busesData = await busesRes.json();
         setBuses(busesData.buses || []);
       }
 
-      // 3. Stats
-      const statsRes = await fetch(`${API_BASE}/monitor/stats?t=${ts}`, { cache: 'no-store' });
-      if (statsRes.ok) {
+      if (statsRes && statsRes.ok) {
         const statsData = await statsRes.json();
         setStats(statsData.stats || null);
+      }
+
+      if (fetchRemoved || viewMode === 'dedup') {
+        const removedRes = await fetch(`${API_BASE}/monitor/removed-routes?t=${ts}`, { cache: 'no-store' }).catch(() => null);
+        if (removedRes && removedRes.ok) {
+          const removedData = await removedRes.json();
+          setRemovedRoutes(removedData.removedRoutes || []);
+        }
       }
 
       setLastRefreshed(new Date());
       if (isManual) setRefreshTrigger(prev => prev + 1);
     } catch (err) {
-      console.error('[Admin Console] Error polling admin data:', err);
+      // Suppress polling errors during server restarts
     } finally {
       if (isManual) {
-        setTimeout(() => setIsRefreshing(false), 500); // minimum visual feedback
+        setTimeout(() => setIsRefreshing(false), 500);
       }
+    }
+  };
+
+  const handleRunDeduplication = async () => {
+    setIsDeduplicating(true);
+    try {
+      const res = await fetch(`${API_BASE}/monitor/deduplicate`, { method: 'POST' });
+      if (res.ok) {
+        await fetchData(true, true);
+      }
+    } catch (e) {
+      console.error('Error triggering deduplication:', e);
+    } finally {
+      setIsDeduplicating(false);
     }
   };
 
   // Setup polling intervals
   useEffect(() => {
-    fetchData(); // Initial load
+    fetchData(false, true); // Initial load with removed routes
 
     if (!isLive) return;
 
     const interval = setInterval(() => {
       fetchData();
-    }, 1000); // 1-second update cycle for near real-time logs
+    }, 2500); // 2.5-second update cycle to prevent TCP TIMEWAIT socket exhaustion
 
     return () => clearInterval(interval);
-  }, [isLive]);
+  }, [isLive, viewMode]);
 
   // Scroll to bottom of terminal when logs change
   useEffect(() => {
@@ -931,6 +966,23 @@ export default function AdminMonitor() {
             >
               Coverage
             </button>
+            <button 
+              style={{
+                padding: '6px 14px',
+                fontSize: '12.5px',
+                borderRadius: '6px',
+                border: 'none',
+                cursor: 'pointer',
+                background: viewMode === 'dedup' ? '#ef4444' : 'transparent',
+                color: viewMode === 'dedup' ? '#ffffff' : '#f3f4f6',
+                fontWeight: 600,
+                transition: 'all 0.2s',
+                outline: 'none'
+              }}
+              onClick={() => setViewMode('dedup')}
+            >
+              Deduplication ({removedRoutes.length})
+            </button>
           </div>
           
           <span style={{ color: '#374151' }}>|</span>
@@ -1296,6 +1348,76 @@ export default function AdminMonitor() {
       ) : viewMode === 'map' ? (
         <div style={{ height: 'calc(100vh - 200px)', minHeight: '560px', background: 'rgba(17, 24, 39, 0.6)', border: '1px solid rgba(255, 255, 255, 0.06)', borderRadius: '12px', padding: '12px', boxSizing: 'border-box' }}>
           <LiveMap buses={buses} refreshTrigger={refreshTrigger} />
+        </div>
+      ) : viewMode === 'dedup' ? (
+        <div className="buses-panel" style={{ height: 'calc(100vh - 200px)', minHeight: '560px' }}>
+          <div className="panel-header">
+            <div className="panel-title">
+              <RefreshCw size={18} style={{ color: '#ef4444' }} />
+              <span>Master-Mapping Route Deduplication Audit</span>
+              <span className="bus-count-badge" style={{ background: '#ef4444', color: '#ffffff' }}>
+                {removedRoutes.length} Duplicates Pruned
+              </span>
+            </div>
+            <button
+              onClick={handleRunDeduplication}
+              disabled={isDeduplicating}
+              style={{
+                background: '#ef4444',
+                color: '#ffffff',
+                border: 'none',
+                padding: '6px 14px',
+                borderRadius: '6px',
+                fontWeight: 600,
+                fontSize: '12px',
+                cursor: 'pointer',
+                opacity: isDeduplicating ? 0.6 : 1
+              }}
+            >
+              {isDeduplicating ? 'Running Deduplication...' : '⚡ Run Deduplication Scan'}
+            </button>
+          </div>
+
+          <div className="buses-table-wrapper">
+            <table className="buses-table">
+              <thead>
+                <tr>
+                  <th>Removed Route Code</th>
+                  <th>Removed Route Name</th>
+                  <th>Kept Master Route Code</th>
+                  <th>Reason / Constraint Match</th>
+                  <th>Removed At</th>
+                </tr>
+              </thead>
+              <tbody>
+                {removedRoutes.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>
+                      No duplicate routes detected yet. Deduplication engine is actively monitoring network routes.
+                    </td>
+                  </tr>
+                ) : (
+                  removedRoutes.map((item) => (
+                    <tr key={item.id}>
+                      <td>
+                        <span className="bus-badge-reg" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#f87171', borderColor: 'rgba(239, 68, 68, 0.3)' }}>
+                          {item.removed_route_code}
+                        </span>
+                      </td>
+                      <td>{item.removed_route_name}</td>
+                      <td>
+                        <span className="bus-badge-reg" style={{ background: 'rgba(34, 197, 94, 0.1)', color: '#4ade80', borderColor: 'rgba(34, 197, 94, 0.3)' }}>
+                          {item.kept_canonical_route_code}
+                        </span>
+                      </td>
+                      <td style={{ color: '#fbbf24', fontSize: '12px' }}>{item.reason}</td>
+                      <td style={{ fontSize: '12px', color: '#9ca3af' }}>{formatTime(item.removed_at)}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       ) : (
         <div style={{ height: 'calc(100vh - 200px)', minHeight: '560px', background: 'rgba(17, 24, 39, 0.6)', border: '1px solid rgba(255, 255, 255, 0.06)', borderRadius: '12px', padding: '40px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>

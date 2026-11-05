@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 import path from "path";
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: ['192.168.31.203', 'localhost', '127.0.0.1'],
   transpilePackages: ['lucide-react'],
   turbopack: {
     root: path.resolve(__dirname),

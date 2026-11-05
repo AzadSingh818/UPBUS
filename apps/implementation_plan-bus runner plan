@@ -1,0 +1,56 @@
+# Implementation Plan - Live Bus Movement & Telemetry Interpolation Stream in SingleBusMap
+
+This plan details how we will enable continuous real-time movement, smooth Leaflet marker animation, and live coordinate/speed/heading updates for single bus tracking on the Admin Console modal (`SingleBusMap`).
+
+---
+
+## User Requirement Summary
+When an admin clicks on any yellow bus registration badge (e.g. `UP78KT1322`):
+1. **Live Moving Marker**: As the bus runs, its position marker on the map should smoothly glide forward along its trajectory in real-time.
+2. **Dynamic Live Telemetry Stream**: The modal side panel displaying **Speed** (e.g. `59 km/h`), **Heading** (e.g. `334°`), **Coordinates** (e.g. `26.111853, 80.595100`), **Destination Status**, and **Regional District** should continuously update live as the bus moves.
+3. **Seamless Telemetry Calibration**: When fresh telemetry packets arrive from the UPSRTC backend, the bus marker position and velocity vector seamlessly re-anchor without jarring jumps.
+
+---
+
+## Technical Design & Architecture
+
+### 1. GPS Trajectory Interpolation Engine (`SingleBusMap.tsx`)
+- **Real-Time Physics Model**:
+  - When `speed > 0` (e.g., $59\text{ km/h} \approx 16.38\text{ m/s}$), convert speed and heading ($\theta$) into delta coordinates per second:
+    $$\Delta \text{lat} = \frac{v \times \Delta t \times \cos(\theta \times \frac{\pi}{180})}{111,320}$$
+    $$\Delta \text{lng} = \frac{v \times \Delta t \times \sin(\theta \times \frac{\pi}{180})}{111,320 \times \cos(\text{lat} \times \frac{\pi}{180})}$$
+- **Animation Loop (`requestAnimationFrame` / 100ms Interval)**:
+  - Continuously update the bus's `liveLat`, `liveLng`, `liveSpeed`, and `liveHeading` state variables.
+  - Smoothly update Leaflet marker position (`markerRef.current.setLatLng(...)`) and center map camera with ease animation (`mapRef.current.panTo(..., { animate: true })`).
+
+### 2. Live Panel HUD Enhancements
+- **Dynamic Compass Indicator**: Add an animated 360° compass rose that rotates live to match `liveHeading`.
+- **Live Speedometer Pulse**: Color-code speed changes (Green for moving $\ge 5\text{ km/h}$, Orange for slow traffic, Red for idling).
+- **Coordinate Telemetry Ticker**: High-precision 6-decimal latitude & longitude coordinates updating every 200ms as the bus glides.
+- **Pulsing Stream Badge**: Add a green glowing **"● LIVE TELEMETRY STREAM"** badge at the top of the sidebar.
+
+### 3. Backend Active Bus Frequency Sync
+- **Backend Sync**: Ensure `allBuses` prop in `apps/admin/src/app/page.tsx` passes updated telemetry array every cycle so real GPS packets seamlessly anchor the physics engine.
+
+---
+
+## Proposed Changes
+
+### Component: Single Bus Tracking Modal
+#### [MODIFY] [SingleBusMap.tsx (Admin)](file:///c:/Users/Azad%20Singh/Desktop/upbus/apps/admin/src/components/SingleBusMap.tsx)
+- Add physics-based dead-reckoning trajectory interpolation state (`liveLat`, `liveLng`, `liveSpeed`, `liveHeading`).
+- Implement smooth Leaflet marker movement loop (`requestAnimationFrame`).
+- Add dynamic compass rose, live coordinate ticker, and pulsing telemetry status badge to sidebar UI.
+
+---
+
+## Verification Plan
+
+### Manual Verification
+1. Boot Admin UI (`cd apps/admin && npm run dev`) and Backend (`cd apps/backend && npm run dev`).
+2. Open `http://localhost:3003` in browser.
+3. Click on any bus registration number badge (e.g., `UP78KT1322`).
+4. **Verify**:
+   - Bus marker smoothly glides forward on the dark mode Leaflet map.
+   - Speedometer, Compass Heading (e.g., `334°`), and Coordinates (e.g., `26.111853, 80.595100`) continuously tick and update in real-time.
+   - Modal side card displays current destination status and geocoded regional district.

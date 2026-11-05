@@ -65,17 +65,17 @@ export default function LiveMap({ buses, refreshTrigger = 0 }: LiveMapProps) {
     const map = L.map(container, {
       center: [26.8467, 80.9462],
       zoom: 7,
-      maxZoom: 15,
+      maxZoom: 19,
       minZoom: 6,
     });
 
     mapInstanceRef.current = map;
 
-    // Add Dark Mode CartoDB Map Tiles
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
-      subdomains: 'abcd',
-      maxZoom: 20
+    // High-Detail OpenStreetMap Layer (Shops, Street Names, Colonies, Area Names, Landmarks)
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      maxZoom: 19,
+      maxNativeZoom: 19
     }).addTo(map);
 
     // Render static routes if available
