@@ -6,10 +6,14 @@ import path from 'path';
 dotenv.config();
 
 const connectionString = process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/upbus';
+const isRemoteDb = connectionString.includes('amazonaws.com') || connectionString.includes('sslmode=require');
 
 let pool: Pool | null = null;
 try {
-  pool = new Pool({ connectionString });
+  pool = new Pool({
+    connectionString,
+    ssl: isRemoteDb ? { rejectUnauthorized: false } : undefined
+  });
 } catch (e) {
   console.warn('⚠️ [Warning] Could not initialize PostgreSQL pool:', e);
 }
