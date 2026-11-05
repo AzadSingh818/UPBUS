@@ -1,4 +1,5 @@
-import mockDb from '../db/data.json';
+// Use dynamic require so TypeScript does not load and parse massive JSON at compile time
+const mockDb: any = require('../db/data.json');
 import { query } from '../db';
 import { haversineDistanceKm } from './geoUtils';
 
