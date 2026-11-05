@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   const { path } = await params;
-  const backendBase = process.env.NODE_ENV === 'development' 
+  const backendBase = process.env.BACKEND_URL || (process.env.NODE_ENV === 'development' 
     ? 'http://127.0.0.1:5000' 
-    : 'http://51.20.190.81:5000';
+    : 'http://65.2.150.27:5000');
     
   const targetUrl = `${backendBase}/api/${path.join('/')}${req.nextUrl.search}`;
 
@@ -20,9 +20,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ path
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   const { path } = await params;
-  const backendBase = process.env.NODE_ENV === 'development' 
+  const backendBase = process.env.BACKEND_URL || (process.env.NODE_ENV === 'development' 
     ? 'http://127.0.0.1:5000' 
-    : 'http://51.20.190.81:5000';
+    : 'http://65.2.150.27:5000');
 
   const targetUrl = `${backendBase}/api/${path.join('/')}`;
 
