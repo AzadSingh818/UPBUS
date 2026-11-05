@@ -17,11 +17,14 @@ const consoleFormat = winston.format.combine(
   winston.format.printf(({ timestamp, level, message, module }) => {
     const moduleTag = module ? `[${module}]` : '[SYSTEM]';
 
+    const ts = String(timestamp);
+    const msg = String(message);
+
     if (module === 'SCRAPER') {
-      return `${colors.gray(timestamp)} ${colors.magenta.bold(moduleTag)} ${level}: ${colors.cyan(message)}`;
+      return `${colors.gray(ts)} ${colors.magenta.bold(moduleTag)} ${level}: ${colors.cyan(msg)}`;
     }
 
-    return `${colors.gray(timestamp)} ${colors.blue.bold(moduleTag)} ${level}: ${message}`;
+    return `${colors.gray(ts)} ${colors.blue.bold(moduleTag)} ${level}: ${msg}`;
   })
 );
 
