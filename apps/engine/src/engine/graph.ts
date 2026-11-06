@@ -1,4 +1,5 @@
-import mockDb from '../db/data.json';
+// Dynamic require to prevent memory explosion during compilation and runtime
+const mockDb: any = require('../db/data.json');
 import { query } from '../db';
 import { haversineDistanceKm } from './geoUtils';
 

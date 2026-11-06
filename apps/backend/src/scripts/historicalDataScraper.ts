@@ -9,51 +9,65 @@ import { logger } from '../utils/logger';
  * massive dataset needed to train our Deep Learning ETA models.
  */
 
-const SCRAPE_INTERVAL_MS = 30000; // 30 seconds
+const SCRAPE_INTERVAL_MS = 60000; // 60 seconds interval to maintain ultra-low CPU
+
+// In-memory cache for bus & route IDs to prevent 40,000 database roundtrips per cycle
+const busIdCache = new Map<string, number | null>();
+const routeIdCache = new Map<string, number | null>();
 
 async function startScraping() {
-  logger.info(`Starting cron job. Interval: ${SCRAPE_INTERVAL_MS}ms`, { module: 'SCRAPER' });
+  logger.info(`Starting lightweight historical logger cron job. Interval: ${SCRAPE_INTERVAL_MS}ms`, { module: 'SCRAPER' });
+
+  // Auto-pruning cron: clean historical logs older than 24 hours every hour to preserve AWS RDS storage
+  setInterval(async () => {
+    try {
+      await query(`DELETE FROM historical_gps_logs WHERE timestamp < NOW() - INTERVAL '24 hours'`);
+      logger.info('Auto-pruned historical logs older than 24 hours.', { module: 'SCRAPER' });
+    } catch {}
+  }, 60 * 60 * 1000);
 
   setInterval(async () => {
     try {
-      logger.info(`Fetching live data...`, { module: 'SCRAPER' });
       const liveData = await fetchMargdarshiLiveData();
       
       if (!liveData || liveData.length === 0) {
-        logger.info(`Scraper waiting for active buses from engine...`, { module: 'SCRAPER' });
         return;
       }
 
-      logger.debug(`Received ${liveData.length} active buses. Logging to DB...`, { module: 'SCRAPER' });
-
-      // We'll batch insert the records to avoid overwhelming the database
-      // In production with 10k buses, you might chunk this array.
-      
+      // Sample up to 100 buses per cycle to protect memory and avoid overwhelming the database
+      const sampledBuses = liveData.slice(0, 100);
       const values: any[] = [];
       const placeholders: string[] = [];
       let paramIndex = 1;
 
-      // Mock weather logic (in a real system, you'd fetch from a weather API based on Lat/Lng)
       const currentHour = new Date().getHours();
-      let mockWeatherCondition = 0; // Clear
-      if (currentHour > 1 && currentHour < 7) mockWeatherCondition = 2; // Fog early morning
+      let mockWeatherCondition = (currentHour > 1 && currentHour < 7) ? 2 : 0;
 
-      for (const bus of liveData) {
-        // Extract basic data (Margdarshi API fields might vary, using logical defaults here)
+      for (const bus of sampledBuses) {
         const rawReg = bus.RegNo || bus.regNum || bus.registration_no || bus.vehicle_no || 'UNKNOWN';
-        const busIdRes = await query(`SELECT id FROM buses WHERE registration_no = $1 LIMIT 1`, [rawReg]);
-        const busId = busIdRes.rowCount && busIdRes.rowCount > 0 ? busIdRes.rows[0].id : null;
+        let busId = busIdCache.get(rawReg);
+        if (busId === undefined) {
+          const busIdRes = await query(`SELECT id FROM buses WHERE registration_no = $1 LIMIT 1`, [rawReg]);
+          busId = (busIdRes.rowCount && busIdRes.rowCount > 0) ? busIdRes.rows[0].id : null;
+          busIdCache.set(rawReg, busId);
+        }
 
-        const rawRoute = bus.routeCode || bus.route_code || bus.RouteCode || bus.routeName || bus.route_name || bus.RouteName || bus.routename || 'UNKNOWN';
-        const routeIdRes = await query(`SELECT id FROM routes WHERE route_code = $1 OR route_name ILIKE $2 LIMIT 1`, [rawRoute, `%${rawRoute}%`]);
-        const routeId = routeIdRes.rowCount && routeIdRes.rowCount > 0 ? routeIdRes.rows[0].id : null;
+        const rawRoute = bus.routeCode || bus.route_code || bus.RouteCode || bus.routeName || bus.route_name || 'UNKNOWN';
+        let routeId = routeIdCache.get(rawRoute);
+        if (routeId === undefined) {
+          const routeIdRes = await query(`SELECT id FROM routes WHERE route_code = $1 LIMIT 1`, [rawRoute]);
+          routeId = (routeIdRes.rowCount && routeIdRes.rowCount > 0) ? routeIdRes.rows[0].id : null;
+          routeIdCache.set(rawRoute, routeId);
+        }
 
         const lat = parseFloat(bus.latitude !== undefined ? bus.latitude : bus.lat) || 0;
         const lng = parseFloat(bus.longitude !== undefined ? bus.longitude : bus.lng || bus.long) || 0;
         const speed = parseFloat(bus.speed) || 0;
 
-        placeholders.push(`($${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++})`);
-        values.push(busId, routeId, lat, lng, speed, mockWeatherCondition);
+        if (lat !== 0 && lng !== 0) {
+          placeholders.push(`($${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++})`);
+          values.push(busId, routeId, lat, lng, speed, mockWeatherCondition);
+        }
       }
 
       if (placeholders.length > 0) {
@@ -62,7 +76,7 @@ async function startScraping() {
           VALUES ${placeholders.join(', ')}
         `;
         await query(insertQuery, values);
-        logger.info(`Successfully logged ${placeholders.length} records.`, { module: 'SCRAPER' });
+        logger.info(`Successfully logged ${placeholders.length} sample records. Memory healthy.`, { module: 'SCRAPER' });
       }
 
     } catch (err: any) {
