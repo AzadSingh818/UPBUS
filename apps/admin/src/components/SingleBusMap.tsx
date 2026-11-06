@@ -171,9 +171,17 @@ export default function SingleBusMap({ bus: initialBus, onClose, allBuses }: Sin
         const totalDistToTarget = Math.sqrt(latDist * latDist + lngDist * lngDist);
 
         if (totalDistToTarget < 0.00005) {
-          // Within 5 meters of target hardware location: smoothly hold at target position until fresh ping arrives
-          currLat = target.latitude;
-          currLng = target.longitude;
+          // Dead Reckoning Extrapolation: Even if we reached the last ping point,
+          // the bus has speed > 5 km/h, so KEEP MOVING forward along current heading!
+          const speedMetersPerSec = (currSpeed * 1000) / 3600;
+          const distanceMeters = speedMetersPerSec * dt;
+          const radHeading = (currHeading * Math.PI) / 180;
+
+          const deltaLat = (distanceMeters * Math.cos(radHeading)) / 111320;
+          const deltaLng = (distanceMeters * Math.sin(radHeading)) / (111320 * Math.cos((currLat * Math.PI) / 180));
+
+          currLat += deltaLat;
+          currLng += deltaLng;
         } else {
           // Calculate direct bearing towards target hardware position
           const targetRadBearing = Math.atan2(lngDist * Math.cos((currLat * Math.PI) / 180), latDist);
@@ -185,7 +193,7 @@ export default function SingleBusMap({ bus: initialBus, onClose, allBuses }: Sin
           if (bDiff < -180) bDiff += 360;
           currHeading += bDiff * 0.1;
 
-          // Motion vector is 100% aligned with target direction — zero tug-of-war!
+          // Motion vector is 100% aligned with target direction
           const speedMetersPerSec = (currSpeed * 1000) / 3600;
           const distanceMeters = speedMetersPerSec * dt;
 
