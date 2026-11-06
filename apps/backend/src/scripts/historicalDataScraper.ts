@@ -48,16 +48,16 @@ async function startScraping() {
         let busId = busIdCache.get(rawReg);
         if (busId === undefined) {
           const busIdRes = await query(`SELECT id FROM buses WHERE registration_no = $1 LIMIT 1`, [rawReg]);
-          busId = (busIdRes.rowCount && busIdRes.rowCount > 0) ? busIdRes.rows[0].id : null;
-          busIdCache.set(rawReg, busId);
+          busId = (busIdRes.rowCount && busIdRes.rowCount > 0) ? (busIdRes.rows[0].id as number) : null;
+          busIdCache.set(rawReg, busId ?? null);
         }
 
         const rawRoute = bus.routeCode || bus.route_code || bus.RouteCode || bus.routeName || bus.route_name || 'UNKNOWN';
         let routeId = routeIdCache.get(rawRoute);
         if (routeId === undefined) {
           const routeIdRes = await query(`SELECT id FROM routes WHERE route_code = $1 LIMIT 1`, [rawRoute]);
-          routeId = (routeIdRes.rowCount && routeIdRes.rowCount > 0) ? routeIdRes.rows[0].id : null;
-          routeIdCache.set(rawRoute, routeId);
+          routeId = (routeIdRes.rowCount && routeIdRes.rowCount > 0) ? (routeIdRes.rows[0].id as number) : null;
+          routeIdCache.set(rawRoute, routeId ?? null);
         }
 
         const lat = parseFloat(bus.latitude !== undefined ? bus.latitude : bus.lat) || 0;
