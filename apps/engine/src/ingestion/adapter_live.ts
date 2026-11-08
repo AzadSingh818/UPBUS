@@ -384,10 +384,24 @@ async function runLiveIngestionCycle(): Promise<void> {
 
   // ⚡ INSTANT 0ms UI TELEMETRY SYNC:
   // Immediately push all 9,800+ fresh bus states to adminMonitor before starting slow DB batches.
+  const { resolveNearestStopName } = require('../utils/nearestStopResolver');
+
   for (const bus of buses) {
     const bId = getBusIdFromRegNo(bus.registrationNo);
-    const resolved = resolveSmartRouteName(bus.registrationNo, bus.latitude, bus.longitude, bus.routeName);
+    const resolved = resolveSmartRouteName(
+      bus.registrationNo,
+      bus.latitude,
+      bus.longitude,
+      bus.routeName,
+      bus.depotName,
+      bus.zoneName
+    );
     const resolvedRouteName = resolved.routeName;
+
+    let dynamicStop = bus.nextStop ? `Next: ${bus.nextStop}` : bus.destination;
+    if (!dynamicStop || dynamicStop.toLowerCase().includes('en-route') || dynamicStop === 'Unknown' || dynamicStop.toLowerCase().includes('en route')) {
+      dynamicStop = resolveNearestStopName(bus.latitude, bus.longitude, bus.zoneName);
+    }
 
     adminMonitor.updateBus(bId, bus.registrationNo, {
       latitude: bus.latitude,
@@ -397,7 +411,7 @@ async function runLiveIngestionCycle(): Promise<void> {
       lastSeen: bus.timestamp ? bus.timestamp.toISOString() : new Date().toISOString(),
       routeName: resolvedRouteName,
       routeCode: resolved.routeCode,
-      currentStop: bus.nextStop ? `Next: ${bus.nextStop}` : bus.destination || 'En-route',
+      currentStop: dynamicStop,
       status: bus.speed > 0 ? 'MOVING' : 'HALTED',
       zoneName: bus.zoneName,
       originalRouteStr: bus.routeName || resolvedRouteName

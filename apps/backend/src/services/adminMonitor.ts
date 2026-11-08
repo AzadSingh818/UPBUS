@@ -164,31 +164,45 @@ class AdminMonitorService {
     
     let finalRouteName = data.routeName ?? existing?.routeName;
     let finalRouteCode = data.routeCode ?? existing?.routeCode;
+    let finalCurrentStop = data.currentStop ?? existing?.currentStop;
 
+    const busLat = data.latitude ?? existing?.latitude ?? 0;
+    const busLng = data.longitude ?? existing?.longitude ?? 0;
+    const busZone = data.zoneName ?? existing?.zoneName;
+
+    // 1. Resolve Intelligent Route Name (Eliminating repetitive 'Lucknow - Kanpur Express')
     if (!finalRouteName || finalRouteName === 'Lucknow - Kanpur Express' || finalRouteName === 'UNKNOWN') {
       try {
         const { resolveSmartRouteName } = require('../engine/smartRouteResolver');
-        const resolved = resolveSmartRouteName(regNo, data.latitude ?? existing?.latitude ?? 0, data.longitude ?? existing?.longitude ?? 0, data.routeName);
+        const resolved = resolveSmartRouteName(regNo, busLat, busLng, data.originalRouteStr || data.routeName, undefined, busZone);
         finalRouteName = resolved.routeName;
-        if (!finalRouteCode || finalRouteCode === 'R_UNKNOWN') {
+        if (!finalRouteCode || finalRouteCode === 'R_UNKNOWN' || finalRouteCode === 'R_LKO_KAN') {
           finalRouteCode = resolved.routeCode;
         }
+      } catch {}
+    }
+
+    // 2. Resolve Dynamic Landmark Stop (Eliminating repetitive 'Near: En-route')
+    if (!finalCurrentStop || finalCurrentStop.toLowerCase().includes('en-route') || finalCurrentStop === 'Unknown' || finalCurrentStop.toLowerCase().includes('en route')) {
+      try {
+        const { resolveNearestStopName } = require('../utils/nearestStopResolver');
+        finalCurrentStop = resolveNearestStopName(busLat, busLng, busZone);
       } catch {}
     }
 
     const updated: ActiveBusState = {
       busId: busId,
       regNo: regNo || existing?.regNo || 'UP-UNKNOWN',
-      latitude: data.latitude ?? existing?.latitude ?? 0,
-      longitude: data.longitude ?? existing?.longitude ?? 0,
+      latitude: busLat,
+      longitude: busLng,
       speed: data.speed ?? existing?.speed ?? 0,
       heading: data.heading ?? existing?.heading ?? 0,
       lastSeen: new Date().toISOString(),
       routeCode: finalRouteCode,
       routeName: finalRouteName,
       tripId: data.tripId ?? existing?.tripId,
-      currentStop: data.currentStop ?? existing?.currentStop,
-      zoneName: data.zoneName ?? existing?.zoneName,
+      currentStop: finalCurrentStop,
+      zoneName: busZone,
       status: data.status ?? existing?.status ?? 'active'
     };
     

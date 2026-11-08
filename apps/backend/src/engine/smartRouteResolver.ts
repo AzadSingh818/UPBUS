@@ -12,6 +12,7 @@ export interface RouteResolution {
   routeCode: string;
   sourceCity: string;
   destinationCity: string;
+  nearestStop?: string;
 }
 
 // 1. RTO Code Mapping for Uttar Pradesh Districts
@@ -94,21 +95,51 @@ const RTO_MAP: Record<string, { city: string; region: string }> = {
 
 // 2. Geographical UP Hub Coordinates Bounding Box Map
 const CITY_CENTERS: Array<{ name: string; lat: number; lng: number; radiusKm: number; defaultCorridor: string }> = [
-  { name: 'Bareilly', lat: 28.3647, lng: 79.4149, radiusKm: 85, defaultCorridor: 'Bareilly - Delhi Express' },
-  { name: 'Sonbhadra', lat: 24.1468, lng: 82.7703, radiusKm: 120, defaultCorridor: 'Varanasi - Renukoot Intercity' },
-  { name: 'Kanpur', lat: 26.4499, lng: 80.3319, radiusKm: 50, defaultCorridor: 'Lucknow - Kanpur Express' },
-  { name: 'Auraiya / Etawah', lat: 26.5116, lng: 79.3981, radiusKm: 70, defaultCorridor: 'Kanpur - Etawah - Agra Express' },
-  { name: 'Azamgarh', lat: 26.1469, lng: 83.3148, radiusKm: 80, defaultCorridor: 'Varanasi - Azamgarh - Gorakhpur' },
-  { name: 'Varanasi', lat: 25.3176, lng: 82.9739, radiusKm: 60, defaultCorridor: 'Varanasi Cantt - Prayagraj' },
-  { name: 'Gorakhpur', lat: 26.7606, lng: 83.3732, radiusKm: 70, defaultCorridor: 'Gorakhpur - Lucknow Express' },
-  { name: 'Lucknow', lat: 26.8467, lng: 80.9462, radiusKm: 50, defaultCorridor: 'Lucknow - Kanpur Express' },
-  { name: 'Prayagraj', lat: 25.4358, lng: 81.8463, radiusKm: 60, defaultCorridor: 'Prayagraj - Kanpur Express' },
-  { name: 'Agra', lat: 27.1767, lng: 78.0081, radiusKm: 60, defaultCorridor: 'Agra - Mathura - Delhi Yamuna Express' },
-  { name: 'Meerut / NCR', lat: 28.9845, lng: 77.7064, radiusKm: 70, defaultCorridor: 'Delhi - Meerut Express' },
-  { name: 'Jhansi', lat: 25.4484, lng: 78.5685, radiusKm: 80, defaultCorridor: 'Jhansi - Kanpur - Lucknow' },
-  { name: 'Moradabad', lat: 28.8386, lng: 78.7733, radiusKm: 70, defaultCorridor: 'Moradabad - Delhi Highway' },
-  { name: 'Aligarh', lat: 27.8974, lng: 78.0880, radiusKm: 60, defaultCorridor: 'Aligarh - Agra - Mathura' },
-  { name: 'Banda', lat: 25.4754, lng: 80.3347, radiusKm: 80, defaultCorridor: 'Banda - Kanpur Intercity' }
+  { name: 'Bareilly', lat: 28.3647, lng: 79.4149, radiusKm: 65, defaultCorridor: 'Bareilly - Delhi Highway Express' },
+  { name: 'Sonbhadra', lat: 24.1468, lng: 82.7703, radiusKm: 80, defaultCorridor: 'Varanasi - Renukoot Intercity' },
+  { name: 'Kanpur', lat: 26.4499, lng: 80.3319, radiusKm: 35, defaultCorridor: 'Kanpur Central - Fatehpur Intercity' },
+  { name: 'Auraiya / Etawah', lat: 26.5116, lng: 79.3981, radiusKm: 45, defaultCorridor: 'Etawah - Kanpur Expressway' },
+  { name: 'Azamgarh', lat: 26.1469, lng: 83.3148, radiusKm: 50, defaultCorridor: 'Azamgarh - Varanasi Intercity' },
+  { name: 'Varanasi', lat: 25.3176, lng: 82.9739, radiusKm: 45, defaultCorridor: 'Varanasi Cantt - Prayagraj Sangam Express' },
+  { name: 'Gorakhpur', lat: 26.7606, lng: 83.3732, radiusKm: 50, defaultCorridor: 'Gorakhpur - Basti - Ayodhya Express' },
+  { name: 'Lucknow', lat: 26.8467, lng: 80.9462, radiusKm: 30, defaultCorridor: 'Lucknow Charbagh - Ayodhya Express' },
+  { name: 'Prayagraj', lat: 25.4358, lng: 81.8463, radiusKm: 45, defaultCorridor: 'Prayagraj - Mirzapur Intercity' },
+  { name: 'Agra', lat: 27.1767, lng: 78.0081, radiusKm: 45, defaultCorridor: 'Agra Fort - Mathura - Delhi Yamuna Express' },
+  { name: 'Meerut / NCR', lat: 28.9845, lng: 77.7064, radiusKm: 50, defaultCorridor: 'Delhi ISBT - Meerut Expressway' },
+  { name: 'Jhansi', lat: 25.4484, lng: 78.5685, radiusKm: 55, defaultCorridor: 'Jhansi - Orai - Kanpur Intercity' },
+  { name: 'Moradabad', lat: 28.8386, lng: 78.7733, radiusKm: 50, defaultCorridor: 'Moradabad - Rampur - Bareilly' },
+  { name: 'Aligarh', lat: 27.8974, lng: 78.0880, radiusKm: 45, defaultCorridor: 'Aligarh - Bulandshahr - Delhi' },
+  { name: 'Banda', lat: 25.4754, lng: 80.3347, radiusKm: 55, defaultCorridor: 'Banda - Chitrakoot Express' },
+  { name: 'Sitapur', lat: 27.5644, lng: 80.6787, radiusKm: 45, defaultCorridor: 'Sitapur - Lakhimpur Highway' },
+  { name: 'Hardoi', lat: 27.3989, lng: 80.1319, radiusKm: 45, defaultCorridor: 'Hardoi - Lucknow Intercity' },
+  { name: 'Ayodhya', lat: 26.7922, lng: 82.1998, radiusKm: 45, defaultCorridor: 'Ayodhya Dham - Gorakhpur Express' },
+  { name: 'Faizabad', lat: 26.7730, lng: 82.1460, radiusKm: 40, defaultCorridor: 'Ayodhya - Sultanpur Intercity' },
+  { name: 'Mathura', lat: 27.4924, lng: 77.6737, radiusKm: 40, defaultCorridor: 'Mathura - Agra - Aligarh Express' },
+  { name: 'Saharanpur', lat: 29.9671, lng: 77.5510, radiusKm: 45, defaultCorridor: 'Saharanpur - Muzaffarnagar - Delhi' },
+  { name: 'Muzaffarnagar', lat: 29.4727, lng: 77.7085, radiusKm: 40, defaultCorridor: 'Muzaffarnagar - Meerut Express' },
+  { name: 'Ghaziabad', lat: 28.6692, lng: 77.4538, radiusKm: 35, defaultCorridor: 'Ghaziabad - Anand Vihar ISBT' },
+  { name: 'Noida', lat: 28.5355, lng: 77.3910, radiusKm: 35, defaultCorridor: 'Noida City Centre - Greater Noida Express' },
+  { name: 'Bulandshahr', lat: 28.4069, lng: 77.8498, radiusKm: 40, defaultCorridor: 'Bulandshahr - Delhi Highway' },
+  { name: 'Kasganj', lat: 27.8083, lng: 78.6473, radiusKm: 40, defaultCorridor: 'Kasganj - Bareilly Intercity' },
+  { name: 'Shahjahanpur', lat: 27.8805, lng: 79.9120, radiusKm: 40, defaultCorridor: 'Shahjahanpur - Bareilly Highway' },
+  { name: 'Pilibhit', lat: 28.6300, lng: 79.8000, radiusKm: 40, defaultCorridor: 'Pilibhit - Bareilly Intercity' },
+  { name: 'Bahraich', lat: 27.5705, lng: 81.5977, radiusKm: 45, defaultCorridor: 'Bahraich - Gonda - Ayodhya Express' },
+  { name: 'Gonda', lat: 27.1300, lng: 81.9600, radiusKm: 40, defaultCorridor: 'Gonda - Balrampur Express' },
+  { name: 'Basti', lat: 26.7997, lng: 82.7483, radiusKm: 40, defaultCorridor: 'Basti - Gorakhpur Highway' },
+  { name: 'Deoria', lat: 26.5020, lng: 83.7780, radiusKm: 40, defaultCorridor: 'Deoria - Gorakhpur Intercity' },
+  { name: 'Ballia', lat: 25.7600, lng: 84.1500, radiusKm: 45, defaultCorridor: 'Ballia - Varanasi Highway' },
+  { name: 'Ghazipur', lat: 25.5800, lng: 83.5800, radiusKm: 40, defaultCorridor: 'Ghazipur - Varanasi Cantt' },
+  { name: 'Jaunpur', lat: 25.7464, lng: 82.6837, radiusKm: 40, defaultCorridor: 'Jaunpur - Varanasi Express' },
+  { name: 'Mirzapur', lat: 25.1500, lng: 82.5800, radiusKm: 40, defaultCorridor: 'Mirzapur - Prayagraj Sangam' },
+  { name: 'Fatehpur', lat: 25.9300, lng: 80.8100, radiusKm: 40, defaultCorridor: 'Fatehpur - Kanpur Central' },
+  { name: 'Pratapgarh', lat: 25.9000, lng: 81.9500, radiusKm: 40, defaultCorridor: 'Pratapgarh - Prayagraj Highway' },
+  { name: 'Rae Bareli', lat: 26.2300, lng: 81.2400, radiusKm: 40, defaultCorridor: 'Rae Bareli - Lucknow Intercity' },
+  { name: 'Unnao', lat: 26.5400, lng: 80.4900, radiusKm: 30, defaultCorridor: 'Unnao - Kanpur Bypass' },
+  { name: 'Firozabad', lat: 27.1500, lng: 78.4000, radiusKm: 35, defaultCorridor: 'Firozabad - Agra Highway' },
+  { name: 'Mainpuri', lat: 27.2300, lng: 79.0200, radiusKm: 40, defaultCorridor: 'Mainpuri - Shikohabad - Agra' },
+  { name: 'Etah', lat: 27.5600, lng: 78.6700, radiusKm: 40, defaultCorridor: 'Etah - Aligarh Highway' },
+  { name: 'Budaun', lat: 28.0300, lng: 79.1200, radiusKm: 40, defaultCorridor: 'Budaun - Bareilly Intercity' },
+  { name: 'Rampur', lat: 28.8100, lng: 79.0300, radiusKm: 35, defaultCorridor: 'Rampur - Moradabad Highway' }
 ];
 
 /**
@@ -138,22 +169,25 @@ function extractRtoCode(regNo: string): string | null {
 }
 
 /**
- * Resolve dynamic smart route name for any given bus
+ * Resolve dynamic smart route name and nearest landmark stop for any given bus
  */
 export function resolveSmartRouteName(
   regNo: string,
   lat: number,
   lng: number,
-  rawRouteName?: string
+  rawRouteName?: string,
+  depotName?: string,
+  zoneName?: string
 ): RouteResolution {
   const cleanRegNo = (regNo || '').toUpperCase().trim();
+  const cleanDepot = (depotName || '').trim();
 
   // Tier 1: Valid Raw Route Name from Official Telemetry
   if (
     rawRouteName &&
     typeof rawRouteName === 'string' &&
     rawRouteName.trim().length > 3 &&
-    !['UNKNOWN', 'NULL', 'UNDEFINED', 'DEFAULT', 'N/A', '0', 'NONE'].includes(rawRouteName.trim().toUpperCase())
+    !['UNKNOWN', 'NULL', 'UNDEFINED', 'DEFAULT', 'N/A', '0', 'NONE', 'LUCKNOW - KANPUR EXPRESS'].includes(rawRouteName.trim().toUpperCase())
   ) {
     const cleanRaw = rawRouteName.trim();
     return {
@@ -164,7 +198,7 @@ export function resolveSmartRouteName(
     };
   }
 
-  // Tier 2: Reverse Geographic Proximity to Major UP City Centers
+  // Tier 2: Nearest Hub City Matching
   let nearestCity = CITY_CENTERS[0];
   let minDistance = Infinity;
 
@@ -176,13 +210,49 @@ export function resolveSmartRouteName(
     }
   }
 
-  // Tier 3: RTO Plate Mapping combined with current location
+  // Clean Depot Name if available (e.g., 'KASGANJ', 'ALAMBAGH', 'ROHILKHAND')
+  let normalizedDepot = cleanDepot;
+  if (normalizedDepot.startsWith('ENFORCEMENT_')) {
+    normalizedDepot = normalizedDepot.replace('ENFORCEMENT_', '');
+  }
+
+  // Tier 3: Official Depot Name + Current Location Corridors
+  if (normalizedDepot && normalizedDepot.length > 2 && normalizedDepot.toUpperCase() !== 'UNKNOWN') {
+    const formattedDepot = normalizedDepot.charAt(0).toUpperCase() + normalizedDepot.slice(1).toLowerCase();
+    
+    // If bus is in a different city than its home depot, route is [Depot] - [Current City]
+    if (formattedDepot.toLowerCase() !== nearestCity.name.toLowerCase() && minDistance <= nearestCity.radiusKm) {
+      return {
+        routeName: `${formattedDepot} - ${nearestCity.name} Express`,
+        routeCode: `R_${formattedDepot.substring(0, 3).toUpperCase()}_${nearestCity.name.substring(0, 3).toUpperCase()}`,
+        sourceCity: formattedDepot,
+        destinationCity: nearestCity.name
+      };
+    }
+
+    if (minDistance <= nearestCity.radiusKm) {
+      return {
+        routeName: nearestCity.defaultCorridor,
+        routeCode: `R_${nearestCity.name.substring(0, 3).toUpperCase()}_EXP`,
+        sourceCity: nearestCity.name,
+        destinationCity: 'Express'
+      };
+    }
+
+    return {
+      routeName: `${formattedDepot} Intercity Express`,
+      routeCode: `R_${formattedDepot.substring(0, 3).toUpperCase()}_INT`,
+      sourceCity: formattedDepot,
+      destinationCity: 'Intercity'
+    };
+  }
+
+  // Tier 4: RTO Plate Mapping combined with current location
   const rtoCode = extractRtoCode(cleanRegNo);
   const rtoInfo = rtoCode ? RTO_MAP[rtoCode] : null;
 
   if (minDistance <= nearestCity.radiusKm) {
-    // If bus is within proximity of a known city corridor
-    if (rtoInfo && rtoInfo.city !== nearestCity.name) {
+    if (rtoInfo && rtoInfo.city.toLowerCase() !== nearestCity.name.toLowerCase()) {
       const routeName = `${rtoInfo.city} - ${nearestCity.name} Intercity`;
       return {
         routeName,
@@ -200,7 +270,7 @@ export function resolveSmartRouteName(
     };
   }
 
-  // Tier 4: Fallback based on RTO Depot City or General Region
+  // Tier 5: Fallback based on RTO Depot City or General Region
   if (rtoInfo) {
     const routeName = `${rtoInfo.city} Depot Express (${rtoInfo.region})`;
     return {
@@ -211,11 +281,11 @@ export function resolveSmartRouteName(
     };
   }
 
-  // Universal Fallback
+  // Universal Fallback based on nearest city
   return {
-    routeName: 'UP Roadways Intercity Express',
-    routeCode: `R_${cleanRegNo || 'UPBUS'}`,
-    sourceCity: 'UP',
-    destinationCity: 'Roadways'
+    routeName: `${nearestCity.name} Regional Link Service`,
+    routeCode: `R_${nearestCity.name.substring(0, 3).toUpperCase()}_LINK`,
+    sourceCity: nearestCity.name,
+    destinationCity: 'Link'
   };
 }
