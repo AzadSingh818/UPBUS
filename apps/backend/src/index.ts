@@ -336,7 +336,7 @@ app.get('/api/v1/search/routes', async (req, res) => {
           tripId: bus.trip_id,
           busRegNo: bus.registration_no,
           busType: 'UPSRTC Ordinary',
-          routeCode: bus.route_code || leg.routeCode,
+          routeCode: leg.routeCode || bus.route_code,
           routeName: `${corridorStops[0]?.name || 'Origin'} ➔ ${corridorStops[corridorStops.length - 1]?.name || 'Destination'}`,
           busLatitude: bus.latitude,
           busLongitude: bus.longitude,

@@ -175,13 +175,13 @@ export async function getTripETAs(tripId: number, regNo?: string, routeCode?: st
               }
             }
           } else {
-            // Try to find the best matching route in DB by checking sub-route keywords in the description
+            // Try to find the best matching route in DB
             const routesRes = await query(`SELECT id, route_code, route_name, source, destination FROM routes`);
             const routes = routesRes.rows;
             let matchedRoute: any = null;
 
             if (routeCode) {
-              matchedRoute = routes.find(r => r.route_code === routeCode);
+              matchedRoute = routes.find(r => r.route_code === routeCode || r.id === Number(routeCode.replace('R_', '')));
             }
 
             if (!matchedRoute) {
@@ -231,6 +231,23 @@ export async function getTripETAs(tripId: number, regNo?: string, routeCode?: st
                   }
                   if (!matchedRoute) matchedRoute = matchingRoutes[0];
                 }
+              }
+            }
+
+            // Spatial Corridor Map-Matching before falling back!
+            if (!matchedRoute) {
+              try {
+                const { resolveSmartRouteName } = require('./smartRouteResolver');
+                const busLat = parseFloat(bus.lat || bus.latitude);
+                const busLng = parseFloat(bus.long || bus.longitude);
+                const busHeading = parseFloat(bus.heading || 0);
+                const busSpeed = parseFloat(bus.speed || 0);
+                const resolved = resolveSmartRouteName(bus.RegNo || bus.regNum, busLat, busLng, undefined, bus.depot_name, bus.zone_name, busHeading, busSpeed);
+                if (resolved && resolved.routeCode) {
+                  matchedRoute = routes.find(r => r.route_code === resolved.routeCode);
+                }
+              } catch (err) {
+                console.error('[ETA Engine] Error running smart route resolver:', err);
               }
             }
             

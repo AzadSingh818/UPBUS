@@ -1653,7 +1653,7 @@ export default function Home() {
                                 </div>
                                 <div style={{ fontSize: '11px', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '4px', paddingLeft: '4px' }}>
                                   <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981' }}></span>
-                                  <span>Bus Status: <strong style={{ color: '#f1f5f9' }}>{trip.currentNextStop && trip.currentNextStop !== 'En-route' ? `Near ${trip.currentNextStop}` : (trip.stops && trip.stops.length > 0 ? `At ${trip.stops[0].name}` : 'En-route')}</strong></span>
+                                  <span>Bus Status: <strong style={{ color: '#f1f5f9' }}>{trip.currentNextStop && trip.currentNextStop !== 'En-route' ? (trip.currentNextStop.startsWith('Near ') || trip.currentNextStop.startsWith('At ') ? trip.currentNextStop : `Near ${trip.currentNextStop}`) : (trip.stops && trip.stops.length > 0 ? `At ${trip.stops[0].name}` : 'En-route')}</strong></span>
                                   {trip.etaToBoardingMinutes !== undefined && (
                                     <span style={{ color: '#38bdf8', marginLeft: '6px' }}>• ~{trip.etaToBoardingMinutes}m to your stop</span>
                                   )}
