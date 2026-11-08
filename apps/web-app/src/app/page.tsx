@@ -534,6 +534,7 @@ export default function Home() {
   const [demoPassenger, setDemoPassenger] = useState(false);
   const [showAdvancedPassengerSettings, setShowAdvancedPassengerSettings] = useState(false);
   const [trackingSource, setTrackingSource] = useState<'gps' | 'network' | 'cell'>('gps');
+  const [passengerDistanceNotice, setPassengerDistanceNotice] = useState<string | null>(null);
   
   const reportIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const demoStateRef = useRef<{ currentIndex: number; step: number }>({ currentIndex: 0, step: 0 });
@@ -938,6 +939,22 @@ export default function Home() {
               speed = 0;
             }
 
+            // Check distance to route corridor to give smart friendly notice if passenger is away
+            if (liveDetails && liveDetails.stops && liveDetails.stops.length > 0) {
+              let minDist = Infinity;
+              liveDetails.stops.forEach(s => {
+                if (s.latitude && s.longitude) {
+                  const d = calculateDistance(lat, lng, s.latitude, s.longitude);
+                  if (d < minDist) minDist = d;
+                }
+              });
+              if (minDist > 15) {
+                setPassengerDistanceNotice(`You are ~${Math.round(minDist)} km away from this bus route.`);
+              } else {
+                setPassengerDistanceNotice(null);
+              }
+            }
+
             if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
               wsRef.current.send(JSON.stringify({
                 event: 'report_location',
@@ -1327,6 +1344,12 @@ export default function Home() {
                         {showAdvancedPassengerSettings ? 'Hide Options' : 'Options'}
                       </button>
                     </div>
+
+                    {passengerDistanceNotice && !demoPassenger && (
+                      <div style={{ marginTop: '8px', padding: '6px 10px', background: 'rgba(245, 158, 11, 0.15)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '6px', fontSize: '11px', color: '#fbbf24' }}>
+                        ⚠️ {passengerDistanceNotice} Sharing location only improves tracking when travelling onboard.
+                      </div>
+                    )}
 
                     {showAdvancedPassengerSettings && (
                       <div style={{ marginTop: '10px', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '10px' }}>
