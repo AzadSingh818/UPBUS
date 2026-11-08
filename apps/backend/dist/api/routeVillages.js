@@ -129,12 +129,19 @@ async function fetchAndCacheVillages(routeId, maxDistanceKm) {
 // ---------------------------------------------------------------------------
 // GET /api/routes/:routeId/villages
 // ---------------------------------------------------------------------------
+const ramVillageCache = new Map();
 exports.router.get('/:routeId/villages', async (req, res) => {
     const routeId = parseInt(req.params.routeId, 10);
     if (isNaN(routeId)) {
         return res.status(400).json({ error: 'routeId must be a number' });
     }
     const maxDistanceKm = parseFloat(req.query.maxDistanceKm) || 0.2; // Default to 0.2 km (200m) to match PRD
+    const ramKey = `${routeId}_${maxDistanceKm}`;
+    const ramCached = ramVillageCache.get(ramKey);
+    if (ramCached && (Date.now() - ramCached.timestamp < CACHE_TTL_MS)) {
+        res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
+        return res.json(ramCached.payload);
+    }
     try {
         // 1. Check cache
         const cached = readCache(routeId);
@@ -150,17 +157,23 @@ exports.router.get('/:routeId/villages', async (req, res) => {
             }));
             // The cached list was already filtered at DEFAULT distance; re-filter for custom distances
             const filtered = (0, villageFilter_1.filterVillagesByDistance)(cached.villages.map(v => ({ name: v.name, latitude: v.latitude, longitude: v.longitude })), polyline, maxDistanceKm);
-            return res.json({
+            const payload = {
                 villages: filtered.map(v => ({ name: v.name, latitude: v.latitude, longitude: v.longitude })),
                 _meta: { source: 'cache', cachedAt: cached.fetchedAt, count: filtered.length },
-            });
+            };
+            ramVillageCache.set(ramKey, { timestamp: Date.now(), payload });
+            res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
+            return res.json(payload);
         }
         // 2. Cache miss or stale → fetch from Overpass
         const villages = await fetchAndCacheVillages(routeId, maxDistanceKm);
-        return res.json({
+        const payload = {
             villages,
             _meta: { source: 'overpass', count: villages.length },
-        });
+        };
+        ramVillageCache.set(ramKey, { timestamp: Date.now(), payload });
+        res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
+        return res.json(payload);
     }
     catch (err) {
         console.error(`[Villages] Error for route ${routeId}:`, err.message);

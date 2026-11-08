@@ -359,11 +359,10 @@ let mockDb = {
         { route_id: 8, stop_id: 215, sequence_no: 8, distance_from_start_km: 61.25 },
         { route_id: 8, stop_id: 29, sequence_no: 9, distance_from_start_km: 70.0 },
         { route_id: 9, stop_id: 19, sequence_no: 1, distance_from_start_km: 0.0 },
-        { route_id: 9, stop_id: 110, sequence_no: 2, distance_from_start_km: 11.0 },
-        { route_id: 9, stop_id: 111, sequence_no: 3, distance_from_start_km: 22.0 },
-        { route_id: 9, stop_id: 31, sequence_no: 4, distance_from_start_km: 33.0 },
-        { route_id: 9, stop_id: 216, sequence_no: 5, distance_from_start_km: 44.0 },
-        { route_id: 9, stop_id: 32, sequence_no: 6, distance_from_start_km: 55.0 },
+        { route_id: 9, stop_id: 110, sequence_no: 2, distance_from_start_km: 14.0 },
+        { route_id: 9, stop_id: 31, sequence_no: 3, distance_from_start_km: 28.0 },
+        { route_id: 9, stop_id: 216, sequence_no: 4, distance_from_start_km: 41.0 },
+        { route_id: 9, stop_id: 32, sequence_no: 5, distance_from_start_km: 55.0 },
         { route_id: 10, stop_id: 24, sequence_no: 1, distance_from_start_km: 0.0 },
         { route_id: 10, stop_id: 217, sequence_no: 2, distance_from_start_km: 8.57 },
         { route_id: 10, stop_id: 23, sequence_no: 3, distance_from_start_km: 17.14 },
@@ -382,11 +381,10 @@ let mockDb = {
         { route_id: 11, stop_id: 25, sequence_no: 8, distance_from_start_km: 61.25 },
         { route_id: 11, stop_id: 19, sequence_no: 9, distance_from_start_km: 70.0 },
         { route_id: 12, stop_id: 32, sequence_no: 1, distance_from_start_km: 0.0 },
-        { route_id: 12, stop_id: 222, sequence_no: 2, distance_from_start_km: 11.0 },
-        { route_id: 12, stop_id: 31, sequence_no: 3, distance_from_start_km: 22.0 },
-        { route_id: 12, stop_id: 111, sequence_no: 4, distance_from_start_km: 33.0 },
-        { route_id: 12, stop_id: 110, sequence_no: 5, distance_from_start_km: 44.0 },
-        { route_id: 12, stop_id: 19, sequence_no: 6, distance_from_start_km: 55.0 },
+        { route_id: 12, stop_id: 222, sequence_no: 2, distance_from_start_km: 14.0 },
+        { route_id: 12, stop_id: 31, sequence_no: 3, distance_from_start_km: 27.0 },
+        { route_id: 12, stop_id: 110, sequence_no: 4, distance_from_start_km: 41.0 },
+        { route_id: 12, stop_id: 19, sequence_no: 5, distance_from_start_km: 55.0 },
         { route_id: 13, stop_id: 19, sequence_no: 1, distance_from_start_km: 0.0 },
         { route_id: 13, stop_id: 223, sequence_no: 2, distance_from_start_km: 16.25 },
         { route_id: 13, stop_id: 33, sequence_no: 3, distance_from_start_km: 32.5 },
@@ -1436,8 +1434,17 @@ function executeMockQuery(text, params = []) {
         }
         return { rows: [], rowCount: 1 };
     }
+    // 13. Historical GPS logs count query
+    if (queryStr.includes('historical_gps_logs')) {
+        const count = mockDb.historical_gps_logs ? mockDb.historical_gps_logs.length : 0;
+        return { rows: [{ count }], rowCount: 1 };
+    }
+    // 14. Registration numbers from buses
+    if (queryStr.includes('SELECT registration_no FROM buses')) {
+        const rows = (mockDb.buses || []).map((b) => ({ registration_no: b.registration_no }));
+        return { rows, rowCount: rows.length };
+    }
     // Default fallback
-    console.log(`Mock DB received unhandled query: ${queryStr}`);
     return { rows: [], rowCount: 0 };
 }
 const query = async (text, params) => {

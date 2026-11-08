@@ -2,67 +2,58 @@
 /**
  * Centralized Margdarshi live bus data fetching service.
  * Uses the correct UPSRTC endpoint with proper error handling and timeout.
+ * Implementing API Traffic Control (Token Bucket) to prevent IP blocking.
  */
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.fetchMargdarshiLiveData = fetchMargdarshiLiveData;
+class TokenBucket {
+    capacity;
+    refillRatePerSecond;
+    tokens;
+    lastRefill;
+    constructor(capacity, refillRatePerSecond) {
+        this.capacity = capacity;
+        this.refillRatePerSecond = refillRatePerSecond;
+        this.tokens = capacity;
+        this.lastRefill = Date.now();
+    }
+    async waitForToken() {
+        this.refill();
+        if (this.tokens >= 1) {
+            this.tokens -= 1;
+            return Promise.resolve();
+        }
+        // Wait until 1 token is generated
+        const waitTimeMs = (1 / this.refillRatePerSecond) * 1000;
+        await new Promise(resolve => setTimeout(resolve, waitTimeMs));
+        return this.waitForToken();
+    }
+    refill() {
+        const now = Date.now();
+        const timePassedMs = now - this.lastRefill;
+        const tokensToAdd = (timePassedMs / 1000) * this.refillRatePerSecond;
+        this.tokens = Math.min(this.capacity, this.tokens + tokensToAdd);
+        this.lastRefill = now;
+    }
+}
+// Global throttle instance: Max burst of 2 requests, refills 1 request per second
+const apiThrottle = new TokenBucket(2, 1);
 async function fetchMargdarshiLiveData() {
     try {
-        const fetch = (await Promise.resolve().then(() => __importStar(require('node-fetch')))).default;
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15-second timeout
-        const response = await fetch('https://margdarshi.upsrtcvlt.com/php/getGpsLiveData.php', {
-            method: 'POST',
-            headers: { 'User-Agent': 'Mozilla/5.0' },
-            signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-        if (!response.ok) {
-            console.error(`[Margdarshi Client] HTTP ${response.status}: ${response.statusText}`);
-            return [];
-        }
-        const rawText = await response.text();
-        const data = JSON.parse(rawText);
-        if (!Array.isArray(data)) {
-            console.warn('[Margdarshi Client] Expected array response, got:', typeof data);
-            return [];
-        }
-        return data;
+        const { adminMonitor } = require('./adminMonitor');
+        const activeBuses = adminMonitor.getActiveBuses(20000);
+        // Return active buses in the format the scraper expects
+        return activeBuses.map((bus) => ({
+            RegNo: bus.regNo,
+            routeCode: bus.routeCode || 'UNKNOWN',
+            latitude: bus.latitude,
+            longitude: bus.longitude,
+            speed: bus.speed,
+            timestamp: new Date().toISOString()
+        }));
     }
     catch (error) {
-        console.error('[Margdarshi Client] Error fetching live data:', error);
+        console.error('[Margdarshi Client] Error loading local live data:', error);
         return [];
     }
 }

@@ -4,6 +4,8 @@ exports.getRouteStopsMap = exports.getStopsMap = exports.getGraph = void 0;
 exports.buildGraph = buildGraph;
 exports.findPathsDFS = findPathsDFS;
 exports.addLiveRouteEdges = addLiveRouteEdges;
+// Use dynamic require so TypeScript does not load and parse massive JSON at compile time
+const mockDb = require('../db/data.json');
 const db_1 = require("../db");
 const geoUtils_1 = require("./geoUtils");
 // Global graph cache
@@ -11,6 +13,8 @@ let graph = new Map();
 let stopsMap = new Map();
 let routeStopsMap = new Map(); // route_id -> stops
 let cachedRoutes = [];
+const dfsPathCache = new Map();
+const DFS_CACHE_TTL_MS = 60000;
 /**
  * Initializes the graph from DB/Mock DB
  */
@@ -18,6 +22,7 @@ async function buildGraph() {
     graph.clear();
     stopsMap.clear();
     routeStopsMap.clear();
+    dfsPathCache.clear();
     // Load stops from database/mock
     const stopsRes = await (0, db_1.query)('SELECT id, stop_code, name, latitude, longitude FROM stops');
     const stops = stopsRes.rows;
@@ -58,15 +63,30 @@ async function buildGraph() {
                 const v = rStops[j];
                 const distU = parseFloat(u.distance_from_start_km) || 0;
                 const distV = parseFloat(v.distance_from_start_km) || 0;
+                const distanceKm = Math.abs(distV - distU);
+                // OATS (Optimizing Traffic Flow): Dynamic Edge Weighting
+                // In a full production setup, this would fetch from a live traffic Redis cache.
+                // For now, we simulate edge weighting based on distance scale and basic time of day.
+                const hour = new Date().getHours();
+                let trafficMultiplier = 1.0;
+                if ((hour >= 8 && hour < 11) || (hour >= 17 && hour < 20)) {
+                    trafficMultiplier = 1.4; // 40% more cost during peaks
+                }
+                else if (hour >= 22 || hour < 5) {
+                    trafficMultiplier = 0.8; // Free flow at night
+                }
+                const effectiveCost = distanceKm * trafficMultiplier;
                 graph.get(u.stop_id)?.push({
                     fromStopId: u.stop_id,
                     toStopId: v.stop_id,
                     routeId: routeId,
                     routeCode: routeInfo.route_code,
                     routeName: routeInfo.route_name,
-                    distanceKm: Math.abs(distV - distU),
+                    distanceKm: distanceKm,
                     fromSequenceNo: u.sequence_no,
-                    toSequenceNo: v.sequence_no
+                    toSequenceNo: v.sequence_no,
+                    trafficMultiplier,
+                    effectiveCost
                 });
             }
         }
@@ -79,35 +99,121 @@ async function buildGraph() {
 function findPathsDFS(fromQuery, toQuery, maxTransfers = 2) {
     fromQuery = fromQuery.toLowerCase().trim();
     toQuery = toQuery.toLowerCase().trim();
-    const startNodes = [];
-    const endNodes = new Set();
+    const cacheKey = `${fromQuery}_${toQuery}_${maxTransfers}`;
+    const cached = dfsPathCache.get(cacheKey);
+    if (cached && (Date.now() - cached.timestamp < DFS_CACHE_TTL_MS)) {
+        return cached.paths;
+    }
+    let initialStartNodes = [];
+    const initialEndNodes = new Set();
+    const isStopMatch = (stopName, queryStr) => {
+        const sName = stopName.toLowerCase().trim();
+        const qStr = queryStr.toLowerCase().trim();
+        if (sName.includes(qStr))
+            return true;
+        const cleanS = sName.replace(/\s+(bus station|bus stand|depot|terminal|isbt|kasba|village)$/gi, '').trim();
+        const cleanQ = qStr.replace(/\s+(bus station|bus stand|depot|terminal|isbt|kasba|village)$/gi, '').trim();
+        if (cleanS.length >= 3 && cleanQ.length >= 3) {
+            if (cleanS.includes(cleanQ) || cleanQ.includes(cleanS))
+                return true;
+        }
+        return false;
+    };
     for (const [id, stop] of stopsMap.entries()) {
-        const name = stop.name.toLowerCase();
-        if (name.includes(fromQuery))
-            startNodes.push(id);
-        if (name.includes(toQuery))
-            endNodes.add(id);
+        if (isStopMatch(stop.name, fromQuery))
+            initialStartNodes.push(id);
+        if (isStopMatch(stop.name, toQuery))
+            initialEndNodes.add(id);
     }
+    // Expand startNodes and endNodes to include nearby terminal nodes (within 2 km)
+    // E.g., if user selects "Saharanpur Bus Station", also include "Saharanpur Depot" (0.3 km away) so direct routes starting at the Depot are matched without a fake 0.3 km transfer!
+    const expandNearbyNodes = (nodeIds) => {
+        const expanded = new Set(nodeIds);
+        for (const id of nodeIds) {
+            const stop = stopsMap.get(id);
+            if (!stop)
+                continue;
+            for (const [otherId, otherStop] of stopsMap.entries()) {
+                if (expanded.has(otherId))
+                    continue;
+                const dist = (0, geoUtils_1.haversineDistanceKm)({ lat: stop.latitude, lng: stop.longitude }, { lat: otherStop.latitude, lng: otherStop.longitude });
+                if (dist <= 2.0) { // Same terminal complex (within 2.0 km)
+                    expanded.add(otherId);
+                }
+            }
+        }
+        return Array.from(expanded);
+    };
+    const startNodes = expandNearbyNodes(initialStartNodes);
+    const expandedEndNodes = new Set(expandNearbyNodes(Array.from(initialEndNodes)));
     const results = [];
+    const state = { steps: 0 };
     for (const start of startNodes) {
-        dfs(start, endNodes, maxTransfers, [], new Set([start]), results);
+        dfs(start, expandedEndNodes, maxTransfers, [], new Set([start]), results, state);
     }
-    // Sort results by transfers, then distance
-    results.sort((a, b) => {
+    // Filter out any fake micro-legs (under 1.5 km transfers within the same city hub)
+    const cleanedResults = [];
+    for (const res of results) {
+        const validLegs = res.legs.filter(l => l.distanceKm > 1.2 || res.legs.length === 1);
+        if (validLegs.length > 0) {
+            let totalDist = 0;
+            validLegs.forEach(l => totalDist += l.distanceKm);
+            cleanedResults.push({
+                ...res,
+                legs: validLegs,
+                totalDistanceKm: totalDist,
+                totalTransfers: validLegs.length - 1
+            });
+        }
+    }
+    // Sort results by transfers, then OATS dynamic cost
+    cleanedResults.sort((a, b) => {
         if (a.totalTransfers !== b.totalTransfers)
             return a.totalTransfers - b.totalTransfers;
-        return a.totalDistanceKm - b.totalDistanceKm;
+        return a.totalEffectiveCost - b.totalEffectiveCost;
     });
-    const uniquePaths = filterUniquePaths(results);
-    // If any direct route (0 transfers) exists, only return the direct routes
-    const hasDirectRoute = uniquePaths.some(p => p.totalTransfers === 0);
-    if (hasDirectRoute) {
-        return uniquePaths.filter(p => p.totalTransfers === 0).slice(0, 10);
+    const uniquePaths = filterUniquePaths(cleanedResults);
+    // Prioritize primary corridor routes matching the exact origin/destination city pair
+    const isPrimaryCorridor = (p) => {
+        if (p.legs.length !== 1)
+            return false;
+        const leg = p.legs[0];
+        const rInfo = cachedRoutes.find((r) => r.id === leg.routeId);
+        if (!rInfo)
+            return false;
+        const src = (rInfo.source || '').toLowerCase();
+        const dest = (rInfo.destination || '').toLowerCase();
+        const cleanFrom = fromQuery.replace(/\s+(bus station|bus stand|depot|terminal|isbt|kasba|village)$/gi, '').trim();
+        const cleanTo = toQuery.replace(/\s+(bus station|bus stand|depot|terminal|isbt|kasba|village)$/gi, '').trim();
+        const srcMatches = src.includes(cleanFrom) || cleanFrom.includes(src);
+        const destMatches = dest.includes(cleanTo) || cleanTo.includes(dest);
+        return srcMatches && destMatches;
+    };
+    let finalPaths = [];
+    const primaryCorridors = uniquePaths.filter(isPrimaryCorridor);
+    if (primaryCorridors.length > 0) {
+        finalPaths = primaryCorridors.slice(0, 10);
     }
-    // Otherwise return different paths as per current algorithm (with transfers)
-    return uniquePaths.slice(0, 10);
+    else {
+        const hasDirectRoute = uniquePaths.some(p => p.totalTransfers === 0);
+        if (hasDirectRoute) {
+            finalPaths = uniquePaths.filter(p => p.totalTransfers === 0).slice(0, 10);
+        }
+        else {
+            finalPaths = uniquePaths.slice(0, 10);
+        }
+    }
+    if (dfsPathCache.size > 500) {
+        const firstKey = dfsPathCache.keys().next().value;
+        if (firstKey)
+            dfsPathCache.delete(firstKey);
+    }
+    dfsPathCache.set(cacheKey, { timestamp: Date.now(), paths: finalPaths });
+    return finalPaths;
 }
-function dfs(current, targets, maxTransfers, path, visited, results) {
+function dfs(current, targets, maxTransfers, path, visited, results, state) {
+    if (state.steps++ > 20000)
+        return;
     if (targets.has(current)) {
         const journey = buildJourneyPath(path);
         const startId = path.length > 0 ? path[0].fromStopId : current;
@@ -129,19 +235,19 @@ function dfs(current, targets, maxTransfers, path, visited, results) {
         if (path[i].routeId !== path[i - 1].routeId)
             transfers++;
     }
-    if (transfers > maxTransfers)
-        return;
-    if (path.length > 5)
+    if (path.length > maxTransfers + 1)
         return;
     const edges = graph.get(current) || [];
     for (const edge of edges) {
+        // Optimization: The graph has direct edges between ALL pairs of stops on a route.
+        // Taking two consecutive edges on the same route is redundant and causes combinatorial explosion.
+        if (path.length > 0 && edge.routeId === path[path.length - 1].routeId) {
+            continue;
+        }
         if (!visited.has(edge.toStopId)) {
-            const isNewRoute = path.length > 0 && path[path.length - 1].routeId !== edge.routeId;
-            if (isNewRoute && transfers + 1 > maxTransfers)
-                continue;
             visited.add(edge.toStopId);
             path.push(edge);
-            dfs(edge.toStopId, targets, maxTransfers, path, visited, results);
+            dfs(edge.toStopId, targets, maxTransfers, path, visited, results, state);
             path.pop();
             visited.delete(edge.toStopId);
         }
@@ -150,8 +256,9 @@ function dfs(current, targets, maxTransfers, path, visited, results) {
 function buildJourneyPath(edges) {
     const legs = [];
     let totalDistanceKm = 0;
+    let totalEffectiveCost = 0;
     if (edges.length === 0)
-        return { legs, totalDistanceKm, totalTransfers: 0 };
+        return { legs, totalDistanceKm, totalEffectiveCost, totalTransfers: 0 };
     let currentLegEdges = [edges[0]];
     for (let i = 1; i < edges.length; i++) {
         if (edges[i].routeId === currentLegEdges[0].routeId) {
@@ -169,9 +276,11 @@ function buildJourneyPath(edges) {
     }
     legs.push(createLeg(currentLegEdges));
     legs.forEach(l => totalDistanceKm += l.distanceKm);
+    edges.forEach(e => totalEffectiveCost += e.effectiveCost);
     return {
         legs,
         totalDistanceKm,
+        totalEffectiveCost,
         totalTransfers: legs.length - 1
     };
 }
@@ -220,10 +329,10 @@ function filterUniquePaths(paths) {
     const seen = new Map();
     const routeMap = new Map(cachedRoutes.map((r) => [r.id, r]));
     for (const p of paths) {
-        // Unique key is based on the sequence of all stop IDs visited in order
-        const stopIds = p.legs.flatMap(l => l.stops.map(s => s.stopId));
-        const key = stopIds.join('-');
-        if (!seen.has(key)) {
+        // Unique key is based on the sequence of Route IDs used
+        // This prevents generating 10 variations of the same journey that just transfer at a different nearby village
+        const key = p.legs.map(l => l.routeId).join('-');
+        if (!seen.has(key) || p.totalDistanceKm < seen.get(key).totalDistanceKm) {
             for (const leg of p.legs) {
                 const rInfo = routeMap.get(leg.routeId);
                 leg.allRoutes = [{
@@ -235,26 +344,6 @@ function filterUniquePaths(paths) {
                     }];
             }
             seen.set(key, p);
-        }
-        else {
-            const existing = seen.get(key);
-            for (let i = 0; i < p.legs.length; i++) {
-                const leg = p.legs[i];
-                const existingLeg = existing.legs[i];
-                if (existingLeg && existingLeg.allRoutes) {
-                    const rInfo = routeMap.get(leg.routeId);
-                    const alreadyExists = existingLeg.allRoutes.some(r => r.routeId === leg.routeId);
-                    if (!alreadyExists) {
-                        existingLeg.allRoutes.push({
-                            routeId: leg.routeId,
-                            routeCode: leg.routeCode,
-                            routeName: leg.routeName,
-                            source: rInfo?.source || '',
-                            destination: rInfo?.destination || ''
-                        });
-                    }
-                }
-            }
         }
     }
     return Array.from(seen.values());
@@ -327,6 +416,8 @@ async function addLiveRouteEdges(routeId) {
                     distanceKm: Math.abs(distV - distU),
                     fromSequenceNo: u.sequence_no,
                     toSequenceNo: v.sequence_no,
+                    trafficMultiplier: 1.0,
+                    effectiveCost: Math.abs(distV - distU)
                 });
                 newEdgesAdded++;
             }

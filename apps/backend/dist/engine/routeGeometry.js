@@ -158,6 +158,8 @@ function computeBusPositionOnRoute(routeId, lat, lng) {
     let bestDist = Infinity;
     let bestCum = 0;
     let bestSeq = -1;
+    let bestLat = lat;
+    let bestLng = lng;
     for (let i = 0; i < pts.length - 1; i++) {
         const a = pts[i];
         const b = pts[i + 1];
@@ -177,9 +179,11 @@ function computeBusPositionOnRoute(routeId, lat, lng) {
             const segLen = haversine(a.latitude, a.longitude, b.latitude, b.longitude);
             bestCum = geom.prefixKm[i] + t * segLen;
             bestSeq = a.seq ?? -1;
+            bestLat = projLat;
+            bestLng = projLng;
         }
     }
-    return { busDistKm: bestCum, closestSeq: bestSeq };
+    return { busDistKm: bestCum, closestSeq: bestSeq, snappedLat: bestLat, snappedLng: bestLng };
 }
 /**
  * Given a bus's distance along the route, speed, and the index of the nearest official stop,

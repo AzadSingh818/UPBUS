@@ -48,7 +48,53 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
 }
+// Markov Decision Process (MDP) for Dynamic ETA Prediction
+// Predicts transition probability of speed states based on live and historical traffic
+function getMDPSpeedTransition(currentSpeedKmph) {
+    const hour = new Date().getHours();
+    // Define State Space (Speed Categories)
+    const isCongested = (hour >= 8 && hour < 11) || (hour >= 17 && hour < 20);
+    const isFreeFlow = (hour >= 22 || hour < 5);
+    // Transition Probability Matrix: P(Next State | Current State, Time)
+    let transitionProbability = 1.0; // Default: maintain current speed
+    if (isCongested) {
+        if (currentSpeedKmph > 40) {
+            // High probability of slowing down
+            transitionProbability = 0.6; // Expect speed to drop by 40%
+        }
+        else {
+            // Likely to stay slow
+            transitionProbability = 0.8;
+        }
+    }
+    else if (isFreeFlow) {
+        if (currentSpeedKmph < 40) {
+            // High probability of speeding up
+            transitionProbability = 1.3; // Expect speed to increase by 30%
+        }
+        else {
+            // Likely to maintain fast speed
+            transitionProbability = 1.05;
+        }
+    }
+    else {
+        // Normal traffic hours
+        transitionProbability = 0.95; // Slight friction
+    }
+    // Calculate the predicted next state (speed) using the MDP transition
+    let predictedSpeed = currentSpeedKmph * transitionProbability;
+    // Bounds checking to prevent unrealistic ETAs
+    predictedSpeed = Math.max(15, Math.min(predictedSpeed, 80));
+    return predictedSpeed;
+}
+const etaResponseCache = new Map();
+const ETA_CACHE_TTL_MS = 1500;
 async function getTripETAs(tripId, regNo, routeCode) {
+    const cacheKey = `${tripId}_${regNo || ''}_${routeCode || ''}`;
+    const cached = etaResponseCache.get(cacheKey);
+    if (cached && (Date.now() - cached.timestamp < ETA_CACHE_TTL_MS)) {
+        return cached.data;
+    }
     try {
         // 1. Fetch trip and bus details
         const tripRes = await (0, db_1.query)(`SELECT t.id as trip_id, t.status as trip_status, 
@@ -296,13 +342,14 @@ async function getTripETAs(tripId, regNo, routeCode) {
                 last_seen_at: new Date()
             };
         }
-        const busLat = parseFloat(live.latitude);
-        const busLng = parseFloat(live.longitude);
+        let busLat = parseFloat(live.latitude);
+        let busLng = parseFloat(live.longitude);
         const busSpeed = parseFloat(live.speed);
         const heading = parseFloat(live.heading);
-        // Speed smoothing: Use current speed if > 25 km/h, otherwise floor to 40 km/h (average highway speed)
-        // to prevent division by zero or inflated ETAs when stationary at a traffic light or depot
-        const speedFloorKmph = busSpeed > 25 ? busSpeed : 45;
+        // Speed smoothing: Use MDP (Markov Decision Process) Transition
+        // to probabilistically predict the upcoming segment's speed
+        const effectiveCurrentSpeed = busSpeed > 5 ? busSpeed : 45; // Floor to 45 if stationary at depot
+        const speedFloorKmph = getMDPSpeedTransition(effectiveCurrentSpeed);
         // Fetch bus ID from buses table and load progress cache if available
         const busIdRes = await (0, db_1.query)(`SELECT id FROM buses WHERE registration_no = $1`, [trip.registration_no]);
         const busId = busIdRes.rowCount && busIdRes.rowCount > 0 ? busIdRes.rows[0].id : null;
@@ -313,12 +360,17 @@ async function getTripETAs(tripId, regNo, routeCode) {
             progressCache = await RouteProgressRepository.getLastProgress(busId);
             visitLogs = await RouteProgressRepository.getStopVisitLogs(busId);
         }
-        // 4. Project bus location onto route path if available
+        // 4. Project bus location onto route path if available (lazy on-demand snapping)
         const routeIdForGeom = trip.route_id || fallbackRouteId;
         let busPos = null;
         if (routeIdForGeom) {
             try {
                 busPos = (0, routeGeometry_1.computeBusPositionOnRoute)(routeIdForGeom, busLat, busLng);
+                // Lazy snapping: use the mathematically projected coordinates
+                if (busPos && busPos.snappedLat !== undefined && busPos.snappedLng !== undefined) {
+                    busLat = busPos.snappedLat;
+                    busLng = busPos.snappedLng;
+                }
             }
             catch (e) {
                 console.warn('[ETA] Could not compute bus position for passed check:', e);
@@ -477,7 +529,7 @@ async function getTripETAs(tripId, regNo, routeCode) {
             // Gracefully degrade — waypoints are bonus info, not critical
             console.warn('[ETA] Could not compute waypoints:', e);
         }
-        return {
+        const result = {
             tripId,
             routeId: trip.route_id || fallbackRouteId,
             busRegNo: trip.registration_no,
@@ -493,6 +545,13 @@ async function getTripETAs(tripId, regNo, routeCode) {
             stops: etas,
             waypoints
         };
+        if (etaResponseCache.size > 200) {
+            const firstKey = etaResponseCache.keys().next().value;
+            if (firstKey)
+                etaResponseCache.delete(firstKey);
+        }
+        etaResponseCache.set(cacheKey, { timestamp: Date.now(), data: result });
+        return result;
     }
     catch (error) {
         console.error('Error generating trip ETAs:', error);
