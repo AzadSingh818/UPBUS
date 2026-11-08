@@ -319,10 +319,14 @@ app.get('/api/v1/search/routes', async (req, res) => {
 
         if (!match.isMatch) continue;
 
-        let busCurrentLocStr = (bus as any).currentStop;
+        let busCurrentLocStr = '';
         const nearestStop = leg.stops[match.nearestStopIndex];
-        if (nearestStop && !busCurrentLocStr) {
+        if (nearestStop) {
           busCurrentLocStr = `Near ${nearestStop.name}`;
+        } else if ((bus as any).currentStop && !(bus as any).currentStop.includes('➔')) {
+          busCurrentLocStr = (bus as any).currentStop;
+        } else {
+          busCurrentLocStr = 'En-route';
         }
 
         const effectiveSpeed = bus.speed >= 10 ? bus.speed : 38;
