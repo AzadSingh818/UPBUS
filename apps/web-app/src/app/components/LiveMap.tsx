@@ -90,20 +90,12 @@ export default function LiveMap({
         zoomControl: true,
       });
 
-      // Primary crisp navigation tile layer (CartoDB Voyager: clean roads, places & high reliability)
-      const baseTiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; <a href="https://carto.com/">CARTO</a> &copy; OpenStreetMap',
-        subdomains: 'abcd',
+      // Standard OpenStreetMap tiles (100% free, no API key required, reliable worldwide)
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        subdomains: ['a', 'b', 'c'],
         maxZoom: 19
       }).addTo(mapInstanceRef.current);
-
-      baseTiles.on('tileerror', () => {
-        // Safe fallback to OSM standard if tile fetch ever fails
-        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          attribution: '&copy; OpenStreetMap contributors',
-          maxZoom: 19
-        }).addTo(mapInstanceRef.current);
-      });
     }
 
     const map = mapInstanceRef.current;
