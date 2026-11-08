@@ -17,6 +17,9 @@ import driverRouter from './routes/driver';
 import { recordLiveLocation } from './engine/routeLearning';
 import { RouteProgressController } from './modules/route-progress/controller/RouteProgressController';
 
+import { matchBusToCorridor } from './utils/corridorMatcher';
+import { adminMonitor } from './services/adminMonitor';
+
 let activeBusesCache: { timestamp: number; rows: any[] } | null = null;
 const ACTIVE_BUSES_CACHE_TTL_MS = 2500;
 
@@ -241,39 +244,98 @@ app.get('/api/v1/search/routes', async (req, res) => {
         }
       }
 
-      // Filter active buses for this leg
-      const matchedBuses = activeBuses.filter(bus => {
+      // Universal Live Bus Matcher:
+      // 1. First, check active buses from Postgres DB
+      // 2. Also check adminMonitor in-memory live stream (10,000 real Margdarshi GPS pings!)
+      const allCandidateBuses: any[] = [];
+      const seenRegs = new Set<string>();
+
+      for (const b of activeBuses) {
+        const reg = (b.registration_no || '').toUpperCase().replace(/\s+/g, '');
+        if (!reg || seenRegs.has(reg)) continue;
+        seenRegs.add(reg);
+        allCandidateBuses.push({
+          trip_id: b.trip_id,
+          registration_no: b.registration_no,
+          latitude: parseFloat(b.latitude),
+          longitude: parseFloat(b.longitude),
+          speed: parseFloat(b.speed) || 0,
+          heading: parseFloat(b.heading) || 0,
+          last_seen_at: b.last_seen_at,
+          route_id: b.route_id,
+          route_code: b.route_code,
+          route_name: b.route_name
+        });
+      }
+
+      // Add monitored buses from Margdarshi live feed
+      const memoryBuses = adminMonitor.getActiveBuses();
+      for (const mb of memoryBuses) {
+        const reg = (mb.regNo || '').toUpperCase().replace(/\s+/g, '');
+        if (!reg || seenRegs.has(reg)) continue;
+        seenRegs.add(reg);
+        allCandidateBuses.push({
+          trip_id: mb.tripId || mb.busId,
+          registration_no: mb.regNo,
+          latitude: mb.latitude,
+          longitude: mb.longitude,
+          speed: mb.speed || 0,
+          heading: mb.heading || 0,
+          last_seen_at: mb.lastSeen,
+          route_id: null,
+          route_code: mb.routeCode,
+          route_name: mb.routeName,
+          currentStop: mb.currentStop
+        });
+      }
+
+      // Spatial Corridor Matching: Match buses physically operating on this route
+      const corridorStops = leg.stops.map(s => ({
+        latitude: Number(s.latitude),
+        longitude: Number(s.longitude),
+        name: s.name
+      }));
+
+      const matchedBuses = allCandidateBuses.filter(bus => {
         if (routeIdsForLeg.has(bus.route_id)) return true;
-        if (bus.route_id === 1) {
-            for (let i = 0; i < Math.min(leg.stops.length, 3); i++) {
-                const stop = leg.stops[i];
-                if (stop) {
-                    const dist = haversineKm(
-                        parseFloat(bus.latitude), parseFloat(bus.longitude),
-                        stop.latitude, stop.longitude
-                    );
-                    if (dist <= 5) return true;
-                }
-            }
+        
+        // Physical road match (within 3.2 km corridor)
+        const match = matchBusToCorridor(bus.latitude, bus.longitude, corridorStops, 3.2);
+        if (match.isMatch) {
+          (bus as any).corridorMatch = match;
+          return true;
         }
         return false;
       });
 
       for (const bus of matchedBuses) {
-        let etaMinutes = 15; 
+        const match = (bus as any).corridorMatch;
+        let etaMinutes = 10;
+        let busCurrentLocStr = (bus as any).currentStop;
+
+        if (match) {
+          const nearestStop = leg.stops[match.nearestStopIndex];
+          if (nearestStop && !busCurrentLocStr) {
+            busCurrentLocStr = `Near ${nearestStop.name}`;
+          }
+          // Compute realistic ETA based on speed or 40 km/h average
+          const effectiveSpeed = bus.speed >= 10 ? bus.speed : 38;
+          etaMinutes = Math.max(2, Math.round((match.distanceToBoardingKm / effectiveSpeed) * 60));
+        }
 
         nextTrips.push({
           tripId: bus.trip_id,
           busRegNo: bus.registration_no,
-          busType: 'UPSRTC',
+          busType: 'UPSRTC Ordinary',
           routeCode: bus.route_code || leg.routeCode,
           routeName: bus.route_name || leg.routeName,
-          busLatitude: parseFloat(bus.latitude),
-          busLongitude: parseFloat(bus.longitude),
-          currentSpeedKmph: parseFloat(bus.speed) || 0,
-          heading: parseFloat(bus.heading) || 0,
+          busLatitude: bus.latitude,
+          busLongitude: bus.longitude,
+          currentSpeedKmph: bus.speed,
+          heading: bus.heading,
           lastSeen: bus.last_seen_at ? new Date(bus.last_seen_at).toISOString() : new Date().toISOString(),
-          status: parseFloat(bus.speed) > 0 ? 'running' : 'halted',
+          status: bus.speed > 0 ? 'running' : 'halted',
+          currentNextStop: busCurrentLocStr || 'En-route',
           stops: leg.stops.map(s => ({
             stopId: s.stopId,
             name: s.name,
