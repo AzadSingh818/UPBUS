@@ -9,6 +9,73 @@
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.resolveSmartRouteName = resolveSmartRouteName;
+const db_1 = require("../db");
+const corridorMatcher_1 = require("../utils/corridorMatcher");
+// In-memory indexed corridor cache for 0ms sub-millisecond map-matching
+let stopsByIdCache = null;
+let routeStopsByRouteIdCache = null;
+function ensureCorridorCache() {
+    if (stopsByIdCache && routeStopsByRouteIdCache)
+        return;
+    stopsByIdCache = new Map();
+    for (const s of (db_1.mockDb?.stops || [])) {
+        stopsByIdCache.set(s.id, s);
+    }
+    routeStopsByRouteIdCache = new Map();
+    for (const rs of (db_1.mockDb?.route_stops || [])) {
+        if (!routeStopsByRouteIdCache.has(rs.route_id)) {
+            routeStopsByRouteIdCache.set(rs.route_id, []);
+        }
+        routeStopsByRouteIdCache.get(rs.route_id).push(rs);
+    }
+}
+/**
+ * Universal Physical Corridor Matcher:
+ * Checks whether the bus is within 3.0 km of an actual known route corridor.
+ */
+function matchPhysicalCorridor(lat, lng, heading = 0, speed = 0, maxOffsetKm = 3.0) {
+    if (!lat || !lng || isNaN(lat) || isNaN(lng) || !db_1.mockDb?.routes)
+        return null;
+    ensureCorridorCache();
+    let bestMatch = null;
+    let minOffset = Infinity;
+    for (const route of db_1.mockDb.routes) {
+        const rsList = routeStopsByRouteIdCache.get(route.id);
+        if (!rsList || rsList.length < 2)
+            continue;
+        // Fast bounding box spatial prune (0.8 deg ~ 88 km)
+        const firstStop = stopsByIdCache.get(rsList[0].stop_id);
+        if (!firstStop)
+            continue;
+        if (Math.abs(firstStop.latitude - lat) > 0.8 || Math.abs(firstStop.longitude - lng) > 0.8) {
+            const lastStop = stopsByIdCache.get(rsList[rsList.length - 1].stop_id);
+            if (!lastStop || (Math.abs(lastStop.latitude - lat) > 0.8 && Math.abs(lastStop.longitude - lng) > 0.8)) {
+                continue;
+            }
+        }
+        const routeStops = rsList
+            .sort((a, b) => a.stop_sequence - b.stop_sequence)
+            .map(rs => stopsByIdCache.get(rs.stop_id))
+            .filter(Boolean)
+            .map(s => ({ latitude: Number(s.latitude), longitude: Number(s.longitude), name: s.name }));
+        if (routeStops.length < 2)
+            continue;
+        const res = (0, corridorMatcher_1.matchBusToCorridor)(lat, lng, heading, speed, routeStops, 0, maxOffsetKm);
+        if (res.isMatch && res.minOffsetKm < minOffset) {
+            minOffset = res.minOffsetKm;
+            bestMatch = route;
+        }
+    }
+    if (bestMatch) {
+        return {
+            routeName: bestMatch.route_name,
+            routeCode: bestMatch.route_code,
+            source: bestMatch.source || bestMatch.route_name.split('-')[0]?.trim() || 'Origin',
+            destination: bestMatch.destination || bestMatch.route_name.split('-')[1]?.trim() || 'Destination'
+        };
+    }
+    return null;
+}
 // 1. RTO Code Mapping for Uttar Pradesh Districts
 const RTO_MAP = {
     'UP11': { city: 'Saharanpur', region: 'Paschim UP' },
@@ -161,7 +228,7 @@ function extractRtoCode(regNo) {
 /**
  * Resolve dynamic smart route name and nearest landmark stop for any given bus
  */
-function resolveSmartRouteName(regNo, lat, lng, rawRouteName, depotName, zoneName) {
+function resolveSmartRouteName(regNo, lat, lng, rawRouteName, depotName, zoneName, heading, speed) {
     const cleanRegNo = (regNo || '').toUpperCase().trim();
     const cleanDepot = (depotName || '').trim();
     // Tier 1: Valid Raw Route Name from Official Telemetry
@@ -177,7 +244,19 @@ function resolveSmartRouteName(regNo, lat, lng, rawRouteName, depotName, zoneNam
             destinationCity: cleanRaw.split('-')[1]?.trim() || 'Express'
         };
     }
-    // Tier 2: Nearest Hub City Matching
+    // Tier 2: Real Physical Road Corridor Map-Matching (Master Route Network)
+    // If the bus is physically traversing an existing route corridor in the database,
+    // use the exact corridor name (e.g. Saharanpur - Gangoh (via Nakur))
+    const physicalMatch = matchPhysicalCorridor(lat, lng, heading || 0, speed || 0, 3.0);
+    if (physicalMatch) {
+        return {
+            routeName: physicalMatch.routeName,
+            routeCode: physicalMatch.routeCode,
+            sourceCity: physicalMatch.source,
+            destinationCity: physicalMatch.destination
+        };
+    }
+    // Tier 3: Nearest Hub City Matching
     let nearestCity = CITY_CENTERS[0];
     let minDistance = Infinity;
     for (const center of CITY_CENTERS) {

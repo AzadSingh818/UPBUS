@@ -34,7 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.initSeeder = initSeeder;
-exports.processMargdarshiBuses = processMargdarshiBuses;
+exports.seedRouteDescription = seedRouteDescription;
 exports.startRouteSeeder = startRouteSeeder;
 exports.stopRouteSeeder = stopRouteSeeder;
 const db_1 = require("../db");
@@ -312,150 +312,111 @@ async function resolveStop(stopName, busLat, busLng, busSpeed, isLastStop) {
 }
 // Deleted old cleanStopName from here
 /**
- * Polls Margdarshi GPS stream and parses/inserts newly discovered routes
+ * Dynamically seeds a route description by resolving and geocoding stops
  */
-async function processMargdarshiBuses() {
-    if (isProcessing)
+async function seedRouteDescription(routeDesc, busLat, busLng, busSpeed) {
+    const cleanDesc = routeDesc.toUpperCase().trim();
+    if (processedRoutes.has(cleanDesc) || processingRoutes.has(cleanDesc))
         return;
-    isProcessing = true;
-    try {
-        const res = await fetchWithTimeout('https://margdarshi.upsrtcvlt.com/php/getGpsLiveData.php', {
-            method: 'POST',
-            headers: { 'User-Agent': 'Mozilla/5.0' }
-        }, 5000);
-        if (!res.ok) {
-            isProcessing = false;
-            return;
+    const stopNames = parseRouteStops(cleanDesc);
+    if (stopNames.length < 2)
+        return;
+    processingRoutes.add(cleanDesc);
+    console.log(`[Route Seeder] Found new route description to parse: "${cleanDesc}"`);
+    adminMonitor_1.adminMonitor.addLog({
+        type: 'SEEDER',
+        message: `Found new route description to parse: "${cleanDesc}"`
+    });
+    // Resolve coordinates for all stops
+    const stopObjs = [];
+    let allResolved = true;
+    for (let i = 0; i < stopNames.length; i++) {
+        const name = stopNames[i];
+        const isLast = i === stopNames.length - 1;
+        const resolved = await resolveStop(name, busLat, busLng, busSpeed, isLast);
+        if (resolved) {
+            stopObjs.push(resolved);
         }
-        const data = JSON.parse(await res.text());
-        if (!Array.isArray(data)) {
-            isProcessing = false;
-            return;
-        }
-        for (const bus of data) {
-            const regNo = bus.RegNo || bus.regNum || bus.bus_id;
-            const latVal = bus.latitude !== undefined ? bus.latitude : bus.lat;
-            const lngVal = bus.longitude !== undefined ? bus.longitude : bus.long;
-            if (!regNo || latVal === undefined || lngVal === undefined || !bus.route_description)
-                continue;
-            const routeDesc = bus.route_description.toUpperCase().trim();
-            if (processedRoutes.has(routeDesc) || processingRoutes.has(routeDesc))
-                continue;
-            const stopNames = parseRouteStops(routeDesc);
-            if (stopNames.length < 2)
-                continue;
-            console.log(`[Route Seeder] Found new route description to parse: "${routeDesc}"`);
-            adminMonitor_1.adminMonitor.addLog({
-                type: 'SEEDER',
-                message: `Found new route description to parse: "${routeDesc}"`
-            });
-            // Resolve coordinates for all stops
-            const stopObjs = [];
-            let allResolved = true;
-            processingRoutes.add(routeDesc);
-            for (let i = 0; i < stopNames.length; i++) {
-                const name = stopNames[i];
-                const isLast = i === stopNames.length - 1;
-                const resolved = await resolveStop(name, parseFloat(latVal), parseFloat(lngVal), parseFloat(bus.speed) || 0, isLast);
-                if (resolved) {
-                    stopObjs.push(resolved);
-                }
-                else {
-                    allResolved = false;
-                    break; // Stop parsing this route if geocoding fails for any stop
-                }
-            }
-            if (!allResolved || stopObjs.length < 2) {
-                console.warn(`[Route Seeder] Could not resolve all stops for route: "${routeDesc}"`);
-                adminMonitor_1.adminMonitor.addLog({
-                    type: 'SEEDER',
-                    status: 'failed',
-                    message: `Failed to resolve stops for route: "${routeDesc}"`
-                });
-                processingRoutes.delete(routeDesc);
-                continue;
-            }
-            // Calculate total route distance (cumulative haversine segment distances * 1.15 winding factor)
-            let totalDistanceKm = 0;
-            const sequenceStops = [{ stopId: stopObjs[0].id, distance: 0 }];
-            for (let i = 1; i < stopObjs.length; i++) {
-                const prev = stopObjs[i - 1];
-                const curr = stopObjs[i];
-                const segDist = (0, geoUtils_1.haversineDistanceKm)({ lat: prev.latitude, lng: prev.longitude }, { lat: curr.latitude, lng: curr.longitude }) * 1.15; // 1.15 multiplier for road winding
-                totalDistanceKm += segDist;
-                sequenceStops.push({ stopId: curr.id, distance: totalDistanceKm });
-            }
-            // Save Route
-            try {
-                const routeCode = `R_AUTO_${stopObjs[0].id}_${stopObjs[stopObjs.length - 1].id}`;
-                const sourceName = stopObjs[0].name;
-                const destName = stopObjs[stopObjs.length - 1].name;
-                const routeInsert = await (0, db_1.query)(`INSERT INTO routes (route_code, route_name, source, destination, distance_km)
-           VALUES ($1, $2, $3, $4, $5)
-           ON CONFLICT (route_code) DO UPDATE SET route_name = EXCLUDED.route_name
-           RETURNING id`, [routeCode, routeDesc, sourceName, destName, parseFloat(totalDistanceKm.toFixed(2))]);
-                const routeId = routeInsert.rows[0].id;
-                // Save Route stops mapping
-                for (let i = 0; i < sequenceStops.length; i++) {
-                    const s = sequenceStops[i];
-                    await (0, db_1.query)(`INSERT INTO route_stops (route_id, stop_id, sequence_no, distance_from_start_km)
-             VALUES ($1, $2, $3, $4)
-             ON CONFLICT (route_id, stop_id) DO NOTHING`, [routeId, s.stopId, i + 1, parseFloat(s.distance.toFixed(2))]);
-                }
-                processedRoutes.add(routeDesc);
-                console.log(`[Route Seeder] Successfully seeded route: "${routeDesc}" (${totalDistanceKm.toFixed(1)} km, ${stopObjs.length} stops)`);
-                adminMonitor_1.adminMonitor.addLog({
-                    type: 'SEEDER',
-                    status: 'success',
-                    message: `Successfully seeded route: "${routeDesc}" (${totalDistanceKm.toFixed(1)} km, ${stopObjs.length} stops)`
-                });
-                // Rebuild the pathfinder graph in-memory so the new route is immediately searchable
-                try {
-                    const { buildGraph } = require('./graph');
-                    await buildGraph();
-                }
-                catch (graphErr) {
-                    console.error('[Route Seeder] Error rebuilding graph in-memory:', graphErr);
-                }
-            }
-            catch (e) {
-                console.error(`[Route Seeder] Error seeding route "${routeDesc}":`, e);
-                adminMonitor_1.adminMonitor.addLog({
-                    type: 'SEEDER',
-                    status: 'failed',
-                    message: `Error seeding route "${routeDesc}": ${e.message || e}`
-                });
-            }
-            finally {
-                processingRoutes.delete(routeDesc);
-            }
+        else {
+            allResolved = false;
+            break; // Stop parsing this route if geocoding fails for any stop
         }
     }
-    catch (error) {
-        console.error('[Route Seeder] Error running seeder cycle:', error);
+    if (!allResolved || stopObjs.length < 2) {
+        console.warn(`[Route Seeder] Could not resolve all stops for route: "${cleanDesc}"`);
+        adminMonitor_1.adminMonitor.addLog({
+            type: 'SEEDER',
+            status: 'failed',
+            message: `Failed to resolve stops for route: "${cleanDesc}"`
+        });
+        processingRoutes.delete(cleanDesc);
+        return;
+    }
+    // Calculate total route distance (cumulative haversine segment distances * 1.15 winding factor)
+    let totalDistanceKm = 0;
+    const sequenceStops = [{ stopId: stopObjs[0].id, distance: 0 }];
+    for (let i = 1; i < stopObjs.length; i++) {
+        const prev = stopObjs[i - 1];
+        const curr = stopObjs[i];
+        const segDist = (0, geoUtils_1.haversineDistanceKm)({ lat: prev.latitude, lng: prev.longitude }, { lat: curr.latitude, lng: curr.longitude }) * 1.15; // 1.15 multiplier for road winding
+        totalDistanceKm += segDist;
+        sequenceStops.push({ stopId: curr.id, distance: totalDistanceKm });
+    }
+    // Save Route
+    try {
+        const routeCode = `R_AUTO_${stopObjs[0].id}_${stopObjs[stopObjs.length - 1].id}`;
+        const sourceName = stopObjs[0].name;
+        const destName = stopObjs[stopObjs.length - 1].name;
+        const routeInsert = await (0, db_1.query)(`INSERT INTO routes (route_code, route_name, source, destination, distance_km)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (route_code) DO UPDATE SET route_name = EXCLUDED.route_name
+       RETURNING id`, [routeCode, cleanDesc, sourceName, destName, parseFloat(totalDistanceKm.toFixed(2))]);
+        const routeId = routeInsert.rows[0].id;
+        // Save Route stops mapping
+        for (let i = 0; i < sequenceStops.length; i++) {
+            const s = sequenceStops[i];
+            await (0, db_1.query)(`INSERT INTO route_stops (route_id, stop_id, sequence_no, distance_from_start_km)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (route_id, stop_id) DO NOTHING`, [routeId, s.stopId, i + 1, parseFloat(s.distance.toFixed(2))]);
+        }
+        processedRoutes.add(cleanDesc);
+        console.log(`[Route Seeder] Successfully seeded route: "${cleanDesc}" (${totalDistanceKm.toFixed(1)} km, ${stopObjs.length} stops)`);
+        adminMonitor_1.adminMonitor.addLog({
+            type: 'SEEDER',
+            status: 'success',
+            message: `Successfully seeded route: "${cleanDesc}" (${totalDistanceKm.toFixed(1)} km, ${stopObjs.length} stops)`
+        });
+        // Rebuild the pathfinder graph in-memory so the new route is immediately searchable
+        try {
+            const { buildGraph } = require('./graph');
+            await buildGraph();
+        }
+        catch (graphErr) {
+            console.error('[Route Seeder] Error rebuilding graph in-memory:', graphErr);
+        }
+    }
+    catch (e) {
+        console.error(`[Route Seeder] Error seeding route "${cleanDesc}":`, e);
+        adminMonitor_1.adminMonitor.addLog({
+            type: 'SEEDER',
+            status: 'failed',
+            message: `Error seeding route "${cleanDesc}": ${e.message || e}`
+        });
     }
     finally {
-        isProcessing = false;
+        processingRoutes.delete(cleanDesc);
     }
 }
 /**
  * Start the seeder daemon in background
  */
 async function startRouteSeeder() {
-    if (seederInterval)
-        return;
     console.log('[Route Seeder] Starting Autonomous Network Seeder...');
     await initSeeder();
-    // Poll Margdarshi every 2 seconds
-    seederInterval = setInterval(processMargdarshiBuses, 2000);
 }
 /**
  * Stop the seeder daemon
  */
 function stopRouteSeeder() {
-    if (seederInterval) {
-        clearInterval(seederInterval);
-        seederInterval = null;
-        console.log('[Route Seeder] Stopped Autonomous Network Seeder.');
-    }
+    console.log('[Route Seeder] Stopped Autonomous Network Seeder.');
 }

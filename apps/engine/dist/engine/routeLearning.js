@@ -38,6 +38,7 @@ exports.recordLiveLocation = recordLiveLocation;
 exports.completeTripAndLearnRoute = completeTripAndLearnRoute;
 const db_1 = require("../db");
 const graph_1 = require("./graph");
+const adminMonitor_1 = require("../services/adminMonitor");
 // In-memory cache of stops to avoid querying the DB on every single ping
 let stopsCache = [];
 let lastStopsFetch = 0;
@@ -71,7 +72,26 @@ function haversineKm(lat1, lon1, lat2, lon2) {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 // Map tracking visited stops for active trips
+// TTL-tracked: entries older than 4 hours are automatically evicted to prevent memory leak
 exports.visitedStopsMap = new Map();
+const visitedStopsLastSeen = new Map(); // tripId → last active timestamp
+const TRIP_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours max per trip
+const MAX_TRIPS_IN_MEMORY = 5000; // Hard cap — never store more than 5000 trips at once
+// Periodic cleanup: evict stale trips every 5 minutes
+setInterval(() => {
+    const cutoff = Date.now() - TRIP_TTL_MS;
+    let evicted = 0;
+    for (const [tripId, lastSeen] of visitedStopsLastSeen.entries()) {
+        if (lastSeen < cutoff) {
+            exports.visitedStopsMap.delete(tripId);
+            visitedStopsLastSeen.delete(tripId);
+            evicted++;
+        }
+    }
+    if (evicted > 0) {
+        console.log(`[Route Learning] Evicted ${evicted} stale trip(s) from memory. Active trips: ${exports.visitedStopsMap.size}`);
+    }
+}, 5 * 60 * 1000);
 /**
  * Record a live bus GPS update and detect if a stop is visited.
  */
@@ -92,13 +112,23 @@ async function recordLiveLocation(tripId, busId, latitude, longitude, speed) {
     if (closestStop) {
         let visited = exports.visitedStopsMap.get(tripId);
         if (!visited) {
+            // Hard cap: if at limit, skip adding new trips to avoid OOM
+            if (exports.visitedStopsMap.size >= MAX_TRIPS_IN_MEMORY)
+                return;
             visited = [];
             exports.visitedStopsMap.set(tripId, visited);
         }
+        // Refresh TTL on every activity
+        visitedStopsLastSeen.set(tripId, Date.now());
         // Add stop if different from the last recorded stop (avoid duplicate consecutive records)
         if (visited.length === 0 || visited[visited.length - 1] !== closestStop.id) {
             visited.push(closestStop.id);
             console.log(`[Route Learning] Trip ${tripId} visited stop: ${closestStop.name} (Stop ID: ${closestStop.id})`);
+            adminMonitor_1.adminMonitor.addLog({
+                type: 'LEARNING',
+                busId,
+                message: `Trip ${tripId} visited stop: ${closestStop.name} (Stop ID: ${closestStop.id})`
+            });
             // Run AI Route Prediction asynchronously
             predictRouteForTrip(tripId, busId, visited).catch(err => {
                 console.error('[Route Prediction] Error predicting route:', err);

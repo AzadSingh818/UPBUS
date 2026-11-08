@@ -19,6 +19,15 @@ class RouteProgressEngine {
     static async process(gpsPacket) {
         const { busId, latitude, longitude, speed, heading, accuracy } = gpsPacket;
         console.log(`[RouteProgressEngine] Processing ping for bus ${busId}: (${latitude}, ${longitude})`);
+        adminMonitor_1.adminMonitor.addLog({
+            terminalId: 'engine',
+            service: 'GEO-MATCH',
+            level: 'INFO',
+            type: 'LEARNING',
+            busId,
+            entityId: `BUS-${busId}`,
+            message: `Ingested raw telemetry packet (Lat: ${latitude.toFixed(4)}, Lng: ${longitude.toFixed(4)}, Speed: ${Math.round(speed)}km/h)`
+        });
         // Fetch trip details to identify the assigned route
         const trip = await RouteProgressRepository_1.RouteProgressRepository.getTripForBus(busId);
         if (trip) {
@@ -76,7 +85,11 @@ class RouteProgressEngine {
         if (isReversing) {
             overallBusState = 'REVERSING';
             stateMachineRollbackAllowed = true;
-            console.log(`[RouteProgressEngine] Reverse travel detected for bus ${busId}. Rollback allowed.`);
+            adminMonitor_1.adminMonitor.addLog({
+                type: 'VALIDATION',
+                busId,
+                message: `Reverse travel detected for bus ${busId}. Rollback allowed.`
+            });
         }
         // 7. Evaluate Stop State Machine for each stop
         const evaluatedStops = [];

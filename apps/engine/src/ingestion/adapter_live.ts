@@ -307,7 +307,16 @@ export async function ingestLocation(location: CanonicalVehicleLocation): Promis
 
     const activeRouteCode = await getRouteCode(activeRouteId);
 
-    const resolved = resolveSmartRouteName(location.registrationNo, snappedLat, snappedLng, location.routeName);
+    const resolved = resolveSmartRouteName(
+      location.registrationNo,
+      snappedLat,
+      snappedLng,
+      location.routeName,
+      location.depotName,
+      location.zoneName,
+      location.heading,
+      location.speed
+    );
 
     // 5. Update admin monitor — auto-registers new buses, updates existing
     adminMonitor.updateBus(busId, location.registrationNo, {
@@ -394,7 +403,9 @@ async function runLiveIngestionCycle(): Promise<void> {
       bus.longitude,
       bus.routeName,
       bus.depotName,
-      bus.zoneName
+      bus.zoneName,
+      bus.heading,
+      bus.speed
     );
     const resolvedRouteName = resolved.routeName;
 

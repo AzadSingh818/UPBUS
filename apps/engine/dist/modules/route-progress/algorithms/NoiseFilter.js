@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.NoiseFilter = void 0;
 const geoUtils_1 = require("../../../engine/geoUtils");
+const adminMonitor_1 = require("../../../services/adminMonitor");
 const lastValidCache = new Map();
 class NoiseFilter {
     static filter(packet) {
@@ -29,6 +30,12 @@ class NoiseFilter {
         const maxAllowedMeters = speedMps * elapsedSeconds + 50;
         if (distanceMeters > maxAllowedMeters) {
             console.warn(`[NoiseFilter] Rejected jump for bus ${busId}: jumped ${Math.round(distanceMeters)}m in ${elapsedSeconds.toFixed(1)}s (max allowed ${Math.round(maxAllowedMeters)}m)`);
+            adminMonitor_1.adminMonitor.addLog({
+                type: 'VALIDATION',
+                busId,
+                status: 'rejected',
+                message: `NoiseFilter: Rejected jump for bus ${busId}: jumped ${Math.round(distanceMeters)}m in ${elapsedSeconds.toFixed(1)}s (max ${Math.round(maxAllowedMeters)}m)`
+            });
             return false;
         }
         // Update last valid cache

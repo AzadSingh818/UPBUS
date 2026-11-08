@@ -4,6 +4,8 @@ exports.getRouteStopsMap = exports.getStopsMap = exports.getGraph = void 0;
 exports.buildGraph = buildGraph;
 exports.findPathsDFS = findPathsDFS;
 exports.addLiveRouteEdges = addLiveRouteEdges;
+// Dynamic require to prevent memory explosion during compilation and runtime
+const mockDb = require('../db/data.json');
 const db_1 = require("../db");
 const geoUtils_1 = require("./geoUtils");
 // Global graph cache

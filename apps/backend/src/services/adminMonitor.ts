@@ -170,13 +170,33 @@ class AdminMonitorService {
     const busLng = data.longitude ?? existing?.longitude ?? 0;
     const busZone = data.zoneName ?? existing?.zoneName;
 
-    // 1. Resolve Intelligent Route Name (Eliminating repetitive 'Lucknow - Kanpur Express')
-    if (!finalRouteName || finalRouteName === 'Lucknow - Kanpur Express' || finalRouteName === 'UNKNOWN') {
+    const busHeading = data.heading ?? existing?.heading ?? 0;
+    const busSpeed = data.speed ?? existing?.speed ?? 0;
+
+    // 1. Resolve Intelligent Route Name (Eliminating repetitive generic corridor assignments)
+    // If routeName is missing, unknown, generic fallback, or if we want exact physical corridor accuracy
+    const isGenericFallback = finalRouteName && (
+      finalRouteName.includes(' - Delhi') ||
+      finalRouteName.includes(' - Lucknow') ||
+      finalRouteName === 'Lucknow - Kanpur Express' ||
+      finalRouteName === 'UNKNOWN'
+    );
+
+    if (!finalRouteName || isGenericFallback) {
       try {
         const { resolveSmartRouteName } = require('../engine/smartRouteResolver');
-        const resolved = resolveSmartRouteName(regNo, busLat, busLng, data.originalRouteStr || data.routeName, undefined, busZone);
-        finalRouteName = resolved.routeName;
-        if (!finalRouteCode || finalRouteCode === 'R_UNKNOWN' || finalRouteCode === 'R_LKO_KAN') {
+        const resolved = resolveSmartRouteName(
+          regNo,
+          busLat,
+          busLng,
+          data.originalRouteStr || (isGenericFallback ? undefined : data.routeName),
+          undefined,
+          busZone,
+          busHeading,
+          busSpeed
+        );
+        if (resolved && resolved.routeName) {
+          finalRouteName = resolved.routeName;
           finalRouteCode = resolved.routeCode;
         }
       } catch {}

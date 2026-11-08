@@ -3,8 +3,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+process.noDeprecation = true;
 const adapter_live_1 = require("./ingestion/adapter_live");
 const routeSeeder_1 = require("./engine/routeSeeder");
+const routeDeduplicationEngine_1 = require("./engine/routeDeduplicationEngine");
 const graph_1 = require("./engine/graph");
 const routeGeometry_1 = require("./engine/routeGeometry");
 const fs_1 = __importDefault(require("fs"));
@@ -33,6 +35,11 @@ async function main() {
     (0, adapter_live_1.startIngestion)();
     // Boot Autonomous Route Seeder (learns routes over time)
     (0, routeSeeder_1.startRouteSeeder)();
+    // Boot Master-Mapping Route Deduplication Engine
+    (0, routeDeduplicationEngine_1.runRouteDeduplicationCycle)().catch(err => console.error('[Engine] Error running initial route dedup cycle:', err));
+    setInterval(() => {
+        (0, routeDeduplicationEngine_1.runRouteDeduplicationCycle)().catch(err => console.error('[Engine] Error running scheduled route dedup cycle:', err));
+    }, 5 * 60 * 1000);
 }
 // Graceful Shutdown
 const shutdown = () => {

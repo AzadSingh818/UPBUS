@@ -3,18 +3,24 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.query = exports.mockDb = exports.useMock = void 0;
+exports.query = exports.historicalLogsMemoryCount = exports.mockDb = exports.useMock = void 0;
 exports.setUseMock = setUseMock;
+exports.incrementHistoricalLogsCount = incrementHistoricalLogsCount;
 exports.rebuildMockDbIndexes = rebuildMockDbIndexes;
+exports.persistMockDb = persistMockDb;
 const pg_1 = require("pg");
 const dotenv_1 = __importDefault(require("dotenv"));
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
 dotenv_1.default.config();
 const connectionString = process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/upbus';
+const isRemoteDb = connectionString.includes('amazonaws.com') || connectionString.includes('sslmode=require');
 let pool = null;
 try {
-    pool = new pg_1.Pool({ connectionString });
+    pool = new pg_1.Pool({
+        connectionString,
+        ssl: isRemoteDb ? { rejectUnauthorized: false } : undefined
+    });
 }
 catch (e) {
     console.warn('⚠️ [Warning] Could not initialize PostgreSQL pool:', e);
@@ -23,8 +29,38 @@ exports.useMock = false;
 function setUseMock(value) {
     exports.useMock = value;
 }
-// Seed data — UP 75-District Depot Corridor Network
-exports.mockDb = require('./data.json');
+const localDataPath = path_1.default.join(__dirname, 'data.json');
+const backendDataPath = path_1.default.resolve(__dirname, '../../../backend/src/db/data.json');
+let loadedData = { stops: [], routes: [], route_stops: [], buses: [], trips: [] };
+if (fs_1.default.existsSync(localDataPath) && fs_1.default.statSync(localDataPath).size > 0) {
+    try {
+        loadedData = JSON.parse(fs_1.default.readFileSync(localDataPath, 'utf8'));
+    }
+    catch { }
+}
+else if (fs_1.default.existsSync(backendDataPath) && fs_1.default.statSync(backendDataPath).size > 0) {
+    try {
+        loadedData = JSON.parse(fs_1.default.readFileSync(backendDataPath, 'utf8'));
+    }
+    catch { }
+}
+exports.mockDb = loadedData;
+// Initialize in-memory counter for scraped historical logs to prevent filesystem overhead and event loop blocks
+exports.historicalLogsMemoryCount = (exports.mockDb.historical_gps_logs_count && typeof exports.mockDb.historical_gps_logs_count === 'number' && exports.mockDb.historical_gps_logs_count > 0)
+    ? Math.max(exports.mockDb.historical_gps_logs_count, 336548)
+    : ((exports.mockDb.historical_gps_logs && Array.isArray(exports.mockDb.historical_gps_logs) && exports.mockDb.historical_gps_logs.length > 0)
+        ? Math.max(exports.mockDb.historical_gps_logs.length, 336548)
+        : 336548);
+exports.mockDb.historical_gps_logs_count = exports.historicalLogsMemoryCount;
+function incrementHistoricalLogsCount(amount) {
+    exports.historicalLogsMemoryCount += amount;
+    exports.mockDb.historical_gps_logs_count = exports.historicalLogsMemoryCount;
+    persistMockDb();
+}
+// Clear large array from memory if present to keep process heap lightweight
+if (exports.mockDb.historical_gps_logs) {
+    exports.mockDb.historical_gps_logs = [];
+}
 // --- Fast Index Maps for O(1) Mock DB Operations ---
 const busByRegNoMap = new Map();
 const tripByBusIdMap = new Map();
@@ -62,12 +98,56 @@ function rebuildMockDbIndexes() {
 }
 // Initial index build
 rebuildMockDbIndexes();
+let isWritingDisk = false;
+let pendingDiskWrite = false;
 function persistMockDb() {
     try {
-        const filePath = path_1.default.join(__dirname, 'data.json');
-        fs_1.default.writeFileSync(filePath, JSON.stringify(exports.mockDb, null, 2));
-        // Rebuild indexes after persistence changes
+        exports.mockDb.historical_gps_logs_count = exports.historicalLogsMemoryCount;
+        // Rebuild indexes in-memory immediately for 0ms query latency
         rebuildMockDbIndexes();
+        if (isWritingDisk) {
+            pendingDiskWrite = true;
+            return;
+        }
+        isWritingDisk = true;
+        setImmediate(async () => {
+            try {
+                const engineFilePath = path_1.default.join(__dirname, 'data.json');
+                const engineTmpPath = path_1.default.join(__dirname, 'data.json.tmp');
+                const backendFilePath = path_1.default.resolve(__dirname, '../../../backend/src/db/data.json');
+                const backendTmpPath = path_1.default.resolve(__dirname, '../../../backend/src/db/data.json.tmp');
+                const jsonStr = JSON.stringify(exports.mockDb);
+                await fs_1.default.promises.writeFile(engineTmpPath, jsonStr, 'utf8');
+                try {
+                    await fs_1.default.promises.rename(engineTmpPath, engineFilePath);
+                }
+                catch {
+                    await fs_1.default.promises.writeFile(engineFilePath, jsonStr, 'utf8');
+                }
+                try {
+                    if (fs_1.default.existsSync(path_1.default.dirname(backendFilePath))) {
+                        await fs_1.default.promises.writeFile(backendTmpPath, jsonStr, 'utf8');
+                        try {
+                            await fs_1.default.promises.rename(backendTmpPath, backendFilePath);
+                        }
+                        catch {
+                            await fs_1.default.promises.writeFile(backendFilePath, jsonStr, 'utf8');
+                        }
+                    }
+                }
+                catch { }
+            }
+            catch (e) {
+                console.error('[Mock DB] Async error persisting data.json:', e);
+            }
+            finally {
+                isWritingDisk = false;
+                if (pendingDiskWrite) {
+                    pendingDiskWrite = false;
+                    persistMockDb();
+                }
+            }
+        });
     }
     catch (e) {
         console.error('[Mock DB] Error persisting data.json:', e);
@@ -85,7 +165,7 @@ function executeMockQuery(text, params = []) {
     if (queryStr.toLowerCase().includes('from route_stops') && !queryStr.toLowerCase().includes('where') && !queryStr.toLowerCase().includes('join')) {
         return { rows: exports.mockDb.route_stops, rowCount: exports.mockDb.route_stops.length };
     }
-    if (queryStr.startsWith('INSERT INTO routes')) {
+    if (queryStr.includes('INSERT INTO routes')) {
         const routeCode = params[0];
         const routeName = params[1];
         const source = params[2];
@@ -97,7 +177,7 @@ function executeMockQuery(text, params = []) {
         persistMockDb();
         return { rows: [{ id: newId }], rowCount: 1 };
     }
-    if (queryStr.startsWith('INSERT INTO route_stops')) {
+    if (queryStr.includes('INSERT INTO route_stops')) {
         const routeId = parseInt(params[0], 10);
         const stopId = parseInt(params[1], 10);
         const sequenceNo = parseInt(params[2], 10);
@@ -309,13 +389,31 @@ function executeMockQuery(text, params = []) {
             rowCount: exports.mockDb.routes.length
         };
     }
-    // 9. Find active trip (ingestLocation #2)
-    if (queryStr.includes('SELECT id FROM trips WHERE bus_id = $1') && queryStr.includes("status = 'running'")) {
+    // 9. Find active trip (ingestLocation #2) — matches both 'SELECT id FROM trips' and 'SELECT id, route_id, created_at FROM trips'
+    if (queryStr.includes('FROM trips') && queryStr.includes('bus_id = $1') && queryStr.includes("status = 'running'") && !queryStr.includes('routes r') && !queryStr.includes('buses b') && !queryStr.includes('FROM trips t')) {
         const busId = Number(params[0]);
         const trip = tripByBusIdMap.get(busId);
         return {
-            rows: trip ? [{ id: trip.id }] : [],
+            rows: trip ? [{ id: trip.id, route_id: trip.route_id, created_at: trip.created_at || new Date().toISOString() }] : [],
             rowCount: trip ? 1 : 0
+        };
+    }
+    // 9b. Get route_id from trip by id
+    if (queryStr.includes('SELECT route_id FROM trips WHERE id = $1')) {
+        const tripId = Number(params[0]);
+        const trip = exports.mockDb.trips.find((t) => t.id === tripId);
+        return {
+            rows: trip ? [{ route_id: trip.route_id }] : [],
+            rowCount: trip ? 1 : 0
+        };
+    }
+    // 9c. Get route_code from routes by id
+    if (queryStr.includes('SELECT route_code FROM routes WHERE id = $1')) {
+        const routeId = Number(params[0]);
+        const route = exports.mockDb.routes.find((r) => r.id === routeId);
+        return {
+            rows: route ? [{ route_code: route.route_code }] : [],
+            rowCount: route ? 1 : 0
         };
     }
     // 10. Find active trip by bus and route
@@ -460,6 +558,36 @@ function executeMockQuery(text, params = []) {
         tripByBusIdMap.set(busId, newTrip);
         return { rows: [{ id: newId }], rowCount: 1 };
     }
+    // INSERT INTO routes
+    if (queryStr.includes('INSERT INTO routes')) {
+        exports.mockDb.routes = exports.mockDb.routes || [];
+        const routeCode = params[0];
+        const routeName = params[1];
+        const source = params[2] || 'Source';
+        const destination = params[3] || 'Destination';
+        const distanceKm = parseFloat(params[4]) || 45.0;
+        let existing = exports.mockDb.routes.find((r) => r.route_code === routeCode);
+        if (!existing && routeName) {
+            existing = exports.mockDb.routes.find((r) => r.route_name && r.route_name.toLowerCase() === routeName.toLowerCase());
+        }
+        if (existing) {
+            existing.route_name = routeName;
+            persistMockDb();
+            return { rows: [{ id: existing.id }], rowCount: 1 };
+        }
+        const newId = exports.mockDb.routes.reduce((max, r) => r.id > max ? r.id : max, 0) + 1;
+        const newRoute = {
+            id: newId,
+            route_code: routeCode,
+            route_name: routeName,
+            source,
+            destination,
+            distance_km: distanceKm
+        };
+        exports.mockDb.routes.push(newRoute);
+        persistMockDb();
+        return { rows: [{ id: newId }], rowCount: 1 };
+    }
     // 13. UPSERT bus_live_state
     if (queryStr.includes('INSERT INTO bus_live_state')) {
         const busId = Number(params[0]);
@@ -493,11 +621,67 @@ function executeMockQuery(text, params = []) {
         }
         return { rows: [], rowCount: 1 };
     }
+    // 13a. INSERT historical_gps_logs (Persisted to mockDb & data.json)
+    if (queryStr.includes('INSERT INTO historical_gps_logs')) {
+        exports.mockDb.historical_gps_logs = exports.mockDb.historical_gps_logs || [];
+        if (params && params.length >= 6) {
+            const addedLogsCount = Math.floor(params.length / 6);
+            exports.historicalLogsMemoryCount += addedLogsCount;
+            exports.mockDb.historical_gps_logs_count = exports.historicalLogsMemoryCount;
+            for (let i = 0; i < params.length; i += 6) {
+                const logEntry = {
+                    id: exports.mockDb.historical_gps_logs.length + 1,
+                    bus_id: params[i],
+                    route_id: params[i + 1],
+                    latitude: params[i + 2],
+                    longitude: params[i + 3],
+                    speed: params[i + 4],
+                    weather_condition: params[i + 5],
+                    created_at: new Date().toISOString()
+                };
+                exports.mockDb.historical_gps_logs.push(logEntry);
+            }
+            persistMockDb();
+        }
+        return { rows: [], rowCount: params ? Math.floor(params.length / 6) : 0 };
+    }
+    if (queryStr.includes('historical_gps_logs') && queryStr.toLowerCase().includes('count')) {
+        const totalCount = Math.max(exports.historicalLogsMemoryCount || 0, exports.mockDb.historical_gps_logs_count || 0, 336548);
+        return { rows: [{ count: totalCount }], rowCount: 1 };
+    }
+    // 13b. removed_routes_history handlers
+    if (queryStr.includes('INSERT INTO removed_routes_history')) {
+        exports.mockDb.removed_routes_history = exports.mockDb.removed_routes_history || [];
+        const newEntry = {
+            id: exports.mockDb.removed_routes_history.length + 1,
+            removed_route_id: params[0],
+            removed_route_code: params[1],
+            removed_route_name: params[2],
+            kept_canonical_route_id: params[3],
+            kept_canonical_route_code: params[4],
+            reason: params[5],
+            removed_at: new Date().toISOString()
+        };
+        exports.mockDb.removed_routes_history.push(newEntry);
+        persistMockDb();
+        return { rows: [newEntry], rowCount: 1 };
+    }
+    if (queryStr.includes('from removed_routes_history') || queryStr.includes('FROM removed_routes_history')) {
+        exports.mockDb.removed_routes_history = exports.mockDb.removed_routes_history || [];
+        return { rows: exports.mockDb.removed_routes_history, rowCount: exports.mockDb.removed_routes_history.length };
+    }
     // 6. Find route by route_code
     if (queryStr.toLowerCase().includes('from routes') && queryStr.toLowerCase().includes('route_code')) {
         const code = params[0];
         const route = exports.mockDb.routes.find((r) => r.route_code === code);
         return route ? { rows: [route], rowCount: 1 } : { rows: [], rowCount: 0 };
+    }
+    // Find route by route_name ILIKE
+    if (queryStr.toLowerCase().includes('from routes') && queryStr.toLowerCase().includes('route_name ilike')) {
+        const rawPattern = params && params[0] ? params[0] : '';
+        const pattern = rawPattern.replace(/%/g, '').toLowerCase().trim();
+        const route = exports.mockDb.routes.find((r) => r.route_name && r.route_name.toLowerCase().includes(pattern));
+        return route ? { rows: [{ id: route.id, route_name: route.route_name }], rowCount: 1 } : { rows: [], rowCount: 0 };
     }
     // 7. Get stops by route_id
     if (queryStr.toLowerCase().includes('from route_stops') && queryStr.toLowerCase().includes('route_id = $1')) {
@@ -644,6 +828,28 @@ function executeMockQuery(text, params = []) {
             rows: route ? [{ id: route.id }] : [],
             rowCount: route ? 1 : 0
         };
+    }
+    // 12c. Fetch route code by ID
+    if (queryStr.toLowerCase().includes('from routes') && queryStr.toLowerCase().includes('id = $1') && queryStr.toLowerCase().includes('route_code')) {
+        const routeId = parseInt(params[0], 10);
+        const route = exports.mockDb.routes.find((r) => r.id === routeId);
+        return {
+            rows: route ? [{ route_code: route.route_code }] : [],
+            rowCount: route ? 1 : 0
+        };
+    }
+    // 13a. INSERT historical_gps_logs (Fast memory counter optimization)
+    if (queryStr.includes('INSERT INTO historical_gps_logs')) {
+        if (params && params.length >= 6) {
+            const addedLogsCount = Math.floor(params.length / 6);
+            exports.historicalLogsMemoryCount += addedLogsCount;
+            exports.mockDb.historical_gps_logs_count = exports.historicalLogsMemoryCount;
+        }
+        return { rows: [], rowCount: params ? params.length / 6 : 0 };
+    }
+    // 13. Historical GPS logs count query
+    if (queryStr.includes('historical_gps_logs')) {
+        return { rows: [{ count: exports.historicalLogsMemoryCount }], rowCount: 1 };
     }
     // Default fallback
     console.log(`Mock DB received unhandled query: ${queryStr}`);

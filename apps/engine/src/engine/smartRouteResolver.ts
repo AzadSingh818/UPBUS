@@ -7,12 +7,92 @@
  * 4. Master Route Graph Map-Matching
  */
 
+import { mockDb } from '../db';
+import { matchBusToCorridor } from '../utils/corridorMatcher';
+
 export interface RouteResolution {
   routeName: string;
   routeCode: string;
   sourceCity: string;
   destinationCity: string;
   nearestStop?: string;
+}
+
+// In-memory indexed corridor cache for 0ms sub-millisecond map-matching
+let stopsByIdCache: Map<number, any> | null = null;
+let routeStopsByRouteIdCache: Map<number, any[]> | null = null;
+
+function ensureCorridorCache() {
+  if (stopsByIdCache && routeStopsByRouteIdCache) return;
+  stopsByIdCache = new Map();
+  for (const s of (mockDb?.stops || [])) {
+    stopsByIdCache.set(s.id, s);
+  }
+  routeStopsByRouteIdCache = new Map();
+  for (const rs of (mockDb?.route_stops || [])) {
+    if (!routeStopsByRouteIdCache.has(rs.route_id)) {
+      routeStopsByRouteIdCache.set(rs.route_id, []);
+    }
+    routeStopsByRouteIdCache.get(rs.route_id)!.push(rs);
+  }
+}
+
+/**
+ * Universal Physical Corridor Matcher:
+ * Checks whether the bus is within 3.0 km of an actual known route corridor.
+ */
+function matchPhysicalCorridor(
+  lat: number,
+  lng: number,
+  heading = 0,
+  speed = 0,
+  maxOffsetKm = 3.0
+): { routeName: string; routeCode: string; source: string; destination: string } | null {
+  if (!lat || !lng || isNaN(lat) || isNaN(lng) || !mockDb?.routes) return null;
+  ensureCorridorCache();
+
+  let bestMatch: any = null;
+  let minOffset = Infinity;
+
+  for (const route of mockDb.routes) {
+    const rsList = routeStopsByRouteIdCache!.get(route.id);
+    if (!rsList || rsList.length < 2) continue;
+
+    // Fast bounding box spatial prune (0.8 deg ~ 88 km)
+    const firstStop = stopsByIdCache!.get(rsList[0].stop_id);
+    if (!firstStop) continue;
+    if (Math.abs(firstStop.latitude - lat) > 0.8 || Math.abs(firstStop.longitude - lng) > 0.8) {
+      const lastStop = stopsByIdCache!.get(rsList[rsList.length - 1].stop_id);
+      if (!lastStop || (Math.abs(lastStop.latitude - lat) > 0.8 && Math.abs(lastStop.longitude - lng) > 0.8)) {
+        continue;
+      }
+    }
+
+    const routeStops = rsList
+      .sort((a, b) => a.stop_sequence - b.stop_sequence)
+      .map(rs => stopsByIdCache!.get(rs.stop_id))
+      .filter(Boolean)
+      .map(s => ({ latitude: Number(s.latitude), longitude: Number(s.longitude), name: s.name }));
+
+    if (routeStops.length < 2) continue;
+
+    const res = matchBusToCorridor(lat, lng, heading, speed, routeStops, 0, maxOffsetKm);
+    if (res.isMatch && res.minOffsetKm < minOffset) {
+      minOffset = res.minOffsetKm;
+      bestMatch = route;
+    }
+  }
+
+  if (bestMatch) {
+    return {
+      routeName: bestMatch.route_name,
+      routeCode: bestMatch.route_code,
+      source: bestMatch.source || bestMatch.route_name.split('-')[0]?.trim() || 'Origin',
+      destination: bestMatch.destination || bestMatch.route_name.split('-')[1]?.trim() || 'Destination'
+    };
+  }
+
+  return null;
 }
 
 // 1. RTO Code Mapping for Uttar Pradesh Districts
@@ -177,7 +257,9 @@ export function resolveSmartRouteName(
   lng: number,
   rawRouteName?: string,
   depotName?: string,
-  zoneName?: string
+  zoneName?: string,
+  heading?: number,
+  speed?: number
 ): RouteResolution {
   const cleanRegNo = (regNo || '').toUpperCase().trim();
   const cleanDepot = (depotName || '').trim();
@@ -198,7 +280,20 @@ export function resolveSmartRouteName(
     };
   }
 
-  // Tier 2: Nearest Hub City Matching
+  // Tier 2: Real Physical Road Corridor Map-Matching (Master Route Network)
+  // If the bus is physically traversing an existing route corridor in the database,
+  // use the exact corridor name (e.g. Saharanpur - Gangoh (via Nakur))
+  const physicalMatch = matchPhysicalCorridor(lat, lng, heading || 0, speed || 0, 3.0);
+  if (physicalMatch) {
+    return {
+      routeName: physicalMatch.routeName,
+      routeCode: physicalMatch.routeCode,
+      sourceCity: physicalMatch.source,
+      destinationCity: physicalMatch.destination
+    };
+  }
+
+  // Tier 3: Nearest Hub City Matching
   let nearestCity = CITY_CENTERS[0];
   let minDistance = Infinity;
 
