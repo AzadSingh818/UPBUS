@@ -697,7 +697,14 @@ export default function Home() {
         const journeysList = data.journeys || (data.legs ? [data] : []);
         setJourneys(journeysList);
         setSelectedJourneyIdx(0);
-        setRoutes(d2.routes || []);
+        const directRoutesList = d2.routes || [];
+        setRoutes(directRoutesList);
+
+        // If journey planner returns no multi-leg journeys but direct routes exist,
+        // automatically switch view to 'direct' so map immediately renders direct routes and active buses!
+        if (journeysList.length === 0 && directRoutesList.length > 0) {
+          setViewMode('direct');
+        }
 
         const firstLeg = journeysList[0]?.legs?.[0];
         const routeIdToFetch = firstLeg?.routeId
@@ -1646,9 +1653,9 @@ export default function Home() {
                                 </div>
                                 <div style={{ fontSize: '11px', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '4px', paddingLeft: '4px' }}>
                                   <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981' }}></span>
-                                  <span>Current Location: <strong style={{ color: '#f1f5f9' }}>{trip.currentNextStop || 'En-route'}</strong></span>
-                                  {typeof trip.currentSpeedKmph === 'number' && trip.currentSpeedKmph > 0 && (
-                                    <span style={{ color: '#10b981', marginLeft: '6px' }}>• {Math.round(trip.currentSpeedKmph)} km/h</span>
+                                  <span>Bus Status: <strong style={{ color: '#f1f5f9' }}>{trip.currentNextStop && trip.currentNextStop !== 'En-route' ? `Near ${trip.currentNextStop}` : (trip.stops && trip.stops.length > 0 ? `At ${trip.stops[0].name}` : 'En-route')}</strong></span>
+                                  {trip.etaToBoardingMinutes !== undefined && (
+                                    <span style={{ color: '#38bdf8', marginLeft: '6px' }}>• ~{trip.etaToBoardingMinutes}m to your stop</span>
                                   )}
                                 </div>
                               </div>
@@ -1770,7 +1777,7 @@ export default function Home() {
                 }}
               />
             </div>
-          ) : viewMode === 'direct' && displayRoutes.length > 0 ? (
+          ) : (displayRoutes.length > 0) ? (
             <div className="map-wrapper" style={{ width: '100%', height: '100%' }}>
               <LiveMap
                 latitude={mapBusLat}
