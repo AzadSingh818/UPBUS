@@ -15,7 +15,7 @@ import type { Village } from './components/LiveMap';
 // ─── Types ──────────────────────────────────────────────────────────────────
 interface ActiveTrip { trip_id: number; status: string; registration_no: string; bus_type: string; depot_name: string; routeCode?: string; }
 interface MissedTrip extends TripLiveDetails { passedMinutesAgo: number; currentNextStop: string; }
-interface NextTrip extends TripLiveDetails { etaToBoardingMinutes: number; }
+interface NextTrip extends TripLiveDetails { etaToBoardingMinutes: number; currentNextStop?: string; }
 interface Route { id: number; route_code: string; route_name: string; source: string; destination: string; distance_km: string; missedTrips: MissedTrip[]; nextTrips: NextTrip[]; stops: StopETA[]; }
 interface StopETA { stopId: number; name: string; sequenceNo: number; latitude: number; longitude: number; distanceRemainingKm: number; etaMinutes: number; status: 'passed' | 'arriving_now' | 'arriving_soon' | 'on_stop' | 'upcoming'; }
 interface TripLiveDetails { tripId: number; busRegNo: string; busType: string; routeCode: string; routeName: string; busLatitude: number; busLongitude: number; currentSpeedKmph: number; heading: number; lastSeen: string; status: string; stops: StopETA[]; error?: string; }
