@@ -71,6 +71,24 @@ interface RemovedRouteLog {
   removed_at: string;
 }
 
+interface MasterStopRecord {
+  stopCode: number;
+  name: string;
+  adminAreaCode?: string;
+  latitude: number | null;
+  longitude: number | null;
+  sourceQuality: 'valid' | 'missing' | 'out_of_bounds';
+  rawEasting: number;
+  rawNorthing: number;
+}
+
+interface MasterStopsStats {
+  totalProcessed: number;
+  validWithCoords: number;
+  missingCoords: number;
+  outOfBoundsCoords: number;
+}
+
 export default function AdminMonitor() {
   const [logs, setLogs] = useState<AdminLogItem[]>([]);
   const [buses, setBuses] = useState<ActiveBusState[]>([]);
@@ -95,9 +113,23 @@ export default function AdminMonitor() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 50;
 
-  const [viewMode, setViewMode] = useState<'console' | 'map' | 'coverage' | 'dedup'>('coverage');
+  const [viewMode, setViewMode] = useState<'console' | 'map' | 'coverage' | 'dedup' | 'stops'>('coverage');
   const [speedFilter, setSpeedFilter] = useState<'all' | 'moving' | 'halted'>('all');
   const [activeTerminal, setActiveTerminal] = useState<'engine' | 'admin' | 'webapp' | 'gateway'>('engine');
+
+  // Master Stops Audit State
+  const [masterStops, setMasterStops] = useState<MasterStopRecord[]>([]);
+  const [masterStopsStats, setMasterStopsStats] = useState<MasterStopsStats>({
+    totalProcessed: 14762,
+    validWithCoords: 3513,
+    missingCoords: 11246,
+    outOfBoundsCoords: 3
+  });
+  const [stopsPage, setStopsPage] = useState(1);
+  const [stopsTotalPages, setStopsTotalPages] = useState(1);
+  const [stopsQualityFilter, setStopsQualityFilter] = useState<'all' | 'valid' | 'missing' | 'out_of_bounds'>('all');
+  const [stopsSearchQuery, setStopsSearchQuery] = useState('');
+  const [isLoadingStops, setIsLoadingStops] = useState(false);
 
   const terminalEndRef = useRef<HTMLDivElement>(null);
 
@@ -254,6 +286,32 @@ export default function AdminMonitor() {
       setIsDeduplicating(false);
     }
   };
+
+  const fetchMasterStops = async (page = 1, quality = stopsQualityFilter, search = stopsSearchQuery) => {
+    setIsLoadingStops(true);
+    try {
+      const qParam = quality && quality !== 'all' ? `&quality=${quality}` : '';
+      const sParam = search ? `&search=${encodeURIComponent(search)}` : '';
+      const res = await fetch(`${API_BASE}/monitor/master-stops?page=${page}&limit=50${qParam}${sParam}`);
+      if (res.ok) {
+        const data = await res.json();
+        setMasterStops(data.stops || []);
+        if (data.stats) setMasterStopsStats(data.stats);
+        setStopsPage(data.page || 1);
+        setStopsTotalPages(data.totalPages || 1);
+      }
+    } catch (e) {
+      console.error('Error fetching master stops:', e);
+    } finally {
+      setIsLoadingStops(false);
+    }
+  };
+
+  useEffect(() => {
+    if (viewMode === 'stops') {
+      fetchMasterStops(stopsPage, stopsQualityFilter, stopsSearchQuery);
+    }
+  }, [viewMode, stopsPage, stopsQualityFilter]);
 
   // Setup polling intervals
   useEffect(() => {
@@ -1213,6 +1271,23 @@ export default function AdminMonitor() {
             >
               Deduplication ({removedRoutes.length})
             </button>
+            <button 
+              style={{
+                padding: '6px 14px',
+                fontSize: '12.5px',
+                borderRadius: '6px',
+                border: 'none',
+                cursor: 'pointer',
+                background: viewMode === 'stops' ? '#3b82f6' : 'transparent',
+                color: viewMode === 'stops' ? '#ffffff' : '#f3f4f6',
+                fontWeight: 600,
+                transition: 'all 0.2s',
+                outline: 'none'
+              }}
+              onClick={() => setViewMode('stops')}
+            >
+              Master Stops ({masterStopsStats.totalProcessed.toLocaleString()})
+            </button>
           </div>
           
           <span style={{ color: '#374151' }}>|</span>
@@ -1702,6 +1777,211 @@ export default function AdminMonitor() {
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+      ) : viewMode === 'stops' ? (
+        <div className="buses-panel" style={{ height: 'calc(100vh - 200px)', minHeight: '560px' }}>
+          <div className="panel-header" style={{ flexWrap: 'wrap', gap: '12px', paddingBottom: '12px' }}>
+            <div className="panel-title">
+              <MapPin size={18} style={{ color: '#3b82f6' }} />
+              <span>Margdarshi Master Stops Ingestion & Quality Audit</span>
+              <span className="bus-count-badge" style={{ background: '#3b82f6', color: '#ffffff' }}>
+                14,762 Total Stops
+              </span>
+            </div>
+
+            {/* Quality Filter Pills */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button
+                onClick={() => { setStopsQualityFilter('all'); setStopsPage(1); }}
+                style={{
+                  padding: '4px 10px',
+                  borderRadius: '6px',
+                  fontSize: '11.5px',
+                  fontWeight: 600,
+                  border: 'none',
+                  cursor: 'pointer',
+                  background: stopsQualityFilter === 'all' ? '#3b82f6' : 'rgba(255,255,255,0.06)',
+                  color: stopsQualityFilter === 'all' ? '#ffffff' : '#9ca3af'
+                }}
+              >
+                All (14,762)
+              </button>
+              <button
+                onClick={() => { setStopsQualityFilter('valid'); setStopsPage(1); }}
+                style={{
+                  padding: '4px 10px',
+                  borderRadius: '6px',
+                  fontSize: '11.5px',
+                  fontWeight: 600,
+                  border: 'none',
+                  cursor: 'pointer',
+                  background: stopsQualityFilter === 'valid' ? '#10b981' : 'rgba(16,185,129,0.1)',
+                  color: stopsQualityFilter === 'valid' ? '#ffffff' : '#34d399'
+                }}
+              >
+                ✓ Valid Coords (3,513)
+              </button>
+              <button
+                onClick={() => { setStopsQualityFilter('missing'); setStopsPage(1); }}
+                style={{
+                  padding: '4px 10px',
+                  borderRadius: '6px',
+                  fontSize: '11.5px',
+                  fontWeight: 600,
+                  border: 'none',
+                  cursor: 'pointer',
+                  background: stopsQualityFilter === 'missing' ? '#f59e0b' : 'rgba(245,158,11,0.1)',
+                  color: stopsQualityFilter === 'missing' ? '#ffffff' : '#fbbf24'
+                }}
+              >
+                ⚠️ Missing / 0,0 (11,246)
+              </button>
+              <button
+                onClick={() => { setStopsQualityFilter('out_of_bounds'); setStopsPage(1); }}
+                style={{
+                  padding: '4px 10px',
+                  borderRadius: '6px',
+                  fontSize: '11.5px',
+                  fontWeight: 600,
+                  border: 'none',
+                  cursor: 'pointer',
+                  background: stopsQualityFilter === 'out_of_bounds' ? '#ef4444' : 'rgba(239,68,68,0.1)',
+                  color: stopsQualityFilter === 'out_of_bounds' ? '#ffffff' : '#f87171'
+                }}
+              >
+                Out of Bounds (3)
+              </button>
+            </div>
+
+            {/* Stop Search Input */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <input
+                type="text"
+                placeholder="Search stop name or code..."
+                value={stopsSearchQuery}
+                onChange={(e) => {
+                  setStopsSearchQuery(e.target.value);
+                  fetchMasterStops(1, stopsQualityFilter, e.target.value);
+                }}
+                style={{
+                  background: '#1f2937',
+                  border: '1px solid #374151',
+                  borderRadius: '6px',
+                  padding: '6px 12px',
+                  fontSize: '12px',
+                  color: '#ffffff',
+                  outline: 'none',
+                  width: '210px'
+                }}
+              />
+            </div>
+          </div>
+
+          <div className="buses-table-wrapper">
+            <table className="buses-table">
+              <thead>
+                <tr>
+                  <th>Stop Code</th>
+                  <th>Stop Name</th>
+                  <th>Admin Area / SCN</th>
+                  <th>Latitude</th>
+                  <th>Longitude</th>
+                  <th>Quality Status</th>
+                  <th>Raw Coordinates</th>
+                </tr>
+              </thead>
+              <tbody>
+                {isLoadingStops ? (
+                  <tr>
+                    <td colSpan={7} style={{ textAlign: 'center', padding: '40px', color: '#9ca3af' }}>
+                      Loading master stops...
+                    </td>
+                  </tr>
+                ) : masterStops.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>
+                      No stops found matching your search filter.
+                    </td>
+                  </tr>
+                ) : (
+                  masterStops.map((stop) => (
+                    <tr key={stop.stopCode}>
+                      <td>
+                        <span className="bus-badge-reg" style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#60a5fa', borderColor: 'rgba(59, 130, 246, 0.3)' }}>
+                          #{stop.stopCode}
+                        </span>
+                      </td>
+                      <td style={{ fontWeight: 600, color: '#f3f4f6' }}>{stop.name}</td>
+                      <td style={{ fontSize: '12px', color: '#9ca3af' }}>{stop.adminAreaCode || '—'}</td>
+                      <td style={{ fontSize: '12px', fontFamily: 'monospace' }}>
+                        {stop.latitude !== null ? stop.latitude.toFixed(6) : <span style={{ color: '#f59e0b' }}>Missing</span>}
+                      </td>
+                      <td style={{ fontSize: '12px', fontFamily: 'monospace' }}>
+                        {stop.longitude !== null ? stop.longitude.toFixed(6) : <span style={{ color: '#f59e0b' }}>Missing</span>}
+                      </td>
+                      <td>
+                        {stop.sourceQuality === 'valid' ? (
+                          <span style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', padding: '3px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>
+                            ✓ Valid High Precision
+                          </span>
+                        ) : stop.sourceQuality === 'missing' ? (
+                          <span style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24', padding: '3px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>
+                            ⚠️ Missing (No Fake Overwrite)
+                          </span>
+                        ) : (
+                          <span style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', padding: '3px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>
+                            Out of Bounds
+                          </span>
+                        )}
+                      </td>
+                      <td style={{ fontSize: '11px', color: '#6b7280', fontFamily: 'monospace' }}>
+                        E: {stop.rawEasting}, N: {stop.rawNorthing}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination Footer */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: 'rgba(17, 24, 39, 0.8)', borderTop: '1px solid #1f2937' }}>
+            <span style={{ fontSize: '12px', color: '#9ca3af' }}>
+              Page {stopsPage} of {stopsTotalPages} (Showing 50 stops/page)
+            </span>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                disabled={stopsPage <= 1}
+                onClick={() => setStopsPage(prev => Math.max(1, prev - 1))}
+                style={{
+                  background: '#1f2937',
+                  border: '1px solid #374151',
+                  color: stopsPage <= 1 ? '#4b5563' : '#ffffff',
+                  padding: '4px 12px',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  cursor: stopsPage <= 1 ? 'not-allowed' : 'pointer'
+                }}
+              >
+                Previous
+              </button>
+              <button
+                disabled={stopsPage >= stopsTotalPages}
+                onClick={() => setStopsPage(prev => Math.min(stopsTotalPages, prev + 1))}
+                style={{
+                  background: '#1f2937',
+                  border: '1px solid #374151',
+                  color: stopsPage >= stopsTotalPages ? '#4b5563' : '#ffffff',
+                  padding: '4px 12px',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  cursor: stopsPage >= stopsTotalPages ? 'not-allowed' : 'pointer'
+                }}
+              >
+                Next
+              </button>
+            </div>
           </div>
         </div>
       ) : (

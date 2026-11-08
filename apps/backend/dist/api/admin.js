@@ -178,3 +178,43 @@ exports.router.post('/monitor/deduplicate', async (req, res) => {
         res.json({ success: false, error: err.message, history: db_1.mockDb.removed_routes_history || [] });
     }
 });
+// 10. Master Stops Ingestion & Quality Audit (14,762 Margdarshi Stops)
+let cachedMasterStopsResult = null;
+exports.router.get('/monitor/master-stops', (req, res) => {
+    try {
+        if (!cachedMasterStopsResult) {
+            const { processMasterStops } = require('../engine/masterStopsIngestion');
+            const path = require('path');
+            const rawPath = path.resolve(__dirname, '../db/margdarshi_raw_stops.json');
+            cachedMasterStopsResult = processMasterStops(rawPath);
+        }
+        const { page = 1, limit = 50, quality, search } = req.query;
+        const pageNum = Math.max(1, parseInt(page, 10) || 1);
+        const limitNum = Math.max(1, Math.min(200, parseInt(limit, 10) || 50));
+        let filtered = cachedMasterStopsResult.stops;
+        if (quality && quality !== 'all') {
+            filtered = filtered.filter((s) => s.sourceQuality === quality);
+        }
+        if (search && typeof search === 'string' && search.trim()) {
+            const q = search.trim().toLowerCase();
+            filtered = filtered.filter((s) => (s.name && s.name.toLowerCase().includes(q)) ||
+                String(s.stopCode).includes(q) ||
+                (s.adminAreaCode && s.adminAreaCode.toLowerCase().includes(q)));
+        }
+        const total = filtered.length;
+        const totalPages = Math.ceil(total / limitNum);
+        const offset = (pageNum - 1) * limitNum;
+        const pagedStops = filtered.slice(offset, offset + limitNum);
+        res.json({
+            stats: cachedMasterStopsResult.stats,
+            total,
+            page: pageNum,
+            limit: limitNum,
+            totalPages,
+            stops: pagedStops
+        });
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
