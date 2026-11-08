@@ -212,41 +212,70 @@ export default function LiveMap({
       const validStops = stops.filter(s => s.latitude !== undefined && s.longitude !== undefined);
       const passedLatLngs: any[] = [];
       const upcomingLatLngs: any[] = [];
+      const hasValidBusCoords = latitude && longitude && !isNaN(latitude) && !isNaN(longitude) && (Number(latitude) !== 0 || Number(longitude) !== 0);
       const busLatLng = [Number(latitude), Number(longitude)];
 
       if (validStops.length > 0) {
+        // Find the nearest stop index to the current bus position
+        let nearestStopIndex = -1;
+        let minBusDist = Infinity;
+        if (hasValidBusCoords) {
+          validStops.forEach((s, idx) => {
+            const d = Math.hypot(Number(s.latitude) - Number(latitude), Number(s.longitude) - Number(longitude));
+            if (d < minBusDist) {
+              minBusDist = d;
+              nearestStopIndex = idx;
+            }
+          });
+        }
+
+        // Only insert busLatLng into route polyline if bus is within realistic proximity (< 3km / ~0.03 deg)
+        // This prevents the diagonal straight "sky-glitch" line across fields to remote stops!
+        const isBusNearCorridor = minBusDist < 0.035;
+
         validStops.forEach((s, i) => {
           const ll = [Number(s.latitude), Number(s.longitude)];
           if (i <= lastPassedIndex) passedLatLngs.push(ll);
           if (i >= lastPassedIndex) upcomingLatLngs.push(ll);
         });
 
-        if (lastPassedIndex >= 0 && lastPassedIndex < validStops.length - 1) {
-          passedLatLngs.push(busLatLng);
-          upcomingLatLngs.unshift(busLatLng);
-        } else if (lastPassedIndex === -1) {
-          upcomingLatLngs.unshift(busLatLng);
-        } else if (lastPassedIndex === validStops.length - 1) {
-          passedLatLngs.push(busLatLng);
+        if (hasValidBusCoords && isBusNearCorridor) {
+          if (lastPassedIndex >= 0 && lastPassedIndex < validStops.length - 1) {
+            passedLatLngs.push(busLatLng);
+            upcomingLatLngs.unshift(busLatLng);
+          } else if (lastPassedIndex === -1) {
+            upcomingLatLngs.unshift(busLatLng);
+          } else if (lastPassedIndex === validStops.length - 1) {
+            passedLatLngs.push(busLatLng);
+          }
         }
 
         if (passedPolylineRef.current) passedPolylineRef.current.remove();
         if (upcomingPolylineRef.current) upcomingPolylineRef.current.remove();
 
-        passedPolylineRef.current = L.polyline(passedLatLngs, { color: '#6b7280', weight: 5, opacity: 0.8 }).addTo(map);
+        passedPolylineRef.current = L.polyline(passedLatLngs, { 
+          color: '#64748b', 
+          weight: 5, 
+          opacity: 0.75, 
+          lineJoin: 'round',
+          lineCap: 'round'
+        }).addTo(map);
+
         if (isNavigationMode) {
           upcomingPolylineRef.current = L.polyline(upcomingLatLngs, {
-            color: '#007aff',
-            weight: 7,
-            opacity: 0.9,
-            lineJoin: 'round'
+            color: '#2563eb',
+            weight: 6,
+            opacity: 0.95,
+            lineJoin: 'round',
+            lineCap: 'round'
           }).addTo(map);
         } else {
           upcomingPolylineRef.current = L.polyline(upcomingLatLngs, {
             color: '#3b82f6',
             weight: 5,
-            opacity: 0.8,
-            dashArray: '8, 8'
+            opacity: 0.9,
+            lineJoin: 'round',
+            lineCap: 'round'
           }).addTo(map);
         }
       }
@@ -361,18 +390,51 @@ export default function LiveMap({
         selectedIcon = L.divIcon({
           className: 'bus-marker-icon',
           html: `
-            <div class="bus-marker-wrapper">
-              <div class="bus-pulse-ring"></div>
-              <div class="bus-direction-arrow" style="transform: rotate(${heading}deg);"></div>
-              <div class="bus-icon-circle">
-                <svg viewBox="0 0 24 24" fill="currentColor">
+            <div class="bus-marker-wrapper" style="position: relative; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;">
+              <div class="bus-pulse-ring" style="
+                position: absolute;
+                width: 44px;
+                height: 44px;
+                border-radius: 50%;
+                background: rgba(16, 185, 129, 0.25);
+                animation: busPulse 2s infinite ease-out;
+              "></div>
+              <div class="bus-direction-container" style="
+                width: 34px;
+                height: 34px;
+                background: #0f172a;
+                border: 2.5px solid #10b981;
+                border-radius: 50%;
+                box-shadow: 0 4px 14px rgba(0,0,0,0.5), 0 0 10px rgba(16, 185, 129, 0.4);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: #ffffff;
+                position: relative;
+                transform: rotate(${heading || 0}deg);
+                transition: transform 0.4s ease-out;
+              ">
+                <!-- Direction Pointer Arrow -->
+                <div style="
+                  position: absolute;
+                  top: -6px;
+                  left: 50%;
+                  transform: translateX(-50%);
+                  width: 0;
+                  height: 0;
+                  border-left: 5px solid transparent;
+                  border-right: 5px solid transparent;
+                  border-bottom: 7px solid #10b981;
+                "></div>
+
+                <svg viewBox="0 0 24 24" fill="currentColor" style="width: 18px; height: 18px; transform: rotate(-${heading || 0}deg);">
                   <path d="M18 11.03V7.05c0-2.22-3.23-2.92-6-2.92s-6 .7-6 2.92v3.98c-1.2.35-2 1.34-2 2.53v5.47c0 .83.67 1.5 1.5 1.5h.5v1c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5v-1h7v1c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5v-1h.5c.83 0 1.5-.67 1.5-1.5v-5.47c0-1.19-.8-2.18-2-2.53zM7.5 16c-.83 0-1.5-.67-1.5-1.5S6.67 13 7.5 13s1.5.67 1.5 1.5S8.33 16 7.5 16zm9 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm1.5-6H6V7h12v3z"/>
                 </svg>
               </div>
             </div>
           `,
-          iconSize: [40, 40],
-          iconAnchor: [20, 20]
+          iconSize: [44, 44],
+          iconAnchor: [22, 22]
         });
       }
 

@@ -1092,105 +1092,134 @@ export default function Home() {
       <div className="page-body">
         {/* ── Search Panel (Left Sidebar) ── */}
         <aside className="search-panel">
-          <form onSubmit={viewMode === 'bus' ? handleSearchBus : handleSearch} className="search-form">
-            <div className="search-title">Find Your Bus</div>
+          {!showTrackingPanel ? (
+            <form onSubmit={viewMode === 'bus' ? handleSearchBus : handleSearch} className="search-form">
+              <div className="search-title">Find Your Bus</div>
 
-            {/* Mode toggle */}
-            <div className="mode-toggle">
-              <button type="button" className={`mode-btn ${viewMode === 'bus' ? 'active' : ''}`} onClick={() => { setViewMode('bus'); setJourneys([]); setRoutes([]); stopTracking(); }}>
-                <Bus size={13} /> Bus No.
+              {/* Mode toggle */}
+              <div className="mode-toggle">
+                <button type="button" className={`mode-btn ${viewMode === 'bus' ? 'active' : ''}`} onClick={() => { setViewMode('bus'); setJourneys([]); setRoutes([]); stopTracking(); }}>
+                  <Bus size={13} /> Bus No.
+                </button>
+                <button type="button" className={`mode-btn ${viewMode === 'journey' ? 'active' : ''}`} onClick={() => setViewMode('journey')}>
+                  <Train size={13} /> Journey Plan
+                </button>
+                <button type="button" className={`mode-btn ${viewMode === 'direct' ? 'active' : ''}`} onClick={() => setViewMode('direct')}>
+                  <Navigation size={13} /> Direct Routes
+                </button>
+              </div>
+
+              {viewMode === 'bus' ? (
+                <div className="input-group">
+                  <div className="input-wrapper" style={{ flex: 1 }}>
+                    <Bus size={16} className="input-icon from-icon" />
+                    <input
+                      type="text"
+                      placeholder="Enter Bus No. (e.g., UP11AT0072)"
+                      value={busNumber}
+                      onChange={(e) => setBusNumber(e.target.value.toUpperCase())}
+                      className="search-input"
+                      autoComplete="off"
+                      required
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="input-group">
+                  <div className="input-wrapper" style={{ position: 'relative' }}>
+                    <MapPin size={16} className="input-icon from-icon" />
+                    <input
+                      id="from-input"
+                      type="text"
+                      value={from}
+                      onChange={e => handleFromChange(e.target.value)}
+                      onBlur={() => setTimeout(() => setShowFromSuggestions(false), 250)}
+                      onFocus={() => { if (from.trim()) setShowFromSuggestions(true); }}
+                      placeholder="From (e.g. Saharanpur)"
+                      className="search-input"
+                      autoComplete="off"
+                    />
+                    {showFromSuggestions && fromSuggestions.length > 0 && (
+                      <div className="autocomplete-dropdown">
+                        {fromSuggestions.map(s => (
+                          <div
+                            key={s.id}
+                            className="autocomplete-item"
+                            onClick={() => selectFromSuggestion(s.name)}
+                          >
+                            <MapPin size={12} className="dropdown-item-icon" />
+                            <span>{s.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <button type="button" className="swap-btn" onClick={swapCities} title="Swap">
+                    <ArrowLeftRight size={16} />
+                  </button>
+                  <div className="input-wrapper" style={{ position: 'relative' }}>
+                    <MapPin size={16} className="input-icon to-icon" />
+                    <input
+                      id="to-input"
+                      type="text"
+                      value={to}
+                      onChange={e => handleToChange(e.target.value)}
+                      onBlur={() => setTimeout(() => setShowToSuggestions(false), 250)}
+                      onFocus={() => { if (to.trim()) setShowToSuggestions(true); }}
+                      placeholder="To (e.g. Mirzapur)"
+                      className="search-input"
+                      autoComplete="off"
+                    />
+                    {showToSuggestions && toSuggestions.length > 0 && (
+                      <div className="autocomplete-dropdown">
+                        {toSuggestions.map(s => (
+                          <div
+                            key={s.id}
+                            className="autocomplete-item"
+                            onClick={() => selectToSuggestion(s.name)}
+                          >
+                            <MapPin size={12} className="dropdown-item-icon" />
+                            <span>{s.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <button type="submit" disabled={loading} className="search-btn">
+                {loading ? <><RotateCw size={16} className="spin" /> Searching...</> : <><Search size={16} /> {viewMode === 'bus' ? 'Track Bus' : 'Search Routes'}</>}
               </button>
-              <button type="button" className={`mode-btn ${viewMode === 'journey' ? 'active' : ''}`} onClick={() => setViewMode('journey')}>
-                <Train size={13} /> Journey Plan
-              </button>
-              <button type="button" className={`mode-btn ${viewMode === 'direct' ? 'active' : ''}`} onClick={() => setViewMode('direct')}>
-                <Navigation size={13} /> Direct Routes
+            </form>
+          ) : (
+            <div style={{ marginBottom: '12px' }}>
+              <button 
+                type="button"
+                onClick={stopTracking} 
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  background: 'rgba(255, 255, 255, 0.06)',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  color: '#9ca3af',
+                  padding: '9px 14px',
+                  borderRadius: '10px',
+                  fontSize: '12.5px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  width: '100%',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={e => e.currentTarget.style.color = '#f3f4f6'}
+                onMouseLeave={e => e.currentTarget.style.color = '#9ca3af'}
+              >
+                ← Back to Search
               </button>
             </div>
-
-            {viewMode === 'bus' ? (
-              <div className="input-group">
-                <div className="input-wrapper" style={{ flex: 1 }}>
-                  <Bus size={16} className="input-icon from-icon" />
-                  <input
-                    type="text"
-                    placeholder="Enter Bus No. (e.g., UP11AT0072)"
-                    value={busNumber}
-                    onChange={(e) => setBusNumber(e.target.value.toUpperCase())}
-                    className="search-input"
-                    autoComplete="off"
-                    required
-                  />
-                </div>
-              </div>
-            ) : (
-              <div className="input-group">
-                <div className="input-wrapper" style={{ position: 'relative' }}>
-                  <MapPin size={16} className="input-icon from-icon" />
-                  <input
-                    id="from-input"
-                    type="text"
-                    value={from}
-                    onChange={e => handleFromChange(e.target.value)}
-                    onBlur={() => setTimeout(() => setShowFromSuggestions(false), 250)}
-                    onFocus={() => { if (from.trim()) setShowFromSuggestions(true); }}
-                    placeholder="From (e.g. Saharanpur)"
-                    className="search-input"
-                    autoComplete="off"
-                  />
-                  {showFromSuggestions && fromSuggestions.length > 0 && (
-                    <div className="autocomplete-dropdown">
-                      {fromSuggestions.map(s => (
-                        <div
-                          key={s.id}
-                          className="autocomplete-item"
-                          onClick={() => selectFromSuggestion(s.name)}
-                        >
-                          <MapPin size={12} className="dropdown-item-icon" />
-                          <span>{s.name}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <button type="button" className="swap-btn" onClick={swapCities} title="Swap">
-                  <ArrowLeftRight size={16} />
-                </button>
-                <div className="input-wrapper" style={{ position: 'relative' }}>
-                  <MapPin size={16} className="input-icon to-icon" />
-                  <input
-                    id="to-input"
-                    type="text"
-                    value={to}
-                    onChange={e => handleToChange(e.target.value)}
-                    onBlur={() => setTimeout(() => setShowToSuggestions(false), 250)}
-                    onFocus={() => { if (to.trim()) setShowToSuggestions(true); }}
-                    placeholder="To (e.g. Mirzapur)"
-                    className="search-input"
-                    autoComplete="off"
-                  />
-                  {showToSuggestions && toSuggestions.length > 0 && (
-                    <div className="autocomplete-dropdown">
-                      {toSuggestions.map(s => (
-                        <div
-                          key={s.id}
-                          className="autocomplete-item"
-                          onClick={() => selectToSuggestion(s.name)}
-                        >
-                          <MapPin size={12} className="dropdown-item-icon" />
-                          <span>{s.name}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            <button type="submit" disabled={loading} className="search-btn">
-              {loading ? <><RotateCw size={16} className="spin" /> Searching...</> : <><Search size={16} /> {viewMode === 'bus' ? 'Track Bus' : 'Search Routes'}</>}
-            </button>
-          </form>
+          )}
 
           {/* ── Active Bus Live Tracking Details (Sidebar) ── */}
           {showTrackingPanel && liveDetails && !liveDetails.error && (

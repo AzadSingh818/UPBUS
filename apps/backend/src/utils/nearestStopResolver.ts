@@ -72,3 +72,4 @@ export function resolveNearestStopName(lat: number, lng: number, fallbackDistric
 
   return 'Near: UP Highway En-route';
 }
+
