@@ -531,7 +531,8 @@ export default function Home() {
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const [isPassenger, setIsPassenger] = useState(false);
-  const [demoPassenger, setDemoPassenger] = useState(true);
+  const [demoPassenger, setDemoPassenger] = useState(false);
+  const [showAdvancedPassengerSettings, setShowAdvancedPassengerSettings] = useState(false);
   const [trackingSource, setTrackingSource] = useState<'gps' | 'network' | 'cell'>('gps');
   
   const reportIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -1310,52 +1311,65 @@ export default function Home() {
                 </div>
 
                 {isPassenger && (
-                  <div className="passenger-settings-panel">
-                    <div className="settings-section">
-                      <div className="settings-label">Tracking Mode:</div>
-                      <div className="tracking-options">
-                        <button
-                          type="button"
-                          className={`track-option-btn ${trackingSource === 'gps' ? 'active' : ''}`}
-                          onClick={() => setTrackingSource('gps')}
-                        >
-                          ⚡ GPS
-                        </button>
-                        <button
-                          type="button"
-                          className={`track-option-btn ${trackingSource === 'network' ? 'active' : ''}`}
-                          onClick={() => setTrackingSource('network')}
-                        >
-                          📶 Network
-                        </button>
-                        <button
-                          type="button"
-                          className={`track-option-btn ${trackingSource === 'cell' ? 'active' : ''}`}
-                          onClick={() => setTrackingSource('cell')}
-                        >
-                          🗼 Cell Tower
-                        </button>
+                  <div className="passenger-settings-panel" style={{ marginTop: '12px', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.25)', borderRadius: '10px', padding: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div className="location-sharing-indicator" style={{ margin: 0 }}>
+                        <span className="sharing-dot pulse-green"></span>
+                        <span style={{ fontSize: '12px', fontWeight: 600, color: '#10b981' }}>
+                          {demoPassenger ? 'Simulating onboard GPS movement' : 'Broadcasting Live Location'}
+                        </span>
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowAdvancedPassengerSettings(!showAdvancedPassengerSettings)}
+                        style={{ background: 'transparent', border: 'none', color: '#94a3b8', fontSize: '11px', cursor: 'pointer', textDecoration: 'underline' }}
+                      >
+                        {showAdvancedPassengerSettings ? 'Hide Options' : 'Options'}
+                      </button>
                     </div>
 
-                    <div className="demo-checkbox-row">
-                      <input
-                        type="checkbox"
-                        id="demo-mode-checkbox"
-                        checked={demoPassenger}
-                        onChange={e => setDemoPassenger(e.target.checked)}
-                      />
-                      <label htmlFor="demo-mode-checkbox" className="demo-label">
-                        Demo Passenger Mode (Simulate movement)
-                      </label>
-                    </div>
+                    {showAdvancedPassengerSettings && (
+                      <div style={{ marginTop: '10px', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '10px' }}>
+                        <div className="settings-section">
+                          <div className="settings-label" style={{ fontSize: '11px', color: '#94a3b8' }}>Tracking Mode:</div>
+                          <div className="tracking-options" style={{ marginTop: '4px' }}>
+                            <button
+                              type="button"
+                              className={`track-option-btn ${trackingSource === 'gps' ? 'active' : ''}`}
+                              onClick={() => setTrackingSource('gps')}
+                            >
+                              ⚡ GPS
+                            </button>
+                            <button
+                              type="button"
+                              className={`track-option-btn ${trackingSource === 'network' ? 'active' : ''}`}
+                              onClick={() => setTrackingSource('network')}
+                            >
+                              📶 Network
+                            </button>
+                            <button
+                              type="button"
+                              className={`track-option-btn ${trackingSource === 'cell' ? 'active' : ''}`}
+                              onClick={() => setTrackingSource('cell')}
+                            >
+                              🗼 Cell
+                            </button>
+                          </div>
+                        </div>
 
-                    <div className="location-sharing-indicator">
-                      <span className="sharing-dot pulse-green"></span>
-                      <span>
-                        {demoPassenger ? 'Simulating passenger updates...' : 'Broadcasting real browser Geolocation...'}
-                      </span>
-                    </div>
+                        <div className="demo-checkbox-row" style={{ marginTop: '8px' }}>
+                          <input
+                            type="checkbox"
+                            id="demo-mode-checkbox"
+                            checked={demoPassenger}
+                            onChange={e => setDemoPassenger(e.target.checked)}
+                          />
+                          <label htmlFor="demo-mode-checkbox" className="demo-label" style={{ fontSize: '11px' }}>
+                            Demo Passenger Mode (Simulate movement)
+                          </label>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1583,28 +1597,37 @@ export default function Home() {
                               <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px', marginTop: '12px' }}>Upcoming Buses</div>
                             )}
                             {route.nextTrips && route.nextTrips.map(trip => (
-                              <div key={trip.tripId} className="trip-row">
-                                <div className="trip-info">
-                                  <Bus size={13} />
-                                  <span className="trip-reg">{trip.busRegNo}</span>
-                                  <span className="trip-type">{trip.busType}</span>
-                                  {trip.etaToBoardingMinutes === 0 ? (
-                                    <span className="live-speed-tag" style={{ marginLeft: '4px' }}>Arriving</span>
-                                  ) : (
-                                    <span className="eta-tag" style={{ marginLeft: '4px', background: 'rgba(59, 130, 246, 0.15)', color: '#3b82f6', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>
-                                      In {trip.etaToBoardingMinutes} min
-                                    </span>
+                              <div key={trip.tripId} style={{ display: 'flex', flexDirection: 'column', gap: '4px', background: 'rgba(255,255,255,0.03)', padding: '8px 10px', borderRadius: '8px', marginBottom: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                <div className="trip-row" style={{ margin: 0, padding: 0, background: 'transparent' }}>
+                                  <div className="trip-info">
+                                    <Bus size={13} color="#38bdf8" />
+                                    <span className="trip-reg" style={{ fontWeight: 700 }}>{trip.busRegNo}</span>
+                                    <span className="trip-type">{trip.busType}</span>
+                                    {trip.etaToBoardingMinutes === 0 ? (
+                                      <span className="live-speed-tag" style={{ marginLeft: '4px' }}>Arriving</span>
+                                    ) : (
+                                      <span className="eta-tag" style={{ marginLeft: '4px', background: 'rgba(59, 130, 246, 0.2)', color: '#38bdf8', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>
+                                        In {trip.etaToBoardingMinutes} min
+                                      </span>
+                                    )}
+                                  </div>
+                                  <button
+                                    className="track-btn"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleTrackBus(trip.tripId, trip.busRegNo, trip.routeCode);
+                                    }}
+                                  >
+                                    <Navigation size={13} /> Track
+                                  </button>
+                                </div>
+                                <div style={{ fontSize: '11px', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '4px', paddingLeft: '4px' }}>
+                                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981' }}></span>
+                                  <span>Current Location: <strong style={{ color: '#f1f5f9' }}>{trip.currentNextStop || 'En-route'}</strong></span>
+                                  {typeof trip.currentSpeedKmph === 'number' && trip.currentSpeedKmph > 0 && (
+                                    <span style={{ color: '#10b981', marginLeft: '6px' }}>• {Math.round(trip.currentSpeedKmph)} km/h</span>
                                   )}
                                 </div>
-                                <button
-                                  className="track-btn"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleTrackBus(trip.tripId, trip.busRegNo, trip.routeCode);
-                                  }}
-                                >
-                                  <Navigation size={13} /> Track
-                                </button>
                               </div>
                             ))}
                           </>

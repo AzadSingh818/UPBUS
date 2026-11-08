@@ -90,11 +90,20 @@ export default function LiveMap({
         zoomControl: true,
       });
 
-      L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
-        attribution: '&copy; Google Maps',
-        subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
-        maxZoom: 20
+      // Primary crisp navigation tile layer (CartoDB Voyager: clean roads, places & high reliability)
+      const baseTiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; <a href="https://carto.com/">CARTO</a> &copy; OpenStreetMap',
+        subdomains: 'abcd',
+        maxZoom: 19
       }).addTo(mapInstanceRef.current);
+
+      baseTiles.on('tileerror', () => {
+        // Safe fallback to OSM standard if tile fetch ever fails
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '&copy; OpenStreetMap contributors',
+          maxZoom: 19
+        }).addTo(mapInstanceRef.current);
+      });
     }
 
     const map = mapInstanceRef.current;
@@ -200,8 +209,13 @@ export default function LiveMap({
         .filter(s => s.latitude !== undefined && s.longitude !== undefined)
         .map(s => [Number(s.latitude), Number(s.longitude)]);
 
+      // If active bus coordinates are also available, include them so the bus marker is clearly framed!
+      if (latitude && longitude && !isNaN(latitude) && !isNaN(longitude) && (Number(latitude) !== 0 || Number(longitude) !== 0)) {
+        allLatLngs.push([Number(latitude), Number(longitude)]);
+      }
+
       if (allLatLngs.length > 0) {
-        map.fitBounds(allLatLngs as any, { padding: [50, 50] });
+        map.fitBounds(allLatLngs as any, { padding: [60, 60], maxZoom: 14 });
       }
     } else if (stops && stops.length > 0) {
       let lastPassedIndex = -1;
@@ -396,9 +410,26 @@ export default function LiveMap({
                 width: 44px;
                 height: 44px;
                 border-radius: 50%;
-                background: rgba(16, 185, 129, 0.25);
-                animation: busPulse 2s infinite ease-out;
+                background: rgba(16, 185, 129, 0.35);
+                animation: busPulse 1.8s infinite ease-out;
               "></div>
+              <div class="bus-badge-label" style="
+                position: absolute;
+                top: -24px;
+                white-space: nowrap;
+                background: #0f172a;
+                color: #38bdf8;
+                font-size: 11px;
+                font-weight: 800;
+                padding: 2px 8px;
+                border-radius: 12px;
+                border: 1.5px solid #0284c7;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+                letter-spacing: 0.3px;
+                pointer-events: none;
+              ">
+                🚌 ${busRegNo}
+              </div>
               <div class="bus-direction-container" style="
                 width: 34px;
                 height: 34px;
