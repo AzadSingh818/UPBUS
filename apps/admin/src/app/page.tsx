@@ -83,6 +83,13 @@ export default function AdminMonitor() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [selectedBusForMap, setSelectedBusForMap] = useState<ActiveBusState | null>(null);
+  const [selectedDivisionModal, setSelectedDivisionModal] = useState<{
+    name: string;
+    key: string;
+    color: string;
+    onTime: string;
+    tab: 'running' | 'halted' | 'all';
+  } | null>(null);
   
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -455,12 +462,82 @@ export default function AdminMonitor() {
           transition: all 0.2s ease;
           position: relative;
           overflow: hidden;
+          cursor: pointer;
         }
 
         .division-card:hover {
-          transform: translateY(-2px);
-          border-color: rgba(245, 158, 11, 0.3);
-          box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+          transform: translateY(-3px);
+          border-color: rgba(245, 158, 11, 0.5);
+          box-shadow: 0 8px 24px rgba(245, 158, 11, 0.15);
+        }
+
+        /* Division Fleet Modal */
+        .div-modal-backdrop {
+          position: fixed;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.85);
+          backdrop-filter: blur(8px);
+          z-index: 1000;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 20px;
+        }
+
+        .div-modal-container {
+          background: #0b0f19;
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          border-radius: 14px;
+          width: 100%;
+          max-width: 960px;
+          height: 82vh;
+          display: flex;
+          flex-direction: column;
+          box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8);
+          overflow: hidden;
+          animation: modalFadeIn 0.2s ease-out;
+        }
+
+        @keyframes modalFadeIn {
+          from { opacity: 0; transform: scale(0.97); }
+          to { opacity: 1; transform: scale(1); }
+        }
+
+        .div-modal-header {
+          padding: 16px 24px;
+          background: #0f172a;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+
+        .div-modal-title {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+
+        .div-modal-tabs {
+          display: flex;
+          gap: 8px;
+          background: rgba(255, 255, 255, 0.04);
+          padding: 4px;
+          border-radius: 8px;
+          border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .div-tab-btn {
+          padding: 6px 14px;
+          border-radius: 6px;
+          border: none;
+          font-size: 12px;
+          font-weight: 700;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          display: flex;
+          align-items: center;
+          gap: 6px;
         }
 
         .division-top {
@@ -1737,15 +1814,26 @@ export default function AdminMonitor() {
 
             <div className="division-grid">
               {[
-                { name: 'Lucknow Central', activePct: 24, moving: Math.round(movingBusesCount * 0.24), total: Math.round(buses.length * 0.24), onTime: '98.4%', color: '#10b981' },
-                { name: 'Kanpur Industrial', activePct: 20, moving: Math.round(movingBusesCount * 0.20), total: Math.round(buses.length * 0.20), onTime: '97.2%', color: '#38bdf8' },
-                { name: 'Varanasi Purvanchal', activePct: 16, moving: Math.round(movingBusesCount * 0.16), total: Math.round(buses.length * 0.16), onTime: '99.1%', color: '#f59e0b' },
-                { name: 'Meerut Western', activePct: 14, moving: Math.round(movingBusesCount * 0.14), total: Math.round(buses.length * 0.14), onTime: '96.8%', color: '#8b5cf6' },
-                { name: 'Agra Braj', activePct: 11, moving: Math.round(movingBusesCount * 0.11), total: Math.round(buses.length * 0.11), onTime: '98.7%', color: '#ec4899' },
-                { name: 'Prayagraj Sangam', activePct: 9, moving: Math.round(movingBusesCount * 0.09), total: Math.round(buses.length * 0.09), onTime: '99.3%', color: '#14b8a6' },
-                { name: 'Ghaziabad NCR', activePct: 6, moving: Math.round(movingBusesCount * 0.06), total: Math.round(buses.length * 0.06), onTime: '95.5%', color: '#f97316' },
+                { name: 'Lucknow Central', key: 'lucknow', activePct: 24, moving: Math.round(movingBusesCount * 0.24), total: Math.round(buses.length * 0.24), onTime: '98.4%', color: '#10b981' },
+                { name: 'Kanpur Industrial', key: 'kanpur', activePct: 20, moving: Math.round(movingBusesCount * 0.20), total: Math.round(buses.length * 0.20), onTime: '97.2%', color: '#38bdf8' },
+                { name: 'Varanasi Purvanchal', key: 'varanasi', activePct: 16, moving: Math.round(movingBusesCount * 0.16), total: Math.round(buses.length * 0.16), onTime: '99.1%', color: '#f59e0b' },
+                { name: 'Meerut Western', key: 'meerut', activePct: 14, moving: Math.round(movingBusesCount * 0.14), total: Math.round(buses.length * 0.14), onTime: '96.8%', color: '#8b5cf6' },
+                { name: 'Agra Braj', key: 'agra', activePct: 11, moving: Math.round(movingBusesCount * 0.11), total: Math.round(buses.length * 0.11), onTime: '98.7%', color: '#ec4899' },
+                { name: 'Prayagraj Sangam', key: 'prayagraj', activePct: 9, moving: Math.round(movingBusesCount * 0.09), total: Math.round(buses.length * 0.09), onTime: '99.3%', color: '#14b8a6' },
+                { name: 'Ghaziabad NCR', key: 'ghaziabad', activePct: 6, moving: Math.round(movingBusesCount * 0.06), total: Math.round(buses.length * 0.06), onTime: '95.5%', color: '#f97316' },
               ].map((division) => (
-                <div key={division.name} className="division-card">
+                <div 
+                  key={division.name} 
+                  className="division-card"
+                  onClick={() => setSelectedDivisionModal({
+                    name: division.name,
+                    key: division.key,
+                    color: division.color,
+                    onTime: division.onTime,
+                    tab: 'running'
+                  })}
+                  title={`Click to view live running & stopped buses in ${division.name}`}
+                >
                   <div className="division-top">
                     <span className="division-name">{division.name}</span>
                     <span 
@@ -1781,6 +1869,10 @@ export default function AdminMonitor() {
                       }}
                     ></div>
                   </div>
+
+                  <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'flex-end', fontSize: '11px', color: '#f59e0b', fontWeight: 600, gap: '4px', alignItems: 'center' }}>
+                    <span>Inspect Fleet</span> →
+                  </div>
                 </div>
               ))}
             </div>
@@ -1789,6 +1881,225 @@ export default function AdminMonitor() {
         </div>
       )}
       
+      {/* Regional Division Fleet Inspector Modal */}
+      {selectedDivisionModal && (
+        <div className="div-modal-backdrop" onClick={() => setSelectedDivisionModal(null)}>
+          <div className="div-modal-container" onClick={(e) => e.stopPropagation()}>
+            {/* Modal Header */}
+            <div className="div-modal-header">
+              <div className="div-modal-title">
+                <div 
+                  style={{ 
+                    width: '36px', 
+                    height: '36px', 
+                    borderRadius: '8px', 
+                    background: `${selectedDivisionModal.color}20`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: selectedDivisionModal.color,
+                    border: `1px solid ${selectedDivisionModal.color}40`
+                  }}
+                >
+                  <Bus size={18} />
+                </div>
+                <div>
+                  <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#ffffff', margin: 0 }}>
+                    {selectedDivisionModal.name} Fleet Telemetry
+                  </h2>
+                  <div style={{ fontSize: '12px', color: '#9ca3af', display: 'flex', gap: '8px', alignItems: 'center', marginTop: '2px' }}>
+                    <span>Operational Division Sector</span>
+                    <span>•</span>
+                    <span style={{ color: selectedDivisionModal.color, fontWeight: 700 }}>
+                      {selectedDivisionModal.onTime} On-Time Compliance
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                {/* Running vs Halted Tabs */}
+                {(() => {
+                  const divBuses = buses.filter(b => {
+                    const text = `${b.zoneName || ''} ${b.routeName || ''} ${b.originalRouteStr || ''} ${b.currentStop || ''}`.toLowerCase();
+                    return text.includes(selectedDivisionModal.key);
+                  });
+                  const movingCount = divBuses.filter(b => (b.speed ?? 0) >= 5).length;
+                  const haltedCount = divBuses.filter(b => (b.speed ?? 0) < 5).length;
+
+                  return (
+                    <div className="div-modal-tabs">
+                      <button 
+                        className="div-tab-btn"
+                        style={{
+                          background: selectedDivisionModal.tab === 'running' ? '#10b981' : 'transparent',
+                          color: selectedDivisionModal.tab === 'running' ? '#0b0f19' : '#10b981'
+                        }}
+                        onClick={() => setSelectedDivisionModal(prev => prev ? { ...prev, tab: 'running' } : null)}
+                      >
+                        <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: selectedDivisionModal.tab === 'running' ? '#0b0f19' : '#10b981' }}></span>
+                        Running ({movingCount})
+                      </button>
+
+                      <button 
+                        className="div-tab-btn"
+                        style={{
+                          background: selectedDivisionModal.tab === 'halted' ? '#ef4444' : 'transparent',
+                          color: selectedDivisionModal.tab === 'halted' ? '#ffffff' : '#f87171'
+                        }}
+                        onClick={() => setSelectedDivisionModal(prev => prev ? { ...prev, tab: 'halted' } : null)}
+                      >
+                        <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: selectedDivisionModal.tab === 'halted' ? '#ffffff' : '#ef4444' }}></span>
+                        Stopped / Depot ({haltedCount})
+                      </button>
+
+                      <button 
+                        className="div-tab-btn"
+                        style={{
+                          background: selectedDivisionModal.tab === 'all' ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                          color: '#f3f4f6'
+                        }}
+                        onClick={() => setSelectedDivisionModal(prev => prev ? { ...prev, tab: 'all' } : null)}
+                      >
+                        All Fleet ({divBuses.length})
+                      </button>
+                    </div>
+                  );
+                })()}
+
+                <button 
+                  onClick={() => setSelectedDivisionModal(null)}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    color: '#9ca3af',
+                    borderRadius: '8px',
+                    width: '32px',
+                    height: '32px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer'
+                  }}
+                  title="Close Inspector"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body / Table */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '0 16px' }}>
+              {(() => {
+                const divisionBuses = buses.filter(b => {
+                  const text = `${b.zoneName || ''} ${b.routeName || ''} ${b.originalRouteStr || ''} ${b.currentStop || ''}`.toLowerCase();
+                  const matchesZone = text.includes(selectedDivisionModal.key);
+                  if (!matchesZone) return false;
+                  const isMoving = (b.speed ?? 0) >= 5;
+                  if (selectedDivisionModal.tab === 'running') return isMoving;
+                  if (selectedDivisionModal.tab === 'halted') return !isMoving;
+                  return true;
+                });
+
+                if (divisionBuses.length === 0) {
+                  return (
+                    <div style={{ textAlign: 'center', padding: '60px 20px', color: '#6b7280' }}>
+                      <Bus size={32} style={{ margin: '0 auto 12px auto', opacity: 0.4 }} />
+                      <div style={{ fontSize: '14px', fontWeight: 600 }}>No buses found matching this division filter right now.</div>
+                      <div style={{ fontSize: '12px', marginTop: '4px' }}>Buses are dynamically mapped based on active trajectory corridor.</div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <table className="buses-table" style={{ width: '100%', borderCollapse: 'collapse', marginTop: '12px' }}>
+                    <thead>
+                      <tr>
+                        <th>Registration No</th>
+                        <th>Corridor Route</th>
+                        <th>Near Stop</th>
+                        <th>GPS Telemetry</th>
+                        <th>Speed</th>
+                        <th>Live Map</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {divisionBuses.map((bus) => {
+                        const isMoving = (bus.speed ?? 0) >= 5;
+                        const isCongested = isMoving && (bus.speed ?? 0) < 25;
+                        return (
+                          <tr key={`${bus.busId ?? ''}-${bus.regNo}`}>
+                            <td>
+                              <span 
+                                className="bus-badge-reg"
+                                onClick={() => {
+                                  setSelectedDivisionModal(null);
+                                  setSelectedBusForMap(bus);
+                                }}
+                                style={{ cursor: 'pointer', transition: 'all 0.2s' }}
+                                title="Click to open full telemetry tracking"
+                              >
+                                {bus.regNo}
+                              </span>
+                            </td>
+                            <td>
+                              <div style={{ fontWeight: 600, color: '#f3f4f6' }}>
+                                {bus.routeName || 'Dynamic Corridor'}
+                              </div>
+                            </td>
+                            <td style={{ color: '#9ca3af', fontSize: '12px' }}>
+                              {bus.currentStop || 'En-route'}
+                            </td>
+                            <td style={{ fontFamily: 'monospace', fontSize: '12px' }}>
+                              <a 
+                                href={`https://www.google.com/maps/search/?api=1&query=${bus.latitude},${bus.longitude}`} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                style={{ color: '#38bdf8', textDecoration: 'underline' }}
+                              >
+                                {bus.latitude.toFixed(4)}, {bus.longitude.toFixed(4)}
+                              </a>
+                            </td>
+                            <td>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <Compass size={12} style={{ transform: `rotate(${bus.heading}deg)`, color: '#6b7280' }} />
+                                <span style={{ fontWeight: 700, color: isMoving ? '#4ade80' : '#f87171' }}>
+                                  {Math.round(bus.speed)} km/h
+                                </span>
+                              </div>
+                            </td>
+                            <td>
+                              <button
+                                onClick={() => {
+                                  setSelectedDivisionModal(null);
+                                  setSelectedBusForMap(bus);
+                                }}
+                                style={{
+                                  background: 'rgba(245, 158, 11, 0.15)',
+                                  color: '#f59e0b',
+                                  border: '1px solid rgba(245, 158, 11, 0.3)',
+                                  borderRadius: '6px',
+                                  padding: '4px 10px',
+                                  fontSize: '11px',
+                                  fontWeight: 700,
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                Track Bus
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
+
       {selectedBusForMap && (
         <SingleBusMap 
           bus={selectedBusForMap} 
