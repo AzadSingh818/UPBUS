@@ -64,10 +64,19 @@ router.post('/monitor/push', (req, res) => {
           latencyMs: log.latencyMs
         });
 
-        if (log.message && log.message.includes('Successfully seeded route')) {
+        if (log.message && (
+          log.message.includes('Successfully seeded route') || 
+          log.message.includes('Successfully learned new route') ||
+          log.message.includes('learned new route variant') ||
+          log.message.includes('Route variation created')
+        )) {
           adminMonitor.seededRoutesCount += 1;
         }
-        if (log.message && log.message.includes('Successfully geocoded and saved stop')) {
+        if (log.message && (
+          log.message.includes('Successfully geocoded and saved stop') ||
+          log.message.includes('New stop registered') ||
+          log.message.includes('geocoded stop')
+        )) {
           adminMonitor.seededStopsCount += 1;
         }
       }
@@ -181,9 +190,9 @@ router.get('/monitor/removed-routes', (req, res) => {
 // 9. Trigger deduplication scan endpoint
 router.post('/monitor/deduplicate', async (req, res) => {
   try {
-    const { runRouteDeduplicationCycle } = require('../../../engine/src/engine/routeDeduplicationEngine');
+    const { runRouteDeduplicationCycle } = require('../engine/routeDeduplicationEngine');
     const result = await runRouteDeduplicationCycle();
-    res.json({ success: true, result });
+    res.json({ success: true, result, history: result.history || mockDb.removed_routes_history || [] });
   } catch (err: any) {
     res.json({ success: false, error: err.message, history: mockDb.removed_routes_history || [] });
   }

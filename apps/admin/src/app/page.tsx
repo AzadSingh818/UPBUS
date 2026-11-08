@@ -178,6 +178,17 @@ export default function AdminMonitor() {
   useEffect(() => {
     setIsMounted(true);
   }, []);
+  const formatCompactNumber = (num?: number) => {
+    if (!num) return '0';
+    if (num >= 1_000_000) {
+      return `${(num / 1_000_000).toFixed(1)}M+`;
+    }
+    if (num >= 1_000) {
+      return `${(num / 1_000).toFixed(1)}k+`;
+    }
+    return num.toLocaleString();
+  };
+
   const API_BASE = '/api/v1/admin';
 
   // Fetch administrative data
@@ -185,10 +196,11 @@ export default function AdminMonitor() {
     if (isManual) setIsRefreshing(true);
     try {
       const ts = Date.now();
-      const [logsRes, busesRes, statsRes] = await Promise.all([
+      const [logsRes, busesRes, statsRes, removedRes] = await Promise.all([
         fetch(`${API_BASE}/monitor/logs?t=${ts}`, { cache: 'no-store' }).catch(() => null),
         fetch(`${API_BASE}/monitor/buses?t=${ts}`, { cache: 'no-store' }).catch(() => null),
-        fetch(`${API_BASE}/monitor/stats?t=${ts}`, { cache: 'no-store' }).catch(() => null)
+        fetch(`${API_BASE}/monitor/stats?t=${ts}`, { cache: 'no-store' }).catch(() => null),
+        fetch(`${API_BASE}/monitor/removed-routes?t=${ts}`, { cache: 'no-store' }).catch(() => null)
       ]);
 
       if (logsRes && logsRes.ok) {
@@ -206,12 +218,9 @@ export default function AdminMonitor() {
         setStats(statsData.stats || null);
       }
 
-      if (fetchRemoved || viewMode === 'dedup') {
-        const removedRes = await fetch(`${API_BASE}/monitor/removed-routes?t=${ts}`, { cache: 'no-store' }).catch(() => null);
-        if (removedRes && removedRes.ok) {
-          const removedData = await removedRes.json();
-          setRemovedRoutes(removedData.removedRoutes || []);
-        }
+      if (removedRes && removedRes.ok) {
+        const removedData = await removedRes.json();
+        setRemovedRoutes(removedData.removedRoutes || []);
       }
 
       setLastRefreshed(new Date());
@@ -1050,7 +1059,9 @@ export default function AdminMonitor() {
             <Database size={20} />
           </div>
           <div className="stat-info">
-            <span className="stat-value">{stats?.historicalLogsCount ?? 0}</span>
+            <span className="stat-value" title={(stats?.historicalLogsCount ?? 0).toLocaleString()}>
+              {formatCompactNumber(stats?.historicalLogsCount)}
+            </span>
             <span className="stat-label">Scraped AI Records</span>
           </div>
         </div>
