@@ -289,46 +289,51 @@ app.get('/api/v1/search/routes', async (req, res) => {
         });
       }
 
-      // Spatial Corridor Matching: Match buses physically operating on this route
-      const corridorStops = leg.stops.map(s => ({
+      // Spatial Corridor Matching with Directional Heading and Boarding Stop Relativity:
+      const corridorStops = leg.stops.map((s, idx) => ({
         latitude: Number(s.latitude),
         longitude: Number(s.longitude),
-        name: s.name
+        name: s.name,
+        sequenceNo: idx
       }));
 
-      const matchedBuses = allCandidateBuses.filter(bus => {
-        if (routeIdsForLeg.has(bus.route_id)) return true;
-        
-        // Physical road match (within 3.2 km corridor)
-        const match = matchBusToCorridor(bus.latitude, bus.longitude, corridorStops, 3.2);
-        if (match.isMatch) {
-          (bus as any).corridorMatch = match;
-          return true;
-        }
-        return false;
-      });
+      // Determine passenger boarding stop index (e.g. if passenger searched from 'Phandpuri')
+      let boardingIdx = 0;
+      const fromQuery = (from as string || '').toLowerCase().trim();
+      const foundIdx = corridorStops.findIndex(s => s.name?.toLowerCase().includes(fromQuery));
+      if (foundIdx !== -1) {
+        boardingIdx = foundIdx;
+      }
 
-      for (const bus of matchedBuses) {
-        const match = (bus as any).corridorMatch;
-        let etaMinutes = 10;
+      for (const bus of allCandidateBuses) {
+        // Physical road and directional heading match
+        const match = matchBusToCorridor(
+          bus.latitude,
+          bus.longitude,
+          bus.heading || 0,
+          bus.speed || 0,
+          corridorStops,
+          boardingIdx,
+          2.6
+        );
+
+        if (!match.isMatch) continue;
+
         let busCurrentLocStr = (bus as any).currentStop;
-
-        if (match) {
-          const nearestStop = leg.stops[match.nearestStopIndex];
-          if (nearestStop && !busCurrentLocStr) {
-            busCurrentLocStr = `Near ${nearestStop.name}`;
-          }
-          // Compute realistic ETA based on speed or 40 km/h average
-          const effectiveSpeed = bus.speed >= 10 ? bus.speed : 38;
-          etaMinutes = Math.max(2, Math.round((match.distanceToBoardingKm / effectiveSpeed) * 60));
+        const nearestStop = leg.stops[match.nearestStopIndex];
+        if (nearestStop && !busCurrentLocStr) {
+          busCurrentLocStr = `Near ${nearestStop.name}`;
         }
 
-        nextTrips.push({
+        const effectiveSpeed = bus.speed >= 10 ? bus.speed : 38;
+        const etaMinutes = Math.max(1, Math.round((match.distanceToBoardingKm / effectiveSpeed) * 60));
+
+        const tripData = {
           tripId: bus.trip_id,
           busRegNo: bus.registration_no,
           busType: 'UPSRTC Ordinary',
           routeCode: bus.route_code || leg.routeCode,
-          routeName: bus.route_name || leg.routeName,
+          routeName: `${corridorStops[0]?.name || 'Origin'} ➔ ${corridorStops[corridorStops.length - 1]?.name || 'Destination'}`,
           busLatitude: bus.latitude,
           busLongitude: bus.longitude,
           currentSpeedKmph: bus.speed,
@@ -343,7 +348,30 @@ app.get('/api/v1/search/routes', async (req, res) => {
             status: 'upcoming'
           })),
           etaToBoardingMinutes: etaMinutes
-        });
+        };
+
+        if (match.isApproachingBoardingStop) {
+          nextTrips.push(tripData);
+        } else {
+          // Bus has already passed passenger's stop
+          const passedMinutesAgo = Math.max(2, Math.round((match.distanceToBoardingKm / effectiveSpeed) * 60));
+          missedTrips.push({
+            ...tripData,
+            passedMinutesAgo
+          });
+        }
+      }
+
+      // Keep only top 3 most relevant upcoming buses closest to the passenger's boarding stop!
+      nextTrips.sort((a, b) => a.etaToBoardingMinutes - b.etaToBoardingMinutes);
+      if (nextTrips.length > 3) {
+        nextTrips.length = 3;
+      }
+
+      // Keep only top 2 recently passed buses
+      missedTrips.sort((a, b) => a.passedMinutesAgo - b.passedMinutesAgo);
+      if (missedTrips.length > 2) {
+        missedTrips.length = 2;
       }
 
       // If no live GPS bus is found pinging for this route right now, generate a fallback active bus
