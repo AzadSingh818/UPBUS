@@ -185,7 +185,11 @@ exports.router.get('/monitor/master-stops', (req, res) => {
         if (!cachedMasterStopsResult) {
             const { processMasterStops } = require('../engine/masterStopsIngestion');
             const path = require('path');
-            const rawPath = path.resolve(__dirname, '../db/margdarshi_raw_stops.json');
+            const fs = require('fs');
+            let rawPath = path.resolve(__dirname, '../db/margdarshi_raw_stops.json');
+            if (!fs.existsSync(rawPath)) {
+                rawPath = path.resolve(__dirname, '../../src/db/margdarshi_raw_stops.json');
+            }
             cachedMasterStopsResult = processMasterStops(rawPath);
         }
         const { page = 1, limit = 50, quality, search } = req.query;
