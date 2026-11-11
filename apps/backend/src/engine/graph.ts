@@ -182,8 +182,8 @@ export function findPathsDFS(fromQuery: string, toQuery: string, maxTransfers: n
   }
 
   // Expand startNodes and endNodes to include nearby terminal nodes (within 2 km)
-  // E.g., if user selects "Saharanpur Bus Station", also include "Saharanpur Depot" (0.3 km away) so direct routes starting at the Depot are matched without a fake 0.3 km transfer!
-  const expandNearbyNodes = (nodeIds: number[]): number[] => {
+  // Strictly filter by queryStr so that disparate cities with bad geocodes do not cross-pollinate.
+  const expandNearbyNodes = (nodeIds: number[], queryStr: string): number[] => {
     const expanded = new Set<number>(nodeIds);
     for (const id of nodeIds) {
       const stop = stopsMap.get(id);
@@ -194,7 +194,7 @@ export function findPathsDFS(fromQuery: string, toQuery: string, maxTransfers: n
           { lat: stop.latitude, lng: stop.longitude },
           { lat: otherStop.latitude, lng: otherStop.longitude }
         );
-        if (dist <= 2.0) { // Same terminal complex (within 2.0 km)
+        if (dist <= 2.0 && isStopMatch(otherStop.name, queryStr)) { // Same terminal complex & same query scope
           expanded.add(otherId);
         }
       }
@@ -202,14 +202,35 @@ export function findPathsDFS(fromQuery: string, toQuery: string, maxTransfers: n
     return Array.from(expanded);
   };
 
-  const startNodes = expandNearbyNodes(initialStartNodes);
-  const expandedEndNodes = new Set<number>(expandNearbyNodes(Array.from(initialEndNodes)));
+  const startNodes = expandNearbyNodes(initialStartNodes, fromQuery);
+  const endNodesArray = expandNearbyNodes(Array.from(initialEndNodes), toQuery);
+  
+  // Guarantee mutual exclusivity: Target nodes must not overlap with start nodes
+  const startSet = new Set<number>(startNodes);
+  const targetNodesArray = endNodesArray.filter(id => !startSet.has(id));
+  const expandedEndNodes = new Set<number>(targetNodesArray);
+
+  // Compute geographical center of destination targets for A* distance heuristic guidance
+  let targetCenterLat = 0;
+  let targetCenterLng = 0;
+  let targetCenterCount = 0;
+  for (const tId of expandedEndNodes) {
+    const s = stopsMap.get(tId);
+    if (s && s.latitude && s.longitude) {
+      targetCenterLat += s.latitude;
+      targetCenterLng += s.longitude;
+      targetCenterCount++;
+    }
+  }
+  const hasTargetCenter = targetCenterCount > 0;
+  const avgTargetLat = hasTargetCenter ? targetCenterLat / targetCenterCount : 0;
+  const avgTargetLng = hasTargetCenter ? targetCenterLng / targetCenterCount : 0;
 
   const results: JourneyPath[] = [];
   const state = { steps: 0 };
 
   for (const start of startNodes) {
-    dfs(start, expandedEndNodes, maxTransfers, [], new Set([start]), results, state);
+    dfs(start, expandedEndNodes, maxTransfers, [], new Set([start]), results, state, hasTargetCenter ? { lat: avgTargetLat, lng: avgTargetLng } : undefined);
   }
 
   // Filter out any fake micro-legs (under 1.5 km transfers within the same city hub)
@@ -283,9 +304,10 @@ function dfs(
   path: GraphEdge[],
   visited: Set<number>,
   results: JourneyPath[],
-  state: { steps: number }
+  state: { steps: number },
+  targetCenter?: { lat: number; lng: number }
 ) {
-  if (state.steps++ > 20000) return;
+  if (state.steps++ > 25000) return;
 
   if (targets.has(current)) {
     const journey = buildJourneyPath(path);
@@ -299,7 +321,7 @@ function dfs(
         { lat: targetStop.latitude, lng: targetStop.longitude }
       );
     }
-    const maxAllowedDistance = Math.max(geodesic * 1.4, geodesic + 30);
+    const maxAllowedDistance = Math.max(geodesic * 1.5, geodesic + 40);
     if (journey.totalDistanceKm <= maxAllowedDistance) {
       results.push(journey);
     }
@@ -314,7 +336,24 @@ function dfs(
 
   if (path.length > maxTransfers + 1) return;
 
-  const edges = graph.get(current) || [];
+  let edges = graph.get(current) || [];
+
+  // A* Heuristic: Sort edges prioritizing those that bring us closer to the destination target center
+  if (targetCenter && edges.length > 1) {
+    edges = [...edges].sort((a, b) => {
+      // Prioritize edges directly landing on targets first
+      const aIsTarget = targets.has(a.toStopId) ? 1 : 0;
+      const bIsTarget = targets.has(b.toStopId) ? 1 : 0;
+      if (aIsTarget !== bIsTarget) return bIsTarget - aIsTarget;
+
+      const sa = stopsMap.get(a.toStopId);
+      const sb = stopsMap.get(b.toStopId);
+      const da = sa ? haversineDistanceKm({ lat: sa.latitude, lng: sa.longitude }, targetCenter) : 9999;
+      const db = sb ? haversineDistanceKm({ lat: sb.latitude, lng: sb.longitude }, targetCenter) : 9999;
+      return da - db;
+    });
+  }
+
   for (const edge of edges) {
     // Optimization: The graph has direct edges between ALL pairs of stops on a route.
     // Taking two consecutive edges on the same route is redundant and causes combinatorial explosion.
@@ -325,7 +364,7 @@ function dfs(
     if (!visited.has(edge.toStopId)) {
       visited.add(edge.toStopId);
       path.push(edge);
-      dfs(edge.toStopId, targets, maxTransfers, path, visited, results, state);
+      dfs(edge.toStopId, targets, maxTransfers, path, visited, results, state, targetCenter);
       path.pop();
       visited.delete(edge.toStopId);
     }
