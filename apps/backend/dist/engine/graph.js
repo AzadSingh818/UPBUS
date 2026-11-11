@@ -242,7 +242,7 @@ function dfs(current, targets, maxTransfers, path, visited, results, state, targ
         if (startStop && targetStop) {
             geodesic = (0, geoUtils_1.haversineDistanceKm)({ lat: startStop.latitude, lng: startStop.longitude }, { lat: targetStop.latitude, lng: targetStop.longitude });
         }
-        const maxAllowedDistance = Math.max(geodesic * 1.5, geodesic + 40);
+        const maxAllowedDistance = Math.max(geodesic * 2.5, geodesic + 80);
         if (journey.totalDistanceKm <= maxAllowedDistance) {
             results.push(journey);
         }

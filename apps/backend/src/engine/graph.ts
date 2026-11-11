@@ -321,7 +321,7 @@ function dfs(
         { lat: targetStop.latitude, lng: targetStop.longitude }
       );
     }
-    const maxAllowedDistance = Math.max(geodesic * 1.5, geodesic + 40);
+    const maxAllowedDistance = Math.max(geodesic * 2.5, geodesic + 80);
     if (journey.totalDistanceKm <= maxAllowedDistance) {
       results.push(journey);
     }
