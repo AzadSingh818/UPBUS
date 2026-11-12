@@ -1321,6 +1321,102 @@ export default function AdminMonitor() {
         .custom-route-tooltip::before {
           display: none !important;
         }
+
+        /* Mobile & Responsive Rules for Admin Console */
+        @media (max-width: 768px) {
+          .admin-dashboard-container {
+            padding: 12px;
+          }
+          .admin-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 14px;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+          }
+          .admin-title {
+            width: 100%;
+            justify-content: space-between;
+          }
+          .admin-title h1 {
+            font-size: 17px;
+          }
+          .admin-actions {
+            width: 100%;
+            flex-direction: column;
+            align-items: stretch;
+            gap: 10px;
+          }
+          .admin-actions > div:first-child {
+            display: flex;
+            overflow-x: auto;
+            width: 100%;
+            white-space: nowrap;
+            padding: 4px;
+            scrollbar-width: none;
+            -webkit-overflow-scrolling: touch;
+          }
+          .admin-actions > div:first-child::-webkit-scrollbar {
+            display: none;
+          }
+          .admin-actions > span {
+            display: none;
+          }
+          .live-indicator {
+            justify-content: center;
+          }
+          .stats-grid {
+            grid-template-columns: repeat(2, 1fr) !important;
+            gap: 10px !important;
+            margin-bottom: 16px !important;
+          }
+          .stat-card {
+            padding: 12px !important;
+            gap: 10px !important;
+          }
+          .stat-icon-box {
+            width: 36px !important;
+            height: 36px !important;
+          }
+          .stat-value {
+            font-size: 16px !important;
+          }
+          .stat-label {
+            font-size: 10px !important;
+          }
+          .console-panel {
+            height: 420px;
+          }
+          .console-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 8px;
+          }
+          .log-tab-buttons {
+            width: 100%;
+            overflow-x: auto;
+            white-space: nowrap;
+            padding-bottom: 4px;
+          }
+          .buses-panel {
+            height: 450px;
+          }
+          .coverage-container {
+            flex-direction: column;
+            gap: 16px;
+            padding: 16px;
+          }
+          .coverage-circles-grid {
+            grid-template-columns: 1fr;
+          }
+          .division-grid {
+            grid-template-columns: 1fr 1fr;
+          }
+          .div-modal-container {
+            width: 95vw;
+            height: 90vh;
+          }
+        }
       `}</style>
 
       {/* Header section */}

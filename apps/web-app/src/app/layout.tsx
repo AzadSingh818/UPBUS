@@ -5,6 +5,7 @@ export const metadata: Metadata = {
   title: 'UP Roadways Live | Real-time UPSRTC Bus Tracking & ETA',
   description: 'Track Uttar Pradesh roadways (UPSRTC) buses in real-time. Search by route or bus number to see live map location, passed stops, delays, and estimated arrival times (ETA).',
   keywords: 'UPSRTC, UP Roadways, Live Bus Tracking, UP Bus status, Where is my bus UP, Lucknow bus tracking, Noida Meerut roadways',
+  viewport: 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no',
 };
 
 export default function RootLayout({

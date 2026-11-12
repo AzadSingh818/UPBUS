@@ -530,6 +530,7 @@ export default function Home() {
   const wsRef = useRef<WebSocket | null>(null);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
+  const [mobileTab, setMobileTab] = useState<'search' | 'map'>('search');
   const [isPassenger, setIsPassenger] = useState(false);
   const [demoPassenger, setDemoPassenger] = useState(false);
   const [showAdvancedPassengerSettings, setShowAdvancedPassengerSettings] = useState(false);
@@ -802,6 +803,8 @@ export default function Home() {
     // Clean up previous
     if (wsRef.current) { wsRef.current.close(); wsRef.current = null; }
     if (pollingIntervalRef.current) { clearInterval(pollingIntervalRef.current); pollingIntervalRef.current = null; }
+
+    setMobileTab('map');
 
     const fetchData = async () => {
       const regNoParam = regNo ? `?regNo=${regNo}` : '';
@@ -1115,8 +1118,29 @@ export default function Home() {
       </header>
 
       <div className="page-body">
+        {/* Mobile View Switcher Tab Bar */}
+        <div className="mobile-nav-bar">
+          <button 
+            type="button" 
+            className={`mobile-nav-btn ${mobileTab === 'search' ? 'active' : ''}`}
+            onClick={() => setMobileTab('search')}
+          >
+            <Search size={16} />
+            <span>Search & Trips</span>
+          </button>
+          <button 
+            type="button" 
+            className={`mobile-nav-btn ${mobileTab === 'map' ? 'active' : ''}`}
+            onClick={() => setMobileTab('map')}
+          >
+            <Navigation size={16} />
+            <span>Live Map</span>
+            {showTrackingPanel && <span className="mobile-live-dot" />}
+          </button>
+        </div>
+
         {/* ── Search Panel (Left Sidebar) ── */}
-        <aside className="search-panel">
+        <aside className={`search-panel ${mobileTab === 'search' ? 'mobile-panel-active' : 'mobile-panel-hidden'}`}>
           {!showTrackingPanel ? (
             <form onSubmit={viewMode === 'bus' ? handleSearchBus : handleSearch} className="search-form">
               <div className="search-title">Find Your Bus</div>
@@ -1702,7 +1726,7 @@ export default function Home() {
         </aside>
 
         {/* ── Right Panel: 100% Full-Bleed Leaflet Map ── */}
-        <section className="map-section">
+        <section className={`map-section ${mobileTab === 'map' ? 'mobile-panel-active' : 'mobile-panel-hidden'}`}>
           {showTrackingPanel && liveDetails && !liveDetails.error ? (
             <div className="map-wrapper" style={{ width: '100%', height: '100%', position: 'relative' }}>
               <LiveMap
