@@ -146,6 +146,23 @@ body {
   padding: 0;
   gap: 0;
   overflow: hidden;
+  position: relative;
+}
+
+.search-panel {
+  width: 440px;
+  min-width: 400px;
+  max-width: 480px;
+  height: 100%;
+  overflow-y: auto;
+  padding: 20px;
+  background: var(--bg-dark-secondary);
+  border-right: 1px solid var(--card-border);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  z-index: 10;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Mobile View Switcher Tab Bar (Visible on phone/tablet) */
@@ -245,6 +262,11 @@ body {
 
   .mobile-panel-active {
     display: flex !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 100% !important;
+    position: relative !important;
+    z-index: 20 !important;
   }
 
   .results-area {
