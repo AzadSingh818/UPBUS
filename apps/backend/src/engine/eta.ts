@@ -411,7 +411,11 @@ export async function getTripETAs(tripId: number, regNo?: string, routeCode?: st
     let visitLogs: any[] = [];
     if (busId) {
       const { RouteProgressRepository } = require('../modules/route-progress/repository/RouteProgressRepository');
-      progressCache = await RouteProgressRepository.getLastProgress(busId);
+      const cached = await RouteProgressRepository.getLastProgress(busId);
+      // Discard stale progress cache older than 10 minutes (600,000ms) or from a completely different trip
+      if (cached && cached.updated_at && (Date.now() - new Date(cached.updated_at).getTime()) < 600000) {
+        progressCache = cached;
+      }
       visitLogs = await RouteProgressRepository.getStopVisitLogs(busId);
     }
 

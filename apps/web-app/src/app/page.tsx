@@ -1354,6 +1354,46 @@ export default function Home() {
                 )}
               </div>
 
+              {/* Dynamic Turn / Diversion Notice when bus takes a turn away from scheduled corridor */}
+              {(() => {
+                if (!liveDetails.busLatitude || !liveDetails.busLongitude || !liveDetails.stops || liveDetails.stops.length === 0) return null;
+                // Check closest stop distance
+                let minStopDist = Infinity;
+                let closestStopName = '';
+                liveDetails.stops.forEach(s => {
+                  if (s.latitude && s.longitude) {
+                    const d = calculateDistance(liveDetails.busLatitude, liveDetails.busLongitude, s.latitude, s.longitude);
+                    if (d < minStopDist) {
+                      minStopDist = d;
+                      closestStopName = s.name;
+                    }
+                  }
+                });
+
+                if (minStopDist > 4.5) {
+                  return (
+                    <div style={{
+                      background: 'rgba(239, 68, 68, 0.12)',
+                      border: '1px solid rgba(239, 68, 68, 0.35)',
+                      borderRadius: '8px',
+                      padding: '8px 10px',
+                      fontSize: '11px',
+                      color: '#fca5a5',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      marginBottom: '10px'
+                    }}>
+                      <span style={{ fontSize: '14px' }}>↪️</span>
+                      <span>
+                        <strong>Route Diversion Detected:</strong> Bus ne scheduled route se detour/turn liya hai (~{Math.round(minStopDist)} km from scheduled corridor). Real-time GPS location map par live update ho rahi hai.
+                      </span>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+
               {((liveDetails as any).isEstimated || (liveDetails as any).trackingNotice) && (
                 <div style={{
                   background: 'rgba(59, 130, 246, 0.1)',

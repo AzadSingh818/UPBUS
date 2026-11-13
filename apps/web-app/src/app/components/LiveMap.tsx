@@ -235,9 +235,26 @@ export default function LiveMap({
           });
         }
 
-        // Only insert busLatLng into route polyline if bus is within realistic proximity (< 3km / ~0.03 deg)
-        // This prevents the diagonal straight "sky-glitch" line across fields to remote stops!
-        const isBusNearCorridor = minBusDist < 0.035;
+        // Only insert busLatLng into route polyline if bus is within realistic proximity to the immediate segment stops (< 5km)
+        // AND check if the bus has taken a route turn / diversion away from the corridor
+        let isBusDiverted = false;
+        let busDistToSegment = Infinity;
+
+        if (hasValidBusCoords) {
+          const prevStop = lastPassedIndex >= 0 ? validStops[lastPassedIndex] : null;
+          const nextStop = lastPassedIndex < validStops.length - 1 ? validStops[lastPassedIndex + 1] : null;
+
+          if (prevStop && nextStop) {
+            const dPrev = Math.hypot(Number(prevStop.latitude) - Number(latitude), Number(prevStop.longitude) - Number(longitude)) * 111;
+            const dNext = Math.hypot(Number(nextStop.latitude) - Number(latitude), Number(nextStop.longitude) - Number(longitude)) * 111;
+            busDistToSegment = Math.min(dPrev, dNext);
+            if (busDistToSegment > 6.0) {
+              isBusDiverted = true;
+            }
+          }
+        }
+
+        const isBusNearCorridor = hasValidBusCoords && !isBusDiverted && busDistToSegment < 6.0;
 
         validStops.forEach((s, i) => {
           const ll = [Number(s.latitude), Number(s.longitude)];
@@ -259,17 +276,19 @@ export default function LiveMap({
         if (passedPolylineRef.current) passedPolylineRef.current.remove();
         if (upcomingPolylineRef.current) upcomingPolylineRef.current.remove();
 
+        // 1. Passed route path is emerald green (#10b981) to match timeline
         passedPolylineRef.current = L.polyline(passedLatLngs, { 
-          color: '#64748b', 
-          weight: 5, 
-          opacity: 0.75, 
+          color: '#10b981', 
+          weight: 6, 
+          opacity: 0.85, 
           lineJoin: 'round',
           lineCap: 'round'
         }).addTo(map);
 
+        // 2. Upcoming route path is bright royal blue / indigo
         if (isNavigationMode) {
           upcomingPolylineRef.current = L.polyline(upcomingLatLngs, {
-            color: '#2563eb',
+            color: '#3b82f6',
             weight: 6,
             opacity: 0.95,
             lineJoin: 'round',
@@ -277,7 +296,7 @@ export default function LiveMap({
           }).addTo(map);
         } else {
           upcomingPolylineRef.current = L.polyline(upcomingLatLngs, {
-            color: '#3b82f6',
+            color: '#6366f1',
             weight: 5,
             opacity: 0.9,
             lineJoin: 'round',
@@ -396,39 +415,43 @@ export default function LiveMap({
         selectedIcon = L.divIcon({
           className: 'bus-marker-icon',
           html: `
-            <div class="bus-marker-wrapper" style="position: relative; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;">
+            <div class="bus-marker-wrapper" style="position: relative; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;">
               <div class="bus-pulse-ring" style="
                 position: absolute;
-                width: 44px;
-                height: 44px;
+                width: 48px;
+                height: 48px;
                 border-radius: 50%;
-                background: rgba(16, 185, 129, 0.35);
+                background: rgba(16, 185, 129, 0.4);
                 animation: busPulse 1.8s infinite ease-out;
               "></div>
               <div class="bus-badge-label" style="
                 position: absolute;
-                top: -24px;
+                top: -26px;
                 white-space: nowrap;
-                background: #0f172a;
+                background: #090d16;
                 color: #38bdf8;
                 font-size: 11px;
                 font-weight: 800;
-                padding: 2px 8px;
+                padding: 3px 8px;
                 border-radius: 12px;
                 border: 1.5px solid #0284c7;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.5);
-                letter-spacing: 0.3px;
+                box-shadow: 0 3px 10px rgba(0,0,0,0.6);
+                letter-spacing: 0.4px;
                 pointer-events: none;
+                display: flex;
+                align-items: center;
+                gap: 4px;
               ">
-                🚌 ${busRegNo}
+                <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #10b981; animation: pulse 1s infinite;"></span>
+                ${busRegNo}
               </div>
               <div class="bus-direction-container" style="
-                width: 34px;
-                height: 34px;
-                background: #0f172a;
+                width: 38px;
+                height: 38px;
+                background: #020617;
                 border: 2.5px solid #10b981;
                 border-radius: 50%;
-                box-shadow: 0 4px 14px rgba(0,0,0,0.5), 0 0 10px rgba(16, 185, 129, 0.4);
+                box-shadow: 0 4px 14px rgba(0,0,0,0.7), 0 0 12px rgba(16, 185, 129, 0.6);
                 display: flex;
                 align-items: center;
                 justify-content: center;
@@ -440,24 +463,24 @@ export default function LiveMap({
                 <!-- Direction Pointer Arrow -->
                 <div style="
                   position: absolute;
-                  top: -6px;
+                  top: -7px;
                   left: 50%;
                   transform: translateX(-50%);
                   width: 0;
                   height: 0;
-                  border-left: 5px solid transparent;
-                  border-right: 5px solid transparent;
-                  border-bottom: 7px solid #10b981;
+                  border-left: 6px solid transparent;
+                  border-right: 6px solid transparent;
+                  border-bottom: 8px solid #10b981;
                 "></div>
 
-                <svg viewBox="0 0 24 24" fill="currentColor" style="width: 18px; height: 18px; transform: rotate(-${heading || 0}deg);">
+                <svg viewBox="0 0 24 24" fill="#38bdf8" style="width: 22px; height: 22px; transform: rotate(-${heading || 0}deg);">
                   <path d="M18 11.03V7.05c0-2.22-3.23-2.92-6-2.92s-6 .7-6 2.92v3.98c-1.2.35-2 1.34-2 2.53v5.47c0 .83.67 1.5 1.5 1.5h.5v1c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5v-1h7v1c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5v-1h.5c.83 0 1.5-.67 1.5-1.5v-5.47c0-1.19-.8-2.18-2-2.53zM7.5 16c-.83 0-1.5-.67-1.5-1.5S6.67 13 7.5 13s1.5.67 1.5 1.5S8.33 16 7.5 16zm9 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm1.5-6H6V7h12v3z"/>
                 </svg>
               </div>
             </div>
           `,
-          iconSize: [44, 44],
-          iconAnchor: [22, 22]
+          iconSize: [48, 48],
+          iconAnchor: [24, 24]
         });
       }
 
