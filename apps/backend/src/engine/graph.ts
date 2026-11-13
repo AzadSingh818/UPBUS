@@ -93,10 +93,12 @@ export async function buildGraph() {
 
   // Build edges with automatic deduplication of consecutive identical or near-identical stops across UP
   function normStopName(name: string): string {
-    return (name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    return (name || '').toLowerCase()
+      .replace(/\b(depot|bus stand|bus station|isbt|terminal|stand|station|chauraha|chowk|junction|rural|village|mandir)\b/gi, '')
+      .replace(/[^a-z0-9]/g, '');
   }
 
-  // Pre-calculate canonical stop mappings for co-located stops with near-identical names
+  // Pre-calculate canonical stop mappings for co-located stops with near-identical names or depot/bus stand synonyms
   const canonicalStopIdMap = new Map<number, number>();
   for (let i = 0; i < stops.length; i++) {
     const s1 = stops[i];
@@ -109,7 +111,7 @@ export async function buildGraph() {
       const distKm = Math.sqrt(dLat * dLat + dLng * dLng) * 111;
       const n1 = normStopName(s1.name);
       const n2 = normStopName(s2.name);
-      if (distKm < 0.5 && (n1 === n2 || n1.includes(n2) || n2.includes(n1))) {
+      if (distKm < 1.0 && n1.length > 2 && n2.length > 2 && (n1 === n2 || n1.includes(n2) || n2.includes(n1))) {
         canonicalStopIdMap.set(s2.id, s1.id);
       }
     }
@@ -486,6 +488,12 @@ function createLeg(edges: GraphEdge[]): PathLeg {
   edges.forEach(e => distanceKm += e.distanceKm);
 
   // Extract all intermediate stops from routeStopsMap (ensuring no consecutive duplicates)
+  function normStopClean(name: string): string {
+    return (name || '').toLowerCase()
+      .replace(/\b(depot|bus stand|bus station|isbt|terminal|stand|station|chauraha|chowk|junction|rural|village|mandir)\b/gi, '')
+      .replace(/[^a-z0-9]/g, '');
+  }
+
   const rStops = routeStopsMap.get(routeId) || [];
   const rawLegStops = rStops
     .filter(rs => rs.sequence_no >= fromSequenceNo && rs.sequence_no <= toSequenceNo)
@@ -507,12 +515,12 @@ function createLeg(edges: GraphEdge[]): PathLeg {
       continue;
     }
     const prev = legStops[legStops.length - 1];
-    const n1 = (prev.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-    const n2 = (s.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const n1 = normStopClean(prev.name);
+    const n2 = normStopClean(s.name);
     const dLat = Math.abs(s.latitude - prev.latitude);
     const dLng = Math.abs(s.longitude - prev.longitude);
     const distKm = Math.sqrt(dLat * dLat + dLng * dLng) * 111;
-    const isNearbyDup = distKm < 0.6 && (n1 === n2 || n1.includes(n2) || n2.includes(n1));
+    const isNearbyDup = distKm < 1.0 && n1.length > 2 && n2.length > 2 && (n1 === n2 || n1.includes(n2) || n2.includes(n1));
     if (s.stopId !== prev.stopId && !isNearbyDup) {
       legStops.push(s);
     }

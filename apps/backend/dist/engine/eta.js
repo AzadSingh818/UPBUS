@@ -554,6 +554,45 @@ async function getTripETAs(tripId, regNo, routeCode) {
                 status
             });
         }
+        // Clean any twin/duplicate stops (e.g. Saharanpur Depot vs Saharanpur Bus Station or repeated consecutive names)
+        function cleanStopSynonym(name) {
+            return (name || '').toLowerCase()
+                .replace(/\b(depot|bus stand|bus station|isbt|terminal|stand|station|chauraha|chowk|junction|rural|village|mandir)\b/gi, '')
+                .replace(/[^a-z0-9]/g, '');
+        }
+        const deduplicatedEtas = [];
+        for (const e of etas) {
+            if (deduplicatedEtas.length === 0) {
+                deduplicatedEtas.push(e);
+                continue;
+            }
+            const prev = deduplicatedEtas[deduplicatedEtas.length - 1];
+            const n1 = cleanStopSynonym(prev.name);
+            const n2 = cleanStopSynonym(e.name);
+            const dLat = Math.abs(e.latitude - prev.latitude);
+            const dLng = Math.abs(e.longitude - prev.longitude);
+            const distKm = Math.sqrt(dLat * dLat + dLng * dLng) * 111;
+            const isNearbySynonym = distKm < 1.0 && n1.length > 2 && n2.length > 2 && (n1 === n2 || n1.includes(n2) || n2.includes(n1));
+            // Check direct adjacent duplicate or nearby synonym
+            if (e.stopId === prev.stopId || isNearbySynonym) {
+                if (prev.status === 'passed' && e.status !== 'passed') {
+                    deduplicatedEtas[deduplicatedEtas.length - 1] = e;
+                }
+                continue;
+            }
+            // Check bounce / stutter loop in the last 3 stops (e.g. A -> B -> A)
+            const recentSlice = deduplicatedEtas.slice(-3);
+            const recentMatch = recentSlice.some(item => {
+                const itName = cleanStopSynonym(item.name);
+                const itDist = Math.sqrt(Math.pow((e.latitude - item.latitude), 2) + Math.pow((e.longitude - item.longitude), 2)) * 111;
+                return (item.stopId === e.stopId) || (itDist < 1.0 && itName.length > 2 && n2.length > 2 && (itName === n2 || itName.includes(n2) || n2.includes(itName)));
+            });
+            if (recentMatch) {
+                // We already have this stop right before the intermediate bounce stop. Skip this bounce repeat.
+                continue;
+            }
+            deduplicatedEtas.push(e);
+        }
         // 6. Compute village waypoints using prefix-sum + binary search
         let waypoints = [];
         try {
@@ -581,7 +620,7 @@ async function getTripETAs(tripId, regNo, routeCode) {
             status: trip.trip_status,
             isEstimated: !isLiveGpsOrCrowd,
             trackingNotice: !isLiveGpsOrCrowd ? 'Scheduled timetable estimation. Turn on "Are you inside this bus?" to broadcast exact live location.' : undefined,
-            stops: etas,
+            stops: deduplicatedEtas,
             waypoints
         };
         if (etaResponseCache.size > 200) {

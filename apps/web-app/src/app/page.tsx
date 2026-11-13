@@ -245,7 +245,13 @@ function JourneyTimeline({ journey, onTrackBus }: { journey: Journey; onTrackBus
         {journey.legs.map((leg, legIdx) => {
           const isExpanded = expandedLegs.has(legIdx);
 
-          // Deduplicate consecutive identical/near-identical stops across UP routes
+          // Deduplicate consecutive identical/near-identical stops and terminal synonyms across UP routes
+          function cleanStopSynonym(name: string): string {
+            return (name || '').toLowerCase()
+              .replace(/\b(depot|bus stand|bus station|isbt|terminal|stand|station|chauraha|chowk|junction|rural|village|mandir)\b/gi, '')
+              .replace(/[^a-z0-9]/g, '');
+          }
+
           const uniqueStops: JourneyStop[] = [];
           (leg.stops || []).forEach(s => {
             if (uniqueStops.length === 0) {
@@ -253,10 +259,17 @@ function JourneyTimeline({ journey, onTrackBus }: { journey: Journey; onTrackBus
               return;
             }
             const prev = uniqueStops[uniqueStops.length - 1];
-            const n1 = (prev.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-            const n2 = (s.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-            const isDup = n1 === n2 || (n1.length > 3 && n2.length > 3 && (n1.includes(n2) || n2.includes(n1)));
-            if (!isDup) {
+            const n1 = cleanStopSynonym(prev.name);
+            const n2 = cleanStopSynonym(s.name);
+            const isDup = (s.stopId && s.stopId === prev.stopId) || n1 === n2 || (n1.length > 2 && n2.length > 2 && (n1.includes(n2) || n2.includes(n1)));
+            if (isDup) return;
+
+            // Also check bounce loops (A -> B -> A)
+            const recentMatch = uniqueStops.slice(-3).some(it => {
+              const itName = cleanStopSynonym(it.name);
+              return (s.stopId && it.stopId === s.stopId) || (itName.length > 2 && n2.length > 2 && (itName === n2 || itName.includes(n2) || n2.includes(itName)));
+            });
+            if (!recentMatch) {
               uniqueStops.push(s);
             }
           });
@@ -1113,7 +1126,13 @@ export default function Home() {
     }
     const rawFiltered = liveDetails.stops.slice(sIdx, eIdx + 1);
 
-    // Deduplicate consecutive identical/near-identical stops across UP routes
+    // Deduplicate consecutive identical/near-identical stops and terminal synonyms across UP routes
+    function cleanStopSynonym(name: string): string {
+      return (name || '').toLowerCase()
+        .replace(/\b(depot|bus stand|bus station|isbt|terminal|stand|station|chauraha|chowk|junction|rural|village|mandir)\b/gi, '')
+        .replace(/[^a-z0-9]/g, '');
+    }
+
     const deduplicated: StopETA[] = [];
     rawFiltered.forEach(s => {
       if (deduplicated.length === 0) {
@@ -1121,10 +1140,23 @@ export default function Home() {
         return;
       }
       const prev = deduplicated[deduplicated.length - 1];
-      const n1 = (prev.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-      const n2 = (s.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-      const isDup = n1 === n2 || (n1.length > 3 && n2.length > 3 && (n1.includes(n2) || n2.includes(n1)));
-      if (!isDup) {
+      const n1 = cleanStopSynonym(prev.name);
+      const n2 = cleanStopSynonym(s.name);
+      const isDup = (s.stopId && s.stopId === prev.stopId) || n1 === n2 || (n1.length > 2 && n2.length > 2 && (n1.includes(n2) || n2.includes(n1)));
+      if (isDup) {
+        if (prev.status === 'passed' && s.status !== 'passed') {
+          deduplicated[deduplicated.length - 1] = s;
+        }
+        return;
+      }
+
+      // Check bounce loops in recent 3 stops
+      const recentMatch = deduplicated.slice(-3).some(item => {
+        const itName = cleanStopSynonym(item.name);
+        return (item.stopId && s.stopId && item.stopId === s.stopId) || (itName.length > 2 && n2.length > 2 && (itName === n2 || itName.includes(n2) || n2.includes(itName)));
+      });
+
+      if (!recentMatch) {
         deduplicated.push(s);
       }
     });
