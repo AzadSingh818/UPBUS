@@ -21,27 +21,25 @@
 
 // ── Tuneable constants ────────────────────────────────────────────────────────
 
-/** Radius (km) within which we start calling it "Arriving Now". */
-export let ARRIVING_RADIUS_KM = 0.5;
+/** Radius (km) within which we start calling it "Arriving Now" (~1.2 km). */
+export let ARRIVING_RADIUS_KM = 1.2;
 
-/** Radius (km) within which entry into "On Stop" can be triggered. */
-export let ON_STOP_RADIUS_KM = 0.05;
-
-/**
- * Hysteresis exit radius (km). Bus must move *beyond* this radius to leave
- * the "On Stop" state. Must be >= ON_STOP_RADIUS_KM.
- */
-export let ON_STOP_EXIT_RADIUS_KM = 0.10;
-
-/** Speed (km/h) below which the bus counts as "stationary" for dwell check. */
-export let SPEED_THRESHOLD_KMPH = 5;
+/** Radius (km) within which entry into "On Stop" is triggered (100 meters = 0.10 km). */
+export let ON_STOP_RADIUS_KM = 0.10;
 
 /**
- * Number of consecutive pings the bus must meet (inside-geofence AND slow)
- * before flipping from "Arriving Now" → "On Stop".
- * Default ingestion interval = 10 s → 2 pings ≈ 20 s minimum dwell.
+ * Hysteresis exit radius (km). Bus must move beyond 120 meters (0.12 km) to exit "On Stop".
  */
-export let DWELL_PINGS = 2;
+export let ON_STOP_EXIT_RADIUS_KM = 0.12;
+
+/** Speed (km/h) below which the bus counts as "stationary / stopped at platform". */
+export let SPEED_THRESHOLD_KMPH = 12;
+
+/**
+ * Number of consecutive pings the bus must meet (inside 100m geofence)
+ * before flipping to "On Stop".
+ */
+export let DWELL_PINGS = 1;
 
 /** Allow runtime override of any constant (useful for future tuning UI). */
 export function configureFSM(overrides: Partial<{

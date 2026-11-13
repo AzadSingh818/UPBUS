@@ -513,7 +513,7 @@ export async function getTripETAs(tripId: number, regNo?: string, routeCode?: st
       if (progressCache) {
         // Use calculations based on Route Progress Engine cache
         const stopDistMeters = parseFloat(stop.distance_from_start_km) * 1000;
-        // A stop is passed if its index is <= completed_stop_index OR if the bus has already covered its distance
+        // Stop is passed if bus has moved > 100 meters past the stop
         const isStopPassed = i <= progressCache.completed_stop_index || (stopDistMeters > 0 && progressCache.covered_distance >= stopDistMeters + 100);
 
         if (isStopPassed) {
@@ -521,17 +521,23 @@ export async function getTripETAs(tripId: number, regNo?: string, routeCode?: st
           distanceRemainingKm = 0;
           etaMinutes = 0;
         } else {
+          // Direct real-time distance from bus coordinates to stop coordinates (in km)
+          const physicalDistKm = calculateDistance(busLat, busLng, stopLat, stopLng);
           distanceRemainingKm = Math.max(0, stopDistMeters - progressCache.covered_distance) / 1000;
           
-          const isAtStop = progressCache.state === 'AT_STOP' && 
+          // 100m (0.10 km) radius rule: Bus is directly at stop if within 100m
+          const isPhysicallyAtStop = physicalDistKm <= 0.10;
+          const isAtStopCache = progressCache.state === 'AT_STOP' && 
             (progressCache.current_stop === stop.name || progressCache.current_segment_from === stop.name);
 
-          if (isAtStop) {
+          if (isPhysicallyAtStop || isAtStopCache) {
             status = 'on_stop';
             etaMinutes = 0;
-          } else if (distanceRemainingKm <= 0.5) {
+            distanceRemainingKm = parseFloat(physicalDistKm.toFixed(2));
+          } else if (distanceRemainingKm <= 1.2 || physicalDistKm <= 1.2) {
+            // Bus has left previous stop and is approaching upcoming stop (within 1.2 km)
             status = 'arriving_now';
-            etaMinutes = Math.round((distanceRemainingKm / speedFloorKmph) * 60);
+            etaMinutes = Math.max(1, Math.round((distanceRemainingKm / speedFloorKmph) * 60));
           } else {
             status = 'upcoming';
             // Calculate travel time + halt delay
@@ -542,28 +548,32 @@ export async function getTripETAs(tripId: number, regNo?: string, routeCode?: st
           }
         }
       } else {
-        // Fallback to original FSM and distance calculations
+        // Fallback to direct distance calculations & FSM
+        const physicalDistKm = calculateDistance(busLat, busLng, stopLat, stopLng);
+
         if (seq < closestSeq) {
           distanceRemainingKm = 0;
           etaMinutes = 0;
           status = 'passed';
         } else if (seq === closestSeq) {
-          distanceRemainingKm = calculateDistance(busLat, busLng, stopLat, stopLng);
+          distanceRemainingKm = physicalDistKm;
 
           const fsmState = getStopFSMState(regNoKey, stop.stop_id);
           const isFirstStop = closestSeq === routeStops[0]?.sequence_no;
           const isPreTrip = trip.trip_status === 'scheduled';
 
-          if (fsmState === 'on_stop') {
+          // 100m (0.10 km) radius rule
+          if (physicalDistKm <= 0.10 || fsmState === 'on_stop') {
             if (isFirstStop && isPreTrip) {
               status = 'scheduled_to_depart';
             } else {
               status = 'on_stop';
             }
             etaMinutes = 0;
-          } else if (fsmState === 'arriving_now') {
+          } else if (physicalDistKm <= 1.2 || fsmState === 'arriving_now') {
+            // Outside 100m: Now approaching / Arriving Now
             status = 'arriving_now';
-            etaMinutes = 0;
+            etaMinutes = Math.max(1, Math.round((distanceRemainingKm / speedFloorKmph) * 60));
           } else {
             etaMinutes = Math.round((distanceRemainingKm / speedFloorKmph) * 60);
             status = 'upcoming';

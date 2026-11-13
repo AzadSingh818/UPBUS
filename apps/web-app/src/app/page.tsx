@@ -1162,10 +1162,27 @@ export default function Home() {
     });
 
     // Invariant: At most one stop can show arriving_now or on_stop.
-    // Multiple consecutive arriving_now stops must be cleanly separated into passed, current active stop, and upcoming with AI ETA.
+    // Stop 100m geofence rule:
+    // If the bus is physically within 100m (0.10 km) of a stop, it is 'on_stop'.
+    // Once it leaves the 100m radius of that stop, that stop becomes 'passed',
+    // and the next stop becomes active ('arriving_now' if <= 1.2km, or upcoming with AI ETA).
+    const busLat = liveDetails.busLatitude;
+    const busLng = liveDetails.busLongitude;
+
     let activeStopFound = false;
     for (let k = 0; k < deduplicated.length; k++) {
       const item = deduplicated[k];
+      const distToStopKm = (busLat && busLng && item.latitude && item.longitude)
+        ? calculateDistance(busLat, busLng, item.latitude, item.longitude)
+        : item.distanceRemainingKm;
+
+      // 100 meters = 0.10 km
+      if (distToStopKm <= 0.10) {
+        item.status = 'on_stop';
+        item.distanceRemainingKm = parseFloat(distToStopKm.toFixed(2));
+        item.etaMinutes = 0;
+      }
+
       if (item.status === 'on_stop' || item.status === 'arriving_now' || item.status === 'arriving_soon') {
         if (!activeStopFound) {
           activeStopFound = true;
