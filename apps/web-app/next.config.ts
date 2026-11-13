@@ -14,6 +14,14 @@ const nextConfig: NextConfig = {
       
     return [
       {
+        source: '/api/send-report',
+        destination: '/api/send-report',
+      },
+      {
+        source: '/api/push-sub',
+        destination: '/api/push-sub',
+      },
+      {
         source: '/api/:path*',
         destination: `${backendBase}/api/:path*`,
       },
