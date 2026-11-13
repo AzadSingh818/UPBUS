@@ -508,13 +508,13 @@ export default function LiveMap({
     if (isNavigationMode) {
       map.setView([latitude, longitude], 15);
     } else if (latitude && longitude && !isNaN(latitude) && !isNaN(longitude) && busRegNo) {
-      map.panTo([latitude, longitude], { animate: true, duration: 1.2 });
+      map.setView([latitude, longitude], Math.max(map.getZoom(), 13), { animate: true });
     }
 
     return () => {
       clearTimeout(resizeTimer);
     };
-  }, [latitude, longitude, stops, busRegNo, heading, multipleRoutes, onSelectRoute]);
+  }, [latitude, longitude, stops, busRegNo, heading, multipleRoutes, onSelectRoute, currentSpeedKmph]);
 
   // ── Village markers + dotted connector lines ───────────────────────────────
   useEffect(() => {

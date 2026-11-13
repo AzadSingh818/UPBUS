@@ -131,9 +131,13 @@ async function getTripETAs(tripId, regNo, routeCode) {
                     bus = regNo ? liveData.find((b) => (b.RegNo || b.regNum || '').toUpperCase().replace(/\s+/g, '') === regNo.toUpperCase().replace(/\s+/g, '')) : null;
                 }
                 if (bus) {
+                    const rawSpeed = parseFloat(bus.speed) || 0;
+                    const isBusLiveMoving = rawSpeed > 0 && bus.vehicle_status !== 'no_signal';
+                    const busStatus = isBusLiveMoving ? 'running' : 'halted';
                     if ((tripRes.rowCount || 0) > 0) {
                         trip = tripRes.rows[0];
                         trip.registration_no = bus.RegNo || bus.regNum || trip.registration_no;
+                        trip.trip_status = busStatus;
                         fallbackRouteId = null;
                         let matchedRoute = null;
                         if (routeCode) {
@@ -262,7 +266,7 @@ async function getTripETAs(tripId, regNo, routeCode) {
                         fallbackRouteId = matchedRoute.id;
                         trip = {
                             trip_id: tripId,
-                            trip_status: 'running',
+                            trip_status: busStatus,
                             route_code: matchedRoute.route_code,
                             route_name: matchedRoute.route_name,
                             registration_no: bus.RegNo || bus.regNum,
@@ -272,9 +276,9 @@ async function getTripETAs(tripId, regNo, routeCode) {
                     live = {
                         latitude: bus.lat || bus.latitude,
                         longitude: bus.long || bus.longitude,
-                        speed: bus.speed,
-                        heading: bus.heading,
-                        last_seen_at: bus.LogrecTime || new Date(),
+                        speed: rawSpeed,
+                        heading: parseFloat(bus.heading) || 0,
+                        last_seen_at: bus.LogrecTime || bus.timestamp || new Date(),
                         isLiveGps: true
                     };
                 }

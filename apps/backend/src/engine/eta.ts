@@ -141,9 +141,14 @@ export async function getTripETAs(tripId: number, regNo?: string, routeCode?: st
         }
         
         if (bus) {
+          const rawSpeed = parseFloat(bus.speed) || 0;
+          const isBusLiveMoving = rawSpeed > 0 && bus.vehicle_status !== 'no_signal';
+          const busStatus = isBusLiveMoving ? 'running' : 'halted';
+
           if ((tripRes.rowCount || 0) > 0) {
             trip = tripRes.rows[0];
             trip.registration_no = bus.RegNo || bus.regNum || trip.registration_no;
+            trip.trip_status = busStatus;
             fallbackRouteId = null;
 
             let matchedRoute: any = null;
@@ -275,7 +280,7 @@ export async function getTripETAs(tripId: number, regNo?: string, routeCode?: st
             fallbackRouteId = matchedRoute.id;
             trip = {
               trip_id: tripId,
-              trip_status: 'running',
+              trip_status: busStatus,
               route_code: matchedRoute.route_code,
               route_name: matchedRoute.route_name,
               registration_no: bus.RegNo || bus.regNum,
@@ -286,9 +291,9 @@ export async function getTripETAs(tripId: number, regNo?: string, routeCode?: st
           live = {
             latitude: bus.lat || bus.latitude,
             longitude: bus.long || bus.longitude,
-            speed: bus.speed,
-            heading: bus.heading,
-            last_seen_at: bus.LogrecTime || new Date(),
+            speed: rawSpeed,
+            heading: parseFloat(bus.heading) || 0,
+            last_seen_at: bus.LogrecTime || bus.timestamp || new Date(),
             isLiveGps: true
           };
         } else {
