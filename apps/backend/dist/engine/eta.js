@@ -274,7 +274,8 @@ async function getTripETAs(tripId, regNo, routeCode) {
                         longitude: bus.long || bus.longitude,
                         speed: bus.speed,
                         heading: bus.heading,
-                        last_seen_at: bus.LogrecTime || new Date()
+                        last_seen_at: bus.LogrecTime || new Date(),
+                        isLiveGps: true
                     };
                 }
                 else {
@@ -560,6 +561,7 @@ async function getTripETAs(tripId, regNo, routeCode) {
             // Gracefully degrade — waypoints are bonus info, not critical
             console.warn('[ETA] Could not compute waypoints:', e);
         }
+        const isLiveGpsOrCrowd = !!activeCrowd || (live && live.isLiveGps);
         const result = {
             tripId,
             routeId: trip.route_id || fallbackRouteId,
@@ -573,6 +575,8 @@ async function getTripETAs(tripId, regNo, routeCode) {
             heading,
             lastSeen: live.last_seen_at,
             status: trip.trip_status,
+            isEstimated: !isLiveGpsOrCrowd,
+            trackingNotice: !isLiveGpsOrCrowd ? 'Scheduled timetable estimation. Turn on "Are you inside this bus?" to broadcast exact live location.' : undefined,
             stops: etas,
             waypoints
         };

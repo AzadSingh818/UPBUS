@@ -1304,6 +1304,24 @@ export default function Home() {
                 )}
               </div>
 
+              {((liveDetails as any).isEstimated || (liveDetails as any).trackingNotice) && (
+                <div style={{
+                  background: 'rgba(59, 130, 246, 0.1)',
+                  border: '1px solid rgba(59, 130, 246, 0.25)',
+                  borderRadius: '8px',
+                  padding: '8px 10px',
+                  fontSize: '11px',
+                  color: '#93c5fd',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  marginBottom: '10px'
+                }}>
+                  <span>🕒</span>
+                  <span><strong>Schedule Estimate:</strong> This bus is running on standard UP timetable. Turn on &quot;Are you inside this bus?&quot; below if travelling onboard to broadcast real-time GPS.</span>
+                </div>
+              )}
+
               {/* Action Buttons */}
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button
@@ -1659,12 +1677,17 @@ export default function Home() {
                                   </button>
                                 </div>
                                 <div style={{ fontSize: '11px', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '4px', paddingLeft: '4px' }}>
-                                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981' }}></span>
-                                  <span>Bus Status: <strong style={{ color: '#f1f5f9' }}>{trip.currentNextStop && trip.currentNextStop !== 'En-route' ? (trip.currentNextStop.startsWith('Near ') || trip.currentNextStop.startsWith('At ') ? trip.currentNextStop : `Near ${trip.currentNextStop}`) : (trip.stops && trip.stops.length > 0 ? `At ${trip.stops[0].name}` : 'En-route')}</strong></span>
+                                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: (trip as any).isEstimated ? '#f59e0b' : '#10b981' }}></span>
+                                  <span>Bus Status: <strong style={{ color: '#f1f5f9' }}>{(trip as any).isEstimated ? 'Scheduled Departure' : (trip.currentNextStop && trip.currentNextStop !== 'En-route' ? (trip.currentNextStop.startsWith('Near ') || trip.currentNextStop.startsWith('At ') ? trip.currentNextStop : `Near ${trip.currentNextStop}`) : (trip.stops && trip.stops.length > 0 ? `At ${trip.stops[0].name}` : 'En-route'))}</strong></span>
                                   {trip.etaToBoardingMinutes !== undefined && (
                                     <span style={{ color: '#38bdf8', marginLeft: '6px' }}>• ~{trip.etaToBoardingMinutes}m to your stop</span>
                                   )}
                                 </div>
+                                {(trip as any).isEstimated && (
+                                  <div style={{ fontSize: '10px', color: '#fbbf24', paddingLeft: '4px', marginTop: '2px' }}>
+                                    ⚡ Timetable estimated departure (live GPS syncs on bus motion)
+                                  </div>
+                                )}
                               </div>
                             ))}
                           </>

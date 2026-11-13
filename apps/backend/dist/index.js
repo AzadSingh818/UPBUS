@@ -384,7 +384,7 @@ app.get('/api/v1/search/routes', async (req, res) => {
                 nextTrips.push({
                     tripId,
                     busRegNo,
-                    busType: 'UPSRTC Ordinary',
+                    busType: 'UPSRTC Ordinary (Scheduled)',
                     routeCode: leg.routeCode,
                     routeName: leg.routeName,
                     busLatitude: Number(firstStop.latitude),
@@ -392,7 +392,9 @@ app.get('/api/v1/search/routes', async (req, res) => {
                     currentSpeedKmph: 45,
                     heading: 90,
                     lastSeen: new Date().toISOString(),
-                    status: 'running',
+                    status: 'scheduled',
+                    isEstimated: true,
+                    notice: 'Timetable schedule estimation. Exact GPS activates when bus departs or onboard passenger shares location.',
                     stops: leg.stops.map(s => ({
                         stopId: s.stopId,
                         name: s.name,
@@ -561,7 +563,8 @@ app.get('/api/v1/journey', async (req, res) => {
                         latitude: firstStop.latitude,
                         longitude: firstStop.longitude,
                         speed: 45,
-                        heading: 90
+                        heading: 90,
+                        isEstimated: true
                     };
                 }
                 let actualRouteCode = leg.routeCode;
@@ -582,12 +585,13 @@ app.get('/api/v1/journey', async (req, res) => {
                     busInfo: bestBus ? {
                         trip_id: bestBus.trip_id,
                         registration_no: bestBus.registration_no,
-                        bus_type: 'UPSRTC',
-                        depot_name: 'Live (UPBus AI)',
+                        bus_type: bestBus.isEstimated ? 'UPSRTC (Scheduled)' : 'UPSRTC',
+                        depot_name: bestBus.isEstimated ? 'Timetable Schedule' : 'Live (UPBus AI)',
                         bus_latitude: parseFloat(bestBus.latitude),
                         bus_longitude: parseFloat(bestBus.longitude),
                         current_speed_kmph: parseFloat(bestBus.speed) || 0,
-                        heading: parseFloat(bestBus.heading) || 0
+                        heading: parseFloat(bestBus.heading) || 0,
+                        isEstimated: !!bestBus.isEstimated
                     } : null,
                     stops: leg.stops.map(s => ({
                         stopId: s.stopId,
