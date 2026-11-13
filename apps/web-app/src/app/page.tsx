@@ -1533,14 +1533,29 @@ export default function Home() {
                 </button>
                 <button
                   type="button"
-                  className={`btn ${isSubscribed ? 'btn-danger' : 'btn-primary'}`}
                   onClick={() => {
                     if (filteredStops.length > 0 && !notifyTargetStop) {
                       setNotifyTargetStop(filteredStops[0].name);
                     }
                     setShowNotifyModal(true);
                   }}
-                  style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '12px', padding: '8px 10px' }}
+                  style={{
+                    flex: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    fontSize: '12px',
+                    padding: '8px 10px',
+                    borderRadius: '8px',
+                    border: isSubscribed ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(255, 255, 255, 0.1)',
+                    backgroundColor: isSubscribed ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255, 255, 255, 0.95)',
+                    color: isSubscribed ? '#34d399' : '#000',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    boxShadow: isSubscribed ? '0 0 12px rgba(16, 185, 129, 0.3)' : 'none',
+                    transition: 'all 0.2s ease'
+                  }}
                 >
                   🔔 {isSubscribed ? 'Alerts Active' : 'Notify Me'}
                 </button>
