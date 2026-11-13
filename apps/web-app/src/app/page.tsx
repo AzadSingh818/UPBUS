@@ -1161,6 +1161,35 @@ export default function Home() {
       }
     });
 
+    // Invariant: At most one stop can show arriving_now or on_stop.
+    // Multiple consecutive arriving_now stops must be cleanly separated into passed, current active stop, and upcoming with AI ETA.
+    let activeStopFound = false;
+    for (let k = 0; k < deduplicated.length; k++) {
+      const item = deduplicated[k];
+      if (item.status === 'on_stop' || item.status === 'arriving_now' || item.status === 'arriving_soon') {
+        if (!activeStopFound) {
+          activeStopFound = true;
+          for (let p = 0; p < k; p++) {
+            if (deduplicated[p].status !== 'passed') {
+              deduplicated[p].status = 'passed';
+              deduplicated[p].distanceRemainingKm = 0;
+              deduplicated[p].etaMinutes = 0;
+            }
+          }
+        } else {
+          // If a later stop is erroneously marked arriving_now, convert it to upcoming
+          item.status = 'upcoming';
+          const prevItem = deduplicated[k - 1];
+          const distBetween = calculateDistance(prevItem.latitude, prevItem.longitude, item.latitude, item.longitude);
+          const addDist = distBetween > 0 ? distBetween : 2.5;
+          item.distanceRemainingKm = parseFloat(((prevItem.distanceRemainingKm || 0) + addDist).toFixed(2));
+          item.etaMinutes = Math.max((prevItem.etaMinutes || 0) + 3, Math.round((item.distanceRemainingKm / 35) * 60));
+        }
+      } else if (activeStopFound && item.status === 'passed') {
+        item.status = 'upcoming';
+      }
+    }
+
     filteredStops = deduplicated;
   }
 
@@ -1399,46 +1428,6 @@ export default function Home() {
                 );
               })()}
 
-              {/* Dynamic Turn / Diversion Notice when bus takes a turn away from scheduled corridor */}
-              {(() => {
-                if (!liveDetails.busLatitude || !liveDetails.busLongitude || !liveDetails.stops || liveDetails.stops.length === 0) return null;
-                // Check closest stop distance
-                let minStopDist = Infinity;
-                let closestStopName = '';
-                liveDetails.stops.forEach(s => {
-                  if (s.latitude && s.longitude) {
-                    const d = calculateDistance(liveDetails.busLatitude, liveDetails.busLongitude, s.latitude, s.longitude);
-                    if (d < minStopDist) {
-                      minStopDist = d;
-                      closestStopName = s.name;
-                    }
-                  }
-                });
-
-                if (minStopDist > 4.5) {
-                  return (
-                    <div style={{
-                      background: 'rgba(239, 68, 68, 0.12)',
-                      border: '1px solid rgba(239, 68, 68, 0.35)',
-                      borderRadius: '8px',
-                      padding: '8px 10px',
-                      fontSize: '11px',
-                      color: '#fca5a5',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      marginBottom: '10px'
-                    }}>
-                      <span style={{ fontSize: '14px' }}>↪️</span>
-                      <span>
-                        <strong>Route Diversion Detected:</strong> Bus ne scheduled route se detour/turn liya hai (~{Math.round(minStopDist)} km from scheduled corridor). Real-time GPS location map par live update ho rahi hai.
-                      </span>
-                    </div>
-                  );
-                }
-                return null;
-              })()}
-
               {((liveDetails as any).isEstimated || (liveDetails as any).trackingNotice) && (
                 <div style={{
                   background: 'rgba(59, 130, 246, 0.1)',
@@ -1551,6 +1540,43 @@ export default function Home() {
                   </div>
                 )}
               </div>
+
+              {/* Dynamic Turn / Diversion Notice positioned directly above Live Stops & ETAs */}
+              {(() => {
+                if (!liveDetails.busLatitude || !liveDetails.busLongitude || !liveDetails.stops || liveDetails.stops.length === 0) return null;
+                let minStopDist = Infinity;
+                liveDetails.stops.forEach(s => {
+                  if (s.latitude && s.longitude) {
+                    const d = calculateDistance(liveDetails.busLatitude, liveDetails.busLongitude, s.latitude, s.longitude);
+                    if (d < minStopDist) {
+                      minStopDist = d;
+                    }
+                  }
+                });
+
+                if (minStopDist > 4.5) {
+                  return (
+                    <div style={{
+                      background: 'rgba(239, 68, 68, 0.12)',
+                      border: '1px solid rgba(239, 68, 68, 0.35)',
+                      borderRadius: '8px',
+                      padding: '10px 12px',
+                      fontSize: '12px',
+                      color: '#fca5a5',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      marginBottom: '12px'
+                    }}>
+                      <span style={{ fontSize: '16px' }}>↪️</span>
+                      <span>
+                        <strong>Route Diversion Detected:</strong> Bus ne scheduled route se detour/turn liya hai (~{Math.round(minStopDist)} km from scheduled corridor). Real-time GPS location map par live update ho rahi hai.
+                      </span>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
 
               {/* Live Stops Progress Timeline */}
               <div className="stops-timeline">

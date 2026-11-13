@@ -476,7 +476,8 @@ async function getTripETAs(tripId, regNo, routeCode) {
             if (progressCache) {
                 // Use calculations based on Route Progress Engine cache
                 const stopDistMeters = parseFloat(stop.distance_from_start_km) * 1000;
-                const isStopPassed = i <= progressCache.completed_stop_index;
+                // A stop is passed if its index is <= completed_stop_index OR if the bus has already covered its distance
+                const isStopPassed = i <= progressCache.completed_stop_index || (stopDistMeters > 0 && progressCache.covered_distance >= stopDistMeters + 100);
                 if (isStopPassed) {
                     status = 'passed';
                     distanceRemainingKm = 0;
@@ -596,6 +597,40 @@ async function getTripETAs(tripId, regNo, routeCode) {
                 continue;
             }
             deduplicatedEtas.push(e);
+        }
+        // Invariant: At most ONE stop can have 'arriving_now' or 'on_stop'.
+        // If a stop is marked 'arriving_now' or 'on_stop', any preceding stops MUST be 'passed',
+        // and all subsequent stops MUST be 'upcoming' with positive ETA.
+        let activeStopFound = false;
+        for (let k = 0; k < deduplicatedEtas.length; k++) {
+            const item = deduplicatedEtas[k];
+            if (item.status === 'on_stop' || item.status === 'arriving_now') {
+                if (!activeStopFound) {
+                    activeStopFound = true;
+                    // Preceding stops should have been marked passed
+                    for (let p = 0; p < k; p++) {
+                        if (deduplicatedEtas[p].status !== 'passed') {
+                            deduplicatedEtas[p].status = 'passed';
+                            deduplicatedEtas[p].distanceRemainingKm = 0;
+                            deduplicatedEtas[p].etaMinutes = 0;
+                        }
+                    }
+                }
+                else {
+                    // A second or subsequent stop cannot also be arriving_now or on_stop!
+                    // Mark it upcoming and give it positive distance/ETA relative to previous stop.
+                    item.status = 'upcoming';
+                    const prevItem = deduplicatedEtas[k - 1];
+                    const distBetween = calculateDistance(prevItem.latitude, prevItem.longitude, item.latitude, item.longitude);
+                    const addDist = distBetween > 0 ? distBetween : 2.5;
+                    item.distanceRemainingKm = parseFloat(((prevItem.distanceRemainingKm || 0) + addDist).toFixed(2));
+                    item.etaMinutes = Math.max((prevItem.etaMinutes || 0) + 3, Math.round((item.distanceRemainingKm / speedFloorKmph) * 60));
+                }
+            }
+            else if (activeStopFound && item.status === 'passed') {
+                // Stop after active stop cannot be passed
+                item.status = 'upcoming';
+            }
         }
         // 6. Compute village waypoints using prefix-sum + binary search
         let waypoints = [];
