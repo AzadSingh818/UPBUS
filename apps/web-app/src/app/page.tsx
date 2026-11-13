@@ -532,14 +532,13 @@ export default function Home() {
 
   const [mobileTab, setMobileTab] = useState<'search' | 'map'>('search');
   const [isPassenger, setIsPassenger] = useState(false);
-  const [demoPassenger, setDemoPassenger] = useState(false);
   const [showAdvancedPassengerSettings, setShowAdvancedPassengerSettings] = useState(false);
   const [trackingSource, setTrackingSource] = useState<'gps' | 'network' | 'cell'>('gps');
   const [passengerDistanceNotice, setPassengerDistanceNotice] = useState<string | null>(null);
   const [locationStatus, setLocationStatus] = useState<string | null>(null);
   
   const reportIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const demoStateRef = useRef<{ currentIndex: number; step: number }>({ currentIndex: 0, step: 0 });
+  const watchPositionIdRef = useRef<number | null>(null);
 
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -858,127 +857,143 @@ export default function Home() {
       clearInterval(reportIntervalRef.current);
       reportIntervalRef.current = null;
     }
+    if (watchPositionIdRef.current !== null && typeof navigator !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.clearWatch(watchPositionIdRef.current);
+      watchPositionIdRef.current = null;
+    }
 
-    if (!selectedTrip || !isPassenger) return;
+    if (!selectedTrip || !isPassenger) {
+      setLocationStatus(null);
+      setPassengerDistanceNotice(null);
+      return;
+    }
 
-    demoStateRef.current = { currentIndex: 0, step: 0 };
-    setLocationStatus(demoPassenger ? 'Simulating onboard GPS movement' : 'Requesting GPS location...');
+    if (typeof window === 'undefined' || !navigator.geolocation) {
+      setLocationStatus('Geolocation is not supported by your browser.');
+      return;
+    }
 
-    const reportLocation = () => {
-      if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+    setLocationStatus('Acquiring live satellite / device location...');
 
-      if (demoPassenger) {
-        if (!liveDetails || !liveDetails.stops || liveDetails.stops.length === 0) return;
-        const stops = liveDetails.stops;
-        const state = demoStateRef.current;
+    let lastKnownPos: { lat: number; lng: number; speed: number; heading: number } | null = null;
 
-        if (state.currentIndex >= stops.length - 1) {
-          state.currentIndex = 0;
-          state.step = 0;
+    const handlePosition = (pos: GeolocationPosition) => {
+      let lat = pos.coords.latitude;
+      let lng = pos.coords.longitude;
+      let speed = pos.coords.speed || 0;
+      const heading = pos.coords.heading || 0;
+      const accuracy = Math.round(pos.coords.accuracy || 10);
+
+      setLocationStatus(`Live Location Broadcasting Active (±${accuracy}m)`);
+
+      if (trackingSource === 'cell') {
+        lat += 0.0008 * (Math.random() - 0.5);
+        lng += 0.0008 * (Math.random() - 0.5);
+        speed = 0;
+      }
+
+      lastKnownPos = { lat, lng, speed, heading };
+
+      // Distance checking to route corridor
+      if (liveDetails && liveDetails.stops && liveDetails.stops.length > 0) {
+        let minDist = Infinity;
+        liveDetails.stops.forEach(s => {
+          if (s.latitude && s.longitude) {
+            const d = calculateDistance(lat, lng, s.latitude, s.longitude);
+            if (d < minDist) minDist = d;
+          }
+        });
+        if (minDist > 15) {
+          setPassengerDistanceNotice(`You are ~${Math.round(minDist)} km away from this bus route.`);
+        } else {
+          setPassengerDistanceNotice(null);
         }
+      }
 
-        const currentStop = stops[state.currentIndex];
-        const nextStop = stops[state.currentIndex + 1];
-
-        const fraction = state.step / 10;
-        let lat = currentStop.latitude + (nextStop.latitude - currentStop.latitude) * fraction;
-        let lng = currentStop.longitude + (nextStop.longitude - currentStop.longitude) * fraction;
-
-        if (trackingSource === 'cell' || trackingSource === 'network') {
-          lat += 0.0012 * (Math.random() - 0.5);
-          lng += 0.0012 * (Math.random() - 0.5);
-        }
-
+      // Broadcast immediately
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         wsRef.current.send(JSON.stringify({
           event: 'report_location',
           tripId: selectedTrip.trip_id,
           latitude: lat,
           longitude: lng,
-          speed: trackingSource === 'cell' ? 0 : Math.floor(40 + Math.random() * 20),
-          heading: 90,
+          speed: Math.round(speed * 3.6),
+          heading,
           source: trackingSource
         }));
-
-        state.step += 1;
-        if (state.step > 10) {
-          state.step = 0;
-          state.currentIndex += 1;
-        }
-      } else {
-        if (typeof window === 'undefined' || !navigator.geolocation) {
-          console.warn('Geolocation not supported');
-          return;
-        }
-
-        navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            let lat = pos.coords.latitude;
-            let lng = pos.coords.longitude;
-            let speed = pos.coords.speed || 0;
-            // eslint-disable-next-line prefer-const
-            let heading = pos.coords.heading || 0;
-            setLocationStatus('Live location broadcasting active (accuracy: ±' + Math.round(pos.coords.accuracy || 10) + 'm)');
-
-            if (trackingSource === 'cell' || trackingSource === 'network') {
-              lat += 0.0012 * (Math.random() - 0.5);
-              lng += 0.0012 * (Math.random() - 0.5);
-              speed = 0;
-            }
-
-            // Check distance to route corridor to give smart friendly notice if passenger is away
-            if (liveDetails && liveDetails.stops && liveDetails.stops.length > 0) {
-              let minDist = Infinity;
-              liveDetails.stops.forEach(s => {
-                if (s.latitude && s.longitude) {
-                  const d = calculateDistance(lat, lng, s.latitude, s.longitude);
-                  if (d < minDist) minDist = d;
-                }
-              });
-              if (minDist > 15) {
-                setPassengerDistanceNotice(`You are ~${Math.round(minDist)} km away from this bus route.`);
-              } else {
-                setPassengerDistanceNotice(null);
-              }
-            }
-
-            if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-              wsRef.current.send(JSON.stringify({
-                event: 'report_location',
-                tripId: selectedTrip.trip_id,
-                latitude: lat,
-                longitude: lng,
-                speed: Math.round(speed * 3.6),
-                heading,
-                source: trackingSource
-              }));
-            }
-          },
-          (err) => {
-            console.error('Geolocation error:', err);
-            setTrackingSource('network');
-            if (err.code === 1) {
-              setLocationStatus('Location permission denied. Please allow location access in your browser settings.');
-            } else if (err.code === 2) {
-              setLocationStatus('Location unavailable on device. Retrying...');
-            } else {
-              setLocationStatus('GPS timeout. Retrying with network location...');
-            }
-          },
-          { enableHighAccuracy: trackingSource === 'gps', timeout: 5000, maximumAge: 0 }
-        );
       }
     };
 
-    reportLocation();
-    reportIntervalRef.current = setInterval(reportLocation, 5000);
+    const handleError = (err: GeolocationPositionError) => {
+      console.warn('Geolocation warning/error:', err);
+      if (err.code === 1) {
+        setLocationStatus('Location permission denied. Please allow location access in your browser/device settings.');
+      } else if (err.code === 2) {
+        setLocationStatus('Position unavailable. Retrying with mobile network/Wi-Fi...');
+      } else if (err.code === 3) {
+        setLocationStatus('GPS timeout. Switching to mobile network / Wi-Fi positioning...');
+      }
+    };
+
+    // 1. Initial quick fix with generous timeout
+    navigator.geolocation.getCurrentPosition(
+      handlePosition,
+      (err) => {
+        handleError(err);
+        // Fallback to lower accuracy if highAccuracy timed out
+        navigator.geolocation.getCurrentPosition(handlePosition, handleError, {
+          enableHighAccuracy: false,
+          timeout: 10000,
+          maximumAge: 30000
+        });
+      },
+      {
+        enableHighAccuracy: trackingSource === 'gps',
+        timeout: 8000,
+        maximumAge: 5000
+      }
+    );
+
+    // 2. Continuous real-time watching
+    try {
+      watchPositionIdRef.current = navigator.geolocation.watchPosition(
+        handlePosition,
+        handleError,
+        {
+          enableHighAccuracy: trackingSource === 'gps',
+          timeout: 15000,
+          maximumAge: 5000
+        }
+      );
+    } catch (e) {
+      console.error('watchPosition error:', e);
+    }
+
+    // 3. Periodic heartbeat broadcast every 5s if position is already locked
+    reportIntervalRef.current = setInterval(() => {
+      if (!lastKnownPos || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+      wsRef.current.send(JSON.stringify({
+        event: 'report_location',
+        tripId: selectedTrip.trip_id,
+        latitude: lastKnownPos.lat,
+        longitude: lastKnownPos.lng,
+        speed: Math.round(lastKnownPos.speed * 3.6),
+        heading: lastKnownPos.heading,
+        source: trackingSource
+      }));
+    }, 5000);
 
     return () => {
       if (reportIntervalRef.current) {
         clearInterval(reportIntervalRef.current);
         reportIntervalRef.current = null;
       }
+      if (watchPositionIdRef.current !== null && typeof navigator !== 'undefined' && navigator.geolocation) {
+        navigator.geolocation.clearWatch(watchPositionIdRef.current);
+        watchPositionIdRef.current = null;
+      }
     };
-  }, [selectedTrip, isPassenger, demoPassenger, trackingSource, liveDetails]);
+  }, [selectedTrip, isPassenger, trackingSource, liveDetails]);
 
   useEffect(() => () => {
     if (wsRef.current) wsRef.current.close();
@@ -1365,7 +1380,7 @@ export default function Home() {
                       <div className="location-sharing-indicator" style={{ margin: 0 }}>
                         <span className="sharing-dot pulse-green"></span>
                         <span style={{ fontSize: '12px', fontWeight: 600, color: '#10b981' }}>
-                          {demoPassenger ? 'Simulating onboard GPS movement' : (locationStatus || 'Broadcasting Live Location')}
+                          {locationStatus || 'Broadcasting Live Location'}
                         </span>
                       </div>
                       <button
@@ -1377,7 +1392,7 @@ export default function Home() {
                       </button>
                     </div>
 
-                    {passengerDistanceNotice && !demoPassenger && (
+                    {passengerDistanceNotice && (
                       <div style={{ marginTop: '8px', padding: '6px 10px', background: 'rgba(245, 158, 11, 0.15)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '6px', fontSize: '11px', color: '#fbbf24' }}>
                         ⚠️ {passengerDistanceNotice} Sharing location only improves tracking when travelling onboard.
                       </div>
@@ -1386,42 +1401,30 @@ export default function Home() {
                     {showAdvancedPassengerSettings && (
                       <div style={{ marginTop: '10px', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '10px' }}>
                         <div className="settings-section">
-                          <div className="settings-label" style={{ fontSize: '11px', color: '#94a3b8' }}>Tracking Mode:</div>
+                          <div className="settings-label" style={{ fontSize: '11px', color: '#94a3b8' }}>Tracking Sensor Mode:</div>
                           <div className="tracking-options" style={{ marginTop: '4px' }}>
                             <button
                               type="button"
                               className={`track-option-btn ${trackingSource === 'gps' ? 'active' : ''}`}
                               onClick={() => setTrackingSource('gps')}
                             >
-                              ⚡ GPS
+                              ⚡ Real GPS
                             </button>
                             <button
                               type="button"
                               className={`track-option-btn ${trackingSource === 'network' ? 'active' : ''}`}
                               onClick={() => setTrackingSource('network')}
                             >
-                              📶 Network
+                              📶 Network / Wi-Fi
                             </button>
                             <button
                               type="button"
                               className={`track-option-btn ${trackingSource === 'cell' ? 'active' : ''}`}
                               onClick={() => setTrackingSource('cell')}
                             >
-                              🗼 Cell
+                              🗼 Cellular Tower
                             </button>
                           </div>
-                        </div>
-
-                        <div className="demo-checkbox-row" style={{ marginTop: '8px' }}>
-                          <input
-                            type="checkbox"
-                            id="demo-mode-checkbox"
-                            checked={demoPassenger}
-                            onChange={e => setDemoPassenger(e.target.checked)}
-                          />
-                          <label htmlFor="demo-mode-checkbox" className="demo-label" style={{ fontSize: '11px' }}>
-                            Demo Passenger Mode (Simulate movement)
-                          </label>
                         </div>
                       </div>
                     )}
