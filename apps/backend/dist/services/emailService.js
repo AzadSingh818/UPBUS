@@ -5,24 +5,29 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.sendPassengerReportEmail = sendPassengerReportEmail;
 const nodemailer_1 = __importDefault(require("nodemailer"));
+const dotenv_1 = __importDefault(require("dotenv"));
+const path_1 = __importDefault(require("path"));
+// Load .env
+dotenv_1.default.config();
+dotenv_1.default.config({ path: path_1.default.resolve(__dirname, '../../.env') });
 const ADMIN_EMAIL = 'exnavodayanfoundationcoe@gmail.com';
-// Configure transporter
-// If SMTP credentials exist in env, use them; otherwise use direct send / fallback
-const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
-const smtpPort = parseInt(process.env.SMTP_PORT || '587', 10);
-const smtpUser = process.env.SMTP_USER || process.env.EMAIL_USER || '';
-const smtpPass = process.env.SMTP_PASS || process.env.EMAIL_PASS || '';
-let transporter = null;
-if (smtpUser && smtpPass) {
-    transporter = nodemailer_1.default.createTransport({
-        host: smtpHost,
-        port: smtpPort,
-        secure: smtpPort === 465,
-        auth: {
-            user: smtpUser,
-            pass: smtpPass
-        }
-    });
+function getTransporter() {
+    const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
+    const smtpPort = parseInt(process.env.SMTP_PORT || '465', 10);
+    const smtpUser = process.env.SMTP_USER || process.env.EMAIL_USER || 'exnavodayanfoundationcoe@gmail.com';
+    const smtpPass = (process.env.SMTP_PASS || process.env.EMAIL_PASS || 'gogveceglbrjkqfo').replace(/\s+/g, '');
+    if (smtpUser && smtpPass) {
+        return nodemailer_1.default.createTransport({
+            host: smtpHost,
+            port: smtpPort,
+            secure: smtpPort === 465,
+            auth: {
+                user: smtpUser,
+                pass: smtpPass
+            }
+        });
+    }
+    return null;
 }
 async function sendPassengerReportEmail(data) {
     const mapLink = data.latitude && data.longitude
@@ -79,10 +84,12 @@ async function sendPassengerReportEmail(data) {
       </div>
     </div>
   `;
+    const transporter = getTransporter();
+    const fromUser = process.env.SMTP_USER || process.env.EMAIL_USER || 'exnavodayanfoundationcoe@gmail.com';
     if (transporter) {
         try {
             await transporter.sendMail({
-                from: `"UP Bus Alert" <${smtpUser}>`,
+                from: `"UP Bus Alert System" <${fromUser}>`,
                 to: ADMIN_EMAIL,
                 subject: `⚠️ [UP BUS REPORT] ${data.reportType} - Bus ${data.busRegNo}`,
                 html: htmlContent
