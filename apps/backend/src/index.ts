@@ -738,25 +738,46 @@ app.get('/api/v1/search/bus/:regNo', async (req, res) => {
 // 6. Save a passenger report
 app.post('/api/v1/reports', async (req, res) => {
   try {
-    const { tripId, busRegNo, reportType, description, latitude, longitude } = req.body;
+    const { tripId, busRegNo, routeName, reportType, description, passengerContact, latitude, longitude } = req.body;
     if (!busRegNo || !reportType) {
       return res.status(400).json({ error: 'busRegNo and reportType are required.' });
     }
 
-    await query(
+    const reportRes = await query(
       `INSERT INTO passenger_reports (trip_id, bus_reg_no, report_type, description, latitude, longitude)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id, created_at`,
       [
         tripId ? parseInt(tripId, 10) : null,
         busRegNo,
         reportType,
-        description || null,
+        description ? (passengerContact ? `${description} [Contact: ${passengerContact}]` : description) : (passengerContact ? `[Contact: ${passengerContact}]` : null),
         latitude ? parseFloat(latitude) : null,
         longitude ? parseFloat(longitude) : null
       ]
     );
 
-    res.status(201).json({ success: true, message: 'Report submitted successfully.' });
+    const createdReport = reportRes.rows?.[0];
+
+    // Trigger instant email dispatch to exnavodayanfoundationcoe@gmail.com
+    try {
+      const { sendPassengerReportEmail } = require('./services/emailService');
+      sendPassengerReportEmail({
+        reportId: createdReport?.id,
+        busRegNo,
+        routeName,
+        reportType,
+        description,
+        passengerContact,
+        latitude: latitude ? parseFloat(latitude) : null,
+        longitude: longitude ? parseFloat(longitude) : null,
+        timestamp: createdReport?.created_at || new Date()
+      }).catch((e: any) => console.error('[Report Email Error]:', e.message));
+    } catch (err: any) {
+      console.warn('Could not load emailService:', err.message);
+    }
+
+    res.status(201).json({ success: true, message: 'Report submitted successfully.', reportId: createdReport?.id });
   } catch (error: any) {
     console.error('Error saving passenger report:', error);
     res.status(500).json({ error: 'Internal Server Error' });

@@ -577,9 +577,20 @@ export default function Home() {
   const [passengerReports, setPassengerReports] = useState<any[]>([]);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
+  const [showNotifyModal, setShowNotifyModal] = useState(false);
+  const [notifyTargetStop, setNotifyTargetStop] = useState('');
+  const [notifyTiming, setNotifyTiming] = useState('10min'); // '10min' or 'arrived'
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
   const [reportType, setReportType] = useState('Delay');
   const [reportDesc, setReportDesc] = useState('');
+  const [passengerContact, setPassengerContact] = useState('');
   const [submittingReport, setSubmittingReport] = useState(false);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 4000);
+  };
 
   // Mount logic: Service worker registration & active report fetching
   useEffect(() => {
@@ -660,26 +671,58 @@ export default function Home() {
         body: JSON.stringify({
           tripId: selectedTrip.trip_id,
           busRegNo: selectedTrip.registration_no || liveDetails.busRegNo,
+          routeName: liveDetails.routeName || (selectedTrip as any).route_name || '',
           reportType,
           description: reportDesc,
+          passengerContact,
           latitude: lat,
           longitude: lng
         })
       });
 
       if (response.ok) {
-        alert('Report submitted successfully! Thank you.');
+        showToast('✅ Report submitted! Email alert dispatched to support team.');
         setShowReportModal(false);
         setReportDesc('');
+        setPassengerContact('');
         fetchActiveReports(); // Refresh reports
       } else {
-        alert('Failed to submit report. Please try again.');
+        showToast('⚠️ Failed to submit report. Please try again.');
       }
     } catch (error) {
       console.error('Error submitting report:', error);
-      alert('Error submitting report.');
+      showToast('⚠️ Error submitting report.');
     } finally {
       setSubmittingReport(false);
+    }
+  };
+
+  const handleNotificationSave = async () => {
+    try {
+      const swHelper = await import('./utils/swHelper');
+      const sub = await swHelper.subscribeToNotifications(API_BASE);
+      if (sub) {
+        setIsSubscribed(true);
+        setShowNotifyModal(false);
+        showToast(`🔔 Alert set! You will be notified when bus approaches ${notifyTargetStop || 'your stop'}.`);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Notification setup failed.';
+      showToast(`⚠️ ${message}`);
+    }
+  };
+
+  const handleNotificationDisable = async () => {
+    try {
+      const swHelper = await import('./utils/swHelper');
+      const success = await swHelper.unsubscribeFromNotifications(API_BASE);
+      if (success) {
+        setIsSubscribed(false);
+        setShowNotifyModal(false);
+        showToast('🔕 Arrival notifications disabled.');
+      }
+    } catch (error) {
+      showToast('⚠️ Could not disable notifications.');
     }
   };
 
@@ -1476,10 +1519,15 @@ export default function Home() {
                 <button
                   type="button"
                   className={`btn ${isSubscribed ? 'btn-danger' : 'btn-primary'}`}
-                  onClick={handleNotificationToggle}
+                  onClick={() => {
+                    if (filteredStops.length > 0 && !notifyTargetStop) {
+                      setNotifyTargetStop(filteredStops[0].name);
+                    }
+                    setShowNotifyModal(true);
+                  }}
                   style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '12px', padding: '8px 10px' }}
                 >
-                  🔔 {isSubscribed ? 'Disable' : 'Notify Me'}
+                  🔔 {isSubscribed ? 'Alerts Active' : 'Notify Me'}
                 </button>
               </div>
 
@@ -2054,8 +2102,8 @@ export default function Home() {
                   <option value="Other">Other Delay / Issue</option>
                 </select>
               </div>
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', color: '#9ca3af' }}>Description (optional)</label>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', color: '#9ca3af' }}>Description / Passenger Note</label>
                 <textarea
                   rows={3}
                   placeholder="E.g., Bus is stuck in traffic near the highway bridge."
@@ -2067,6 +2115,23 @@ export default function Home() {
                     color: 'white', outline: 'none', resize: 'none'
                   }}
                 />
+              </div>
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', color: '#9ca3af' }}>Your Email or Phone (Optional)</label>
+                <input
+                  type="text"
+                  placeholder="Enter email or mobile number"
+                  value={passengerContact}
+                  onChange={e => setPassengerContact(e.target.value)}
+                  style={{
+                    width: '100%', padding: '10px', borderRadius: '6px',
+                    backgroundColor: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)',
+                    color: 'white', outline: 'none'
+                  }}
+                />
+                <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
+                  Alert will be forwarded to support team (exnavodayanfoundationcoe@gmail.com).
+                </div>
               </div>
               <div style={{ display: 'flex', gap: '12px' }}>
                 <button
@@ -2088,6 +2153,168 @@ export default function Home() {
               </div>
             </form>
           </div>
+        </div>
+      )}
+
+      {/* Modern Notify Me Modal */}
+      {showNotifyModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 9999, padding: '16px'
+        }}>
+          <div className="glass-panel" style={{ maxWidth: '420px', width: '100%', padding: '24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'white', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                🔔 Bus Arrival Alerts
+              </h3>
+              <button
+                onClick={() => setShowNotifyModal(false)}
+                style={{ background: 'none', border: 'none', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '18px' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <p style={{ fontSize: '12.5px', color: '#94a3b8', margin: '0 0 16px 0', lineHeight: 1.5 }}>
+              Choose your stop to receive instant arrival alerts on your device lock screen when this bus approaches.
+            </p>
+
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', color: '#9ca3af' }}>Select Your Destination / Boarding Stop</label>
+              <select
+                value={notifyTargetStop}
+                onChange={e => setNotifyTargetStop(e.target.value)}
+                style={{
+                  width: '100%', padding: '10px', borderRadius: '6px',
+                  backgroundColor: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)',
+                  color: 'white', outline: 'none'
+                }}
+              >
+                {filteredStops.map(s => (
+                  <option key={s.stopId} value={s.name}>
+                    {s.name} ({s.status === 'passed' ? 'Passed' : (s.etaMinutes > 0 ? `~${s.etaMinutes}m` : 'Approaching')})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', fontSize: '13px', color: '#9ca3af' }}>When should we notify you?</label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => setNotifyTiming('10min')}
+                  style={{
+                    flex: 1,
+                    padding: '9px 10px',
+                    borderRadius: '8px',
+                    border: notifyTiming === '10min' ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.1)',
+                    background: notifyTiming === '10min' ? 'rgba(56, 189, 248, 0.15)' : 'rgba(0,0,0,0.2)',
+                    color: notifyTiming === '10min' ? 'var(--accent)' : '#9ca3af',
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                    fontWeight: 600
+                  }}
+                >
+                  ⚡ ~10 Mins Before
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setNotifyTiming('arrived')}
+                  style={{
+                    flex: 1,
+                    padding: '9px 10px',
+                    borderRadius: '8px',
+                    border: notifyTiming === 'arrived' ? '1px solid #10b981' : '1px solid rgba(255,255,255,0.1)',
+                    background: notifyTiming === 'arrived' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(0,0,0,0.2)',
+                    color: notifyTiming === 'arrived' ? '#10b981' : '#9ca3af',
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                    fontWeight: 600
+                  }}
+                >
+                  📍 At The Stop
+                </button>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px' }}>
+              {isSubscribed ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={handleNotificationDisable}
+                    style={{
+                      flex: 1,
+                      padding: '10px',
+                      borderRadius: '8px',
+                      border: '1px solid #ef4444',
+                      background: 'rgba(239, 68, 68, 0.15)',
+                      color: '#f87171',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      fontSize: '13px'
+                    }}
+                  >
+                    Turn Off Alerts
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={handleNotificationSave}
+                    style={{ flex: 1 }}
+                  >
+                    Update Stop
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => setShowNotifyModal(false)}
+                    style={{ flex: 1 }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={handleNotificationSave}
+                    style={{ flex: 1 }}
+                  >
+                    Enable Alerts
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Animated Toast Message */}
+      {toastMessage && (
+        <div style={{
+          position: 'fixed',
+          bottom: '24px',
+          right: '24px',
+          backgroundColor: '#1e293b',
+          color: '#f8fafc',
+          padding: '12px 18px',
+          borderRadius: '10px',
+          boxShadow: '0 10px 25px -5px rgba(0,0,0,0.5)',
+          border: '1px solid #3b82f6',
+          fontSize: '13px',
+          fontWeight: 600,
+          zIndex: 10000,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          animation: 'fadeIn 0.3s ease'
+        }}>
+          {toastMessage}
         </div>
       )}
     </main>
