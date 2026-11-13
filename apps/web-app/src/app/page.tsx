@@ -1362,29 +1362,42 @@ export default function Home() {
               </div>
 
               {/* Speed + Status */}
-              <div className="tracking-stats">
-                <div className="stat-pill">
-                  <Navigation size={13} />
-                  <span>{liveDetails.currentSpeedKmph} km/h</span>
-                </div>
-                <div className="stat-pill">
-                  <div className={`status-dot ${liveDetails.status === 'running' ? 'running' : 'halted'}`} />
-                  <span>{liveDetails.status}</span>
-                </div>
-                <div className="stat-pill">
-                  <Clock size={13} />
-                  <span>{new Date(liveDetails.lastSeen).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</span>
-                </div>
-                {(liveDetails as any).trackingMethod && (
-                  <div className="stat-pill tracking-source-badge">
-                    <Zap size={12} />
-                    <span>
-                      {(liveDetails as any).trackingMethod === 'gps' ? 'Crowd GPS' : 
-                       (liveDetails as any).trackingMethod === 'network' ? 'Network' : 'Cell Tower'}
-                    </span>
+              {(() => {
+                const isBusStoppedAtPlatform = filteredStops.some(s => s.status === 'on_stop');
+                const isSpeedZero = Number(liveDetails.currentSpeedKmph || 0) === 0;
+                const displayStatus = isBusStoppedAtPlatform 
+                  ? 'on stop' 
+                  : (isSpeedZero ? 'halted' : (liveDetails.status === 'running' ? 'running' : liveDetails.status));
+                const statusDotClass = isBusStoppedAtPlatform 
+                  ? 'on-stop' 
+                  : (displayStatus === 'running' ? 'running' : 'halted');
+
+                return (
+                  <div className="tracking-stats">
+                    <div className="stat-pill">
+                      <Navigation size={13} />
+                      <span>{Number(liveDetails.currentSpeedKmph || 0)} km/h</span>
+                    </div>
+                    <div className="stat-pill">
+                      <div className={`status-dot ${statusDotClass}`} />
+                      <span style={{ textTransform: 'capitalize' }}>{displayStatus}</span>
+                    </div>
+                    <div className="stat-pill">
+                      <Clock size={13} />
+                      <span>{new Date(liveDetails.lastSeen).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
+                    {(liveDetails as any).trackingMethod && (
+                      <div className="stat-pill tracking-source-badge">
+                        <Zap size={12} />
+                        <span>
+                          {(liveDetails as any).trackingMethod === 'gps' ? 'Crowd GPS' : 
+                           (liveDetails as any).trackingMethod === 'network' ? 'Network' : 'Cell Tower'}
+                        </span>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
+                );
+              })()}
 
               {/* Dynamic Turn / Diversion Notice when bus takes a turn away from scheduled corridor */}
               {(() => {
