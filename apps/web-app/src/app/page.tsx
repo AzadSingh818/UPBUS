@@ -234,7 +234,7 @@ function JourneyTimeline({ journey, onTrackBus }: { journey: Journey; onTrackBus
         <div className="journey-meta">
           <span className="journey-meta-item">🚌 {journey.totalLegs} bus{journey.totalLegs > 1 ? ' changes' : ''}</span>
           <span className="journey-meta-sep">•</span>
-          <span className="journey-meta-item">📍 ~{journey.totalDistanceKm} km</span>
+          <span className="journey-meta-item">📍 ~{Number(journey.totalDistanceKm).toFixed(1)} km</span>
           <span className="journey-meta-sep">•</span>
           <span className="journey-meta-item">⏱ ~{fmtDuration(journey.totalDurationMins)}</span>
         </div>
@@ -312,7 +312,7 @@ function JourneyTimeline({ journey, onTrackBus }: { journey: Journey; onTrackBus
                   <div className="connector-stats">
                     <span>{fmtDuration(leg.durationMins)}</span>
                     <span className="connector-dot">•</span>
-                    <span>{leg.distanceKm} km</span>
+                    <span>{Number(leg.distanceKm).toFixed(1)} km</span>
                   </div>
                   {leg.busInfo && (
                     <button
@@ -401,7 +401,7 @@ function JourneyTimeline({ journey, onTrackBus }: { journey: Journey; onTrackBus
         </div>
         <div className="journey-footer-item">
           <MapPin size={14} />
-          <span>Total Distance: ~{journey.totalDistanceKm} km</span>
+          <span>Total Distance: ~{Number(journey.totalDistanceKm).toFixed(1)} km</span>
         </div>
       </div>
     </div>
@@ -1667,7 +1667,7 @@ export default function Home() {
                             <div className="option-meta">
                               <span>⏱ ~{fmtDuration(j.totalDurationMins)}</span>
                               <span className="dot">•</span>
-                              <span>📍 {j.totalDistanceKm} km</span>
+                              <span>📍 {Number(j.totalDistanceKm).toFixed(1)} km</span>
                             </div>
                           </div>
                         </div>

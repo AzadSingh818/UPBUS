@@ -461,8 +461,8 @@ function buildJourneyPath(edges: GraphEdge[]): JourneyPath {
 
   return {
     legs,
-    totalDistanceKm,
-    totalEffectiveCost,
+    totalDistanceKm: parseFloat(totalDistanceKm.toFixed(1)),
+    totalEffectiveCost: parseFloat(totalEffectiveCost.toFixed(2)),
     totalTransfers: legs.length - 1
   };
 }
@@ -534,7 +534,7 @@ function createLeg(edges: GraphEdge[]): PathLeg {
     fromStopName,
     toStopId,
     toStopName,
-    distanceKm,
+    distanceKm: parseFloat(distanceKm.toFixed(1)),
     stops: legStops
   };
 }

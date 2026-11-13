@@ -607,8 +607,8 @@ app.get('/api/v1/journey', async (req, res) => {
                         etaMinutes: cumulativeMinutes,
                         status: 'upcoming'
                     })),
-                    distanceKm: leg.distanceKm,
-                    durationMins: durationMins,
+                    distanceKm: parseFloat(leg.distanceKm.toFixed(1)),
+                    durationMins: Math.round(durationMins),
                     departureOffsetMins: cumulativeMinutes,
                     arrivalOffsetMins: cumulativeMinutes + durationMins
                 });
@@ -616,14 +616,14 @@ app.get('/api/v1/journey', async (req, res) => {
             }
             journeys.push({
                 legs,
-                totalDistanceKm: path.totalDistanceKm,
-                totalDurationMins: cumulativeMinutes - 15, // subtract last transfer buffer
+                totalDistanceKm: parseFloat(path.totalDistanceKm.toFixed(1)),
+                totalDurationMins: Math.max(1, Math.round(cumulativeMinutes - 15)), // subtract last transfer buffer
                 totalTransfers: path.totalTransfers
             });
         }
         res.json({
             legs: journeys[0].legs,
-            totalDistanceKm: journeys[0].totalDistanceKm,
+            totalDistanceKm: parseFloat(journeys[0].totalDistanceKm.toFixed(1)),
             totalDurationMins: journeys[0].totalDurationMins,
             totalTransfers: journeys[0].totalTransfers,
             journeys
