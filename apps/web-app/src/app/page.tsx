@@ -244,9 +244,26 @@ function JourneyTimeline({ journey, onTrackBus }: { journey: Journey; onTrackBus
       <div className="journey-timeline">
         {journey.legs.map((leg, legIdx) => {
           const isExpanded = expandedLegs.has(legIdx);
-          const departureStop = leg.stops[0];
-          const arrivalStop = leg.stops[leg.stops.length - 1];
-          const midStops = leg.stops.slice(1, -1);
+
+          // Deduplicate consecutive identical/near-identical stops across UP routes
+          const uniqueStops: JourneyStop[] = [];
+          (leg.stops || []).forEach(s => {
+            if (uniqueStops.length === 0) {
+              uniqueStops.push(s);
+              return;
+            }
+            const prev = uniqueStops[uniqueStops.length - 1];
+            const n1 = (prev.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+            const n2 = (s.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+            const isDup = n1 === n2 || (n1.length > 3 && n2.length > 3 && (n1.includes(n2) || n2.includes(n1)));
+            if (!isDup) {
+              uniqueStops.push(s);
+            }
+          });
+
+          const departureStop = uniqueStops[0];
+          const arrivalStop = uniqueStops[uniqueStops.length - 1];
+          const midStops = uniqueStops.slice(1, -1);
 
           return (
             <div key={legIdx} className="journey-leg">
@@ -1094,7 +1111,25 @@ export default function Home() {
     if (sIdx > eIdx) {
       [sIdx, eIdx] = [eIdx, sIdx];
     }
-    filteredStops = liveDetails.stops.slice(sIdx, eIdx + 1);
+    const rawFiltered = liveDetails.stops.slice(sIdx, eIdx + 1);
+
+    // Deduplicate consecutive identical/near-identical stops across UP routes
+    const deduplicated: StopETA[] = [];
+    rawFiltered.forEach(s => {
+      if (deduplicated.length === 0) {
+        deduplicated.push(s);
+        return;
+      }
+      const prev = deduplicated[deduplicated.length - 1];
+      const n1 = (prev.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const n2 = (s.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const isDup = n1 === n2 || (n1.length > 3 && n2.length > 3 && (n1.includes(n2) || n2.includes(n1)));
+      if (!isDup) {
+        deduplicated.push(s);
+      }
+    });
+
+    filteredStops = deduplicated;
   }
 
   return (
