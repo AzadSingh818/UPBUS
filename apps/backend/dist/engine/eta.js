@@ -107,15 +107,29 @@ async function getTripETAs(tripId, regNo, routeCode) {
         let trip = null;
         let live = null;
         let fallbackRouteId = null;
+        // Check active crowd-sourced live updates first (takes precedence over Margdarshi / schedule)
+        const activeCrowd = global.activeCrowdSourcedTrips?.[tripId];
+        if (activeCrowd && Date.now() - activeCrowd.timestamp < 300000) { // 5 minutes
+            live = {
+                latitude: activeCrowd.lat,
+                longitude: activeCrowd.lng,
+                speed: activeCrowd.speed,
+                heading: activeCrowd.heading,
+                last_seen_at: new Date(activeCrowd.timestamp)
+            };
+        }
         if (tripRes.rowCount === 0 || regNo) {
             if (!regNo && tripRes.rowCount === 0)
                 return null;
-            // Fallback: Fetch dynamic data from Margdarshi API
+            // Fallback: Fetch dynamic data from Margdarshi API only if no fresh crowd-sourced live location
             try {
-                const fetch = (await Promise.resolve().then(() => __importStar(require('node-fetch')))).default;
-                const res = await fetch('https://margdarshi.upsrtcvlt.com/php/getGpsLiveData.php', { method: 'POST' });
-                const liveData = JSON.parse(await res.text());
-                const bus = regNo ? liveData.find((b) => (b.RegNo || b.regNum || '').toUpperCase().replace(/\s+/g, '') === regNo.toUpperCase().replace(/\s+/g, '')) : null;
+                let bus = null;
+                if (!live) {
+                    const fetch = (await Promise.resolve().then(() => __importStar(require('node-fetch')))).default;
+                    const res = await fetch('https://margdarshi.upsrtcvlt.com/php/getGpsLiveData.php', { method: 'POST' });
+                    const liveData = JSON.parse(await res.text());
+                    bus = regNo ? liveData.find((b) => (b.RegNo || b.regNum || '').toUpperCase().replace(/\s+/g, '') === regNo.toUpperCase().replace(/\s+/g, '')) : null;
+                }
                 if (bus) {
                     if ((tripRes.rowCount || 0) > 0) {
                         trip = tripRes.rows[0];

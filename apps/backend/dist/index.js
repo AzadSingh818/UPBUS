@@ -821,38 +821,55 @@ wss.on('connection', (ws) => {
                 const tripId = parseInt(data.tripId, 10);
                 const { latitude, longitude, speed, heading, source } = data;
                 console.log(`Received crowd-sourced location for trip ${tripId} via ${source}: (${latitude}, ${longitude})`);
-                // Update database with this coordinates
+                // Find bus_id from trips, or find active subscription / bus_live_state
                 const tripRes = await (0, db_1.query)('SELECT bus_id FROM trips WHERE id = $1', [tripId]);
-                if (tripRes.rows.length > 0) {
-                    const busId = tripRes.rows[0].bus_id;
-                    await (0, db_1.query)(`INSERT INTO bus_live_state (bus_id, trip_id, latitude, longitude, speed, heading, last_seen_at)
-             VALUES ($1, $2, $3, $4, $5, $6, NOW())
-             ON CONFLICT (bus_id) 
-             DO UPDATE SET 
-                trip_id = EXCLUDED.trip_id,
-                latitude = EXCLUDED.latitude,
-                longitude = EXCLUDED.longitude,
-                speed = EXCLUDED.speed,
-                heading = EXCLUDED.heading,
-                last_seen_at = NOW()`, [busId, tripId, latitude, longitude, speed || 0, heading || 0]);
-                    // Record location in the route learning engine
-                    (0, routeLearning_1.recordLiveLocation)(tripId, busId, latitude, longitude, speed || 0).catch(err => {
-                        console.error('[Route Learning] Error recording crowd-sourced location:', err);
-                    });
-                    // Mark this trip as having active crowd-sourced updates to prevent simulator overrides
-                    global.activeCrowdSourcedTrips = global.activeCrowdSourcedTrips || {};
-                    global.activeCrowdSourcedTrips[tripId] = {
-                        timestamp: Date.now(),
-                        method: source
-                    };
-                    // Broadcast update immediately to all clients subscribed to this trip
-                    for (const sub of subscriptions) {
-                        if (sub.tripId === tripId && sub.ws.readyState === ws_1.WebSocket.OPEN) {
-                            const updatedData = await (0, eta_1.getTripETAs)(tripId, sub.regNo, sub.routeCode);
-                            if (updatedData) {
-                                updatedData.trackingMethod = source;
-                                sub.ws.send(JSON.stringify({ event: 'trip_update', data: updatedData }));
-                            }
+                let busId = tripRes.rows.length > 0 ? tripRes.rows[0].bus_id : null;
+                if (!busId) {
+                    // Check if any active subscriber has bus registration
+                    const matchedSub = Array.from(subscriptions).find(s => s.tripId === tripId && s.regNo);
+                    if (matchedSub && matchedSub.regNo) {
+                        const bRes = await (0, db_1.query)('SELECT id FROM buses WHERE registration_no = $1', [matchedSub.regNo]);
+                        if (bRes.rows.length > 0) {
+                            busId = bRes.rows[0].id;
+                        }
+                    }
+                }
+                if (!busId) {
+                    // Fallback to synthetic bus ID derived from tripId
+                    busId = (tripId % 90000) + 1;
+                }
+                // Update database with coordinates
+                await (0, db_1.query)(`INSERT INTO bus_live_state (bus_id, trip_id, latitude, longitude, speed, heading, last_seen_at)
+           VALUES ($1, $2, $3, $4, $5, $6, NOW())
+           ON CONFLICT (bus_id) 
+           DO UPDATE SET 
+              trip_id = EXCLUDED.trip_id,
+              latitude = EXCLUDED.latitude,
+              longitude = EXCLUDED.longitude,
+              speed = EXCLUDED.speed,
+              heading = EXCLUDED.heading,
+              last_seen_at = NOW()`, [busId, tripId, latitude, longitude, speed || 0, heading || 0]);
+                // Record location in the route learning engine
+                (0, routeLearning_1.recordLiveLocation)(tripId, busId, latitude, longitude, speed || 0).catch(err => {
+                    console.error('[Route Learning] Error recording crowd-sourced location:', err);
+                });
+                // Mark this trip as having active crowd-sourced updates to prevent simulator overrides
+                global.activeCrowdSourcedTrips = global.activeCrowdSourcedTrips || {};
+                global.activeCrowdSourcedTrips[tripId] = {
+                    timestamp: Date.now(),
+                    method: source,
+                    lat: latitude,
+                    lng: longitude,
+                    speed: speed || 0,
+                    heading: heading || 0
+                };
+                // Broadcast update immediately to all clients subscribed to this trip
+                for (const sub of subscriptions) {
+                    if (sub.tripId === tripId && sub.ws.readyState === ws_1.WebSocket.OPEN) {
+                        const updatedData = await (0, eta_1.getTripETAs)(tripId, sub.regNo, sub.routeCode);
+                        if (updatedData) {
+                            updatedData.trackingMethod = source;
+                            sub.ws.send(JSON.stringify({ event: 'trip_update', data: updatedData }));
                         }
                     }
                 }

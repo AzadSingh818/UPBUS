@@ -536,6 +536,7 @@ export default function Home() {
   const [showAdvancedPassengerSettings, setShowAdvancedPassengerSettings] = useState(false);
   const [trackingSource, setTrackingSource] = useState<'gps' | 'network' | 'cell'>('gps');
   const [passengerDistanceNotice, setPassengerDistanceNotice] = useState<string | null>(null);
+  const [locationStatus, setLocationStatus] = useState<string | null>(null);
   
   const reportIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const demoStateRef = useRef<{ currentIndex: number; step: number }>({ currentIndex: 0, step: 0 });
@@ -851,33 +852,6 @@ export default function Home() {
   const displayJourneys = getDeduplicatedJourneys(journeys, from, to);
   const journey = displayJourneys[selectedJourneyIdx] || null;
 
-  // Auto-track bus when selecting a route in Bus Mode
-  useEffect(() => {
-    if (viewMode === 'bus' && displayRoutes.length > 0 && displayRoutes[selectedRouteIdx]) {
-      const r = displayRoutes[selectedRouteIdx].route;
-      
-      const trip = r.nextTrips?.[0] || r.missedTrips?.[0];
-      if (trip && !isPassenger) {
-        handleTrackBus(trip.tripId, trip.busRegNo, trip.routeCode);
-      } else {
-        stopTracking();
-      }
-    }
-  }, [selectedRouteIdx, displayRoutes, viewMode, isPassenger]);
-
-  // Auto-track bus when selecting a journey option
-  useEffect(() => {
-    if (viewMode === 'journey' && displayJourneys.length > 0 && displayJourneys[selectedJourneyIdx]) {
-      const journey = displayJourneys[selectedJourneyIdx];
-      const firstLeg = journey.legs[0];
-      if (firstLeg && firstLeg.busInfo && !isPassenger) {
-        handleTrackBus(firstLeg.busInfo.trip_id, firstLeg.busInfo.registration_no, firstLeg.routeCode);
-      } else {
-        stopTracking();
-      }
-    }
-  }, [selectedJourneyIdx, displayJourneys, viewMode, isPassenger]);
-
   // ── Crowd-sourced location reporting effect ──────────────────────────────
   useEffect(() => {
     if (reportIntervalRef.current) {
@@ -888,6 +862,7 @@ export default function Home() {
     if (!selectedTrip || !isPassenger) return;
 
     demoStateRef.current = { currentIndex: 0, step: 0 };
+    setLocationStatus(demoPassenger ? 'Simulating onboard GPS movement' : 'Requesting GPS location...');
 
     const reportLocation = () => {
       if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
@@ -942,6 +917,7 @@ export default function Home() {
             let speed = pos.coords.speed || 0;
             // eslint-disable-next-line prefer-const
             let heading = pos.coords.heading || 0;
+            setLocationStatus('Live location broadcasting active (accuracy: ±' + Math.round(pos.coords.accuracy || 10) + 'm)');
 
             if (trackingSource === 'cell' || trackingSource === 'network') {
               lat += 0.0012 * (Math.random() - 0.5);
@@ -980,6 +956,13 @@ export default function Home() {
           (err) => {
             console.error('Geolocation error:', err);
             setTrackingSource('network');
+            if (err.code === 1) {
+              setLocationStatus('Location permission denied. Please allow location access in your browser settings.');
+            } else if (err.code === 2) {
+              setLocationStatus('Location unavailable on device. Retrying...');
+            } else {
+              setLocationStatus('GPS timeout. Retrying with network location...');
+            }
           },
           { enableHighAccuracy: trackingSource === 'gps', timeout: 5000, maximumAge: 0 }
         );
@@ -1364,7 +1347,7 @@ export default function Home() {
                       <div className="location-sharing-indicator" style={{ margin: 0 }}>
                         <span className="sharing-dot pulse-green"></span>
                         <span style={{ fontSize: '12px', fontWeight: 600, color: '#10b981' }}>
-                          {demoPassenger ? 'Simulating onboard GPS movement' : 'Broadcasting Live Location'}
+                          {demoPassenger ? 'Simulating onboard GPS movement' : (locationStatus || 'Broadcasting Live Location')}
                         </span>
                       </div>
                       <button
